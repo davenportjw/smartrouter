@@ -1,0 +1,30 @@
+# Local Configuration and Secrets
+.env
+.env.bak
+*.local
+
+# Go compiler / testing artifacts
+bin/
+*.out
+*.test
+*.prof
+dist/
+
+# Terraform artifacts
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfstate.lock.info
+*.tfvars
+*.tfvars.json
+.terraform.tfstate.lock.info
+
+# Temporary scratch space
+scratch/
+
+# OS Metadata
+.DS_Store
+
+# IDE settings
+.idea/
+.vscode/
