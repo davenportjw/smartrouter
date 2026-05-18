@@ -1,0 +1,229 @@
+package templates
+
+// FirebaseConfig holds client-side configuration required to initialize Firebase Auth SDK.
+type FirebaseConfig struct {
+	APIKey            string `json:"apiKey"`
+	AuthDomain        string `json:"authDomain"`
+	ProjectID         string `json:"projectId"`
+	StorageBucket     string `json:"storageBucket"`
+	MessagingSenderID string `json:"messagingSenderId"`
+	AppID             string `json:"appId"`
+	IsLocalDev        bool   `json:"isLocalDev"`
+}
+
+templ Login(config FirebaseConfig) {
+	<!DOCTYPE html>
+	<html lang="en" class="h-full bg-gray-50">
+		<head>
+			<meta charset="UTF-8" />
+			<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+			<title>Sign In - Gemini Smart Router</title>
+			<script src="https://cdn.tailwindcss.com"></script>
+			<link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+			<!-- Firebase JS SDK v9+ (using compat for simple CDN injection) -->
+			<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+			<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+			<style>
+				body {
+					font-family: 'Google Sans', sans-serif;
+				}
+			</style>
+		</head>
+		<body class="h-full flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-gray-50">
+			<div class="sm:mx-auto sm:w-full sm:max-w-md">
+				<!-- Stylized Logo -->
+				<div class="flex justify-center text-3xl font-extrabold tracking-tight">
+					<span class="text-blue-600">G</span>
+					<span class="text-red-500">e</span>
+					<span class="text-yellow-500">m</span>
+					<span class="text-blue-600">i</span>
+					<span class="text-green-500">n</span>
+					<span class="text-red-500">i</span>
+					<span class="text-gray-700 ml-2">Smart Router</span>
+				</div>
+				<h2 class="mt-6 text-center text-sm font-medium text-gray-500">
+					Administrative Console
+				</h2>
+			</div>
+
+			<div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+				<div class="bg-white py-8 px-4 shadow-md sm:rounded-lg sm:px-10 border border-gray-200">
+					<div class="space-y-6">
+						<div>
+							<h3 class="text-lg font-medium text-gray-900 text-center">Sign In</h3>
+							<p class="mt-1 text-xs text-gray-500 text-center">
+								Authorized administration access only.
+							</p>
+						</div>
+
+						<!-- Error alert box (hidden by default) -->
+						<div id="error-box" class="hidden rounded-md bg-red-50 p-4">
+							<div class="flex">
+								<div class="flex-shrink-0">
+									<svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+										<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" />
+									</svg>
+								</div>
+								<div class="ml-3">
+									<p id="error-message" class="text-sm font-medium text-red-800"></p>
+								</div>
+							</div>
+						</div>
+
+						<!-- Hidden config element to pass Go config fields to Javascript safely -->
+						<div
+							id="firebase-config"
+							class="hidden"
+							data-api-key={ config.APIKey }
+							data-auth-domain={ config.AuthDomain }
+							data-project-id={ config.ProjectID }
+							data-storage-bucket={ config.StorageBucket }
+							data-messaging-sender-id={ config.MessagingSenderID }
+							data-app-id={ config.AppID }
+						></div>
+
+						<!-- Styled Sign-in with Google Button (matching Google Branding guidelines) -->
+						<button
+							id="login-btn"
+							onclick="signInWithGoogle()"
+							class="w-full flex justify-center items-center gap-3 rounded-md bg-white px-4 py-3 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+						>
+							<!-- Google Icon SVG -->
+							<svg class="h-5 w-5" viewBox="0 0 24 24" width="24px" height="24px">
+								<path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+								<path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+								<path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+								<path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+							</svg>
+							Sign In with Google
+						</button>
+
+						if config.IsLocalDev {
+							<div class="relative flex py-2 items-center">
+								<div class="flex-grow border-t border-gray-300"></div>
+								<span class="flex-shrink mx-4 text-gray-400 text-xs font-semibold uppercase">Or Development</span>
+								<div class="flex-grow border-t border-gray-300"></div>
+							</div>
+
+							<button
+								id="dev-login-btn"
+								onclick="signInAsDeveloper()"
+								class="w-full flex justify-center items-center gap-3 rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:from-blue-500 hover:to-indigo-500 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+							>
+								<svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+								</svg>
+								Bypass Auth (Local Developer)
+							</button>
+						}
+
+						<div id="loading-spinner" class="hidden flex justify-center items-center gap-2 text-sm text-gray-500">
+							<svg class="animate-spin h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24">
+								<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+								<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+							</svg>
+							Authorizing...
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<script>
+				// Read Firebase configuration securely from HTML data attributes
+				const configEl = document.getElementById("firebase-config");
+				const firebaseConfig = {
+					apiKey: configEl.dataset.apiKey,
+					authDomain: configEl.dataset.authDomain,
+					projectId: configEl.dataset.projectId,
+					storageBucket: configEl.dataset.storageBucket,
+					messagingSenderId: configEl.dataset.messagingSenderId,
+					appId: configEl.dataset.appId
+				};
+
+				firebase.initializeApp(firebaseConfig);
+
+				function signInWithGoogle() {
+					document.getElementById("login-btn").classList.add("hidden");
+					if (document.getElementById("dev-login-btn")) {
+						document.getElementById("dev-login-btn").classList.add("hidden");
+					}
+					document.getElementById("loading-spinner").classList.remove("hidden");
+					document.getElementById("error-box").classList.add("hidden");
+
+					const provider = new firebase.auth.GoogleAuthProvider();
+					firebase.auth().signInWithPopup(provider)
+						.then((result) => {
+							// Extract JWT ID token
+							return result.user.getIdToken();
+						})
+						.then((idToken) => {
+							// Post JWT to backend session creator
+							return fetch("/auth/session", {
+								method: "POST",
+								headers: {
+									"Content-Type": "application/x-www-form-urlencoded"
+								},
+								body: new URLSearchParams({ "idToken": idToken })
+							});
+						})
+						.then((response) => {
+							if (!response.ok) {
+								throw new Error("Authentication session generation failed on server.");
+							}
+							return response.json();
+						})
+						.then((data) => {
+							// Successful redirect
+							window.location.href = "/admin/keys";
+						})
+						.catch((error) => {
+							console.error("Google Auth Error:", error);
+							document.getElementById("login-btn").classList.remove("hidden");
+							if (document.getElementById("dev-login-btn")) {
+								document.getElementById("dev-login-btn").classList.remove("hidden");
+							}
+							document.getElementById("loading-spinner").classList.add("hidden");
+							document.getElementById("error-box").classList.remove("hidden");
+							document.getElementById("error-message").innerText = error.message || "Failed to authenticate with Google Identity.";
+						});
+				}
+
+				function signInAsDeveloper() {
+					document.getElementById("login-btn").classList.add("hidden");
+					if (document.getElementById("dev-login-btn")) {
+						document.getElementById("dev-login-btn").classList.add("hidden");
+					}
+					document.getElementById("loading-spinner").classList.remove("hidden");
+					document.getElementById("error-box").classList.add("hidden");
+
+					fetch("/auth/session", {
+						method: "POST",
+						headers: {
+							"Content-Type": "application/x-www-form-urlencoded"
+						},
+						body: new URLSearchParams({ "idToken": "dev-admin-token" })
+					})
+					.then((response) => {
+						if (!response.ok) {
+							throw new Error("Developer authentication session generation failed.");
+						}
+						return response.json();
+					})
+					.then((data) => {
+						window.location.href = "/admin/keys";
+					})
+					.catch((error) => {
+						console.error("Dev Auth Error:", error);
+						document.getElementById("login-btn").classList.remove("hidden");
+						if (document.getElementById("dev-login-btn")) {
+							document.getElementById("dev-login-btn").classList.remove("hidden");
+						}
+						document.getElementById("loading-spinner").classList.add("hidden");
+						document.getElementById("error-box").classList.remove("hidden");
+						document.getElementById("error-message").innerText = error.message || "Failed to bypass auth.";
+					});
+				}
+			</script>
+		</body>
+	</html>
+}

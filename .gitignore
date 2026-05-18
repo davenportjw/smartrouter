@@ -18,9 +18,13 @@ dist/
 *.tfvars
 *.tfvars.json
 .terraform.tfstate.lock.info
+.terraform.lock.hcl
 
 # Temporary scratch space
 scratch/
+
+# Local Database
+data/local_db.json
 
 # OS Metadata
 .DS_Store
