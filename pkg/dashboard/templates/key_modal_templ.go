@@ -8,7 +8,11 @@ package templates
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-func KeyModal() templ.Component {
+import (
+	"geminirouter/pkg/config"
+)
+
+func KeyModal(apps []config.App) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -29,7 +33,56 @@ func KeyModal() templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Modal backdrop --><div id=\"create-key-modal\" class=\"relative z-50\" aria-labelledby=\"modal-title\" role=\"dialog\" aria-modal=\"true\"><div class=\"fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity\"></div><div class=\"fixed inset-0 z-50 w-screen overflow-y-auto\"><div class=\"flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0\"><!-- Modal Panel --><div class=\"relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6 border border-gray-200\"><div class=\"absolute right-0 top-0 hidden pr-4 pt-4 sm:block\"><button type=\"button\" onclick=\"document.getElementById('create-key-modal').remove()\" class=\"rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none\"><span class=\"sr-only\">Close</span> <svg class=\"h-6 w-6\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div><div class=\"sm:flex sm:items-start\"><div class=\"mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full\"><h3 class=\"text-lg font-semibold leading-6 text-gray-900\" id=\"modal-title\">Create Client Profile & API Key</h3><div class=\"mt-2\"><p class=\"text-xs text-gray-500\">Provide parameters to provision an isolated rate limit client and generate an access token.</p></div><!-- Creation Form --><form hx-post=\"/admin/keys/create\" hx-target=\"#new-key-alert\" hx-swap=\"innerHTML\" class=\"mt-6 space-y-4\" onsubmit=\"document.getElementById('create-key-modal').classList.add('hidden'); document.getElementById('new-key-alert').classList.remove('hidden')\"><div><label for=\"client_id\" class=\"block text-xs font-medium text-gray-700\">Client ID Slug (lowercase, no spaces)</label> <input type=\"text\" name=\"client_id\" id=\"client_id\" required placeholder=\"e.g. chat-app-prod\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm\"></div><div><label for=\"client_name\" class=\"block text-xs font-medium text-gray-700\">Client Display Name</label> <input type=\"text\" name=\"client_name\" id=\"client_name\" required placeholder=\"e.g. Customer Chat Support App\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm\"></div><div class=\"grid grid-cols-2 gap-4\"><div><label for=\"tier\" class=\"block text-xs font-medium text-gray-700\">Service Tier</label> <select name=\"tier\" id=\"tier\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm\"><option value=\"free\">Free</option> <option value=\"standard\" selected>Standard</option> <option value=\"premium\">Premium</option></select></div><div><label for=\"priority\" class=\"block text-xs font-medium text-gray-700\">Routing Priority</label> <select name=\"priority\" id=\"priority\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm\"><option value=\"low\">Low (Rejects first)</option> <option value=\"medium\" selected>Medium (Wait queue)</option> <option value=\"high\">High (Bypasses limits)</option></select></div></div><div class=\"grid grid-cols-2 gap-4\"><div><label for=\"rpm\" class=\"block text-xs font-medium text-gray-700\">Requests Per Minute (RPM)</label> <input type=\"number\" name=\"rpm\" id=\"rpm\" required value=\"60\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm\"></div><div><label for=\"tpm\" class=\"block text-xs font-medium text-gray-700\">Tokens Per Minute (TPM)</label> <input type=\"number\" name=\"tpm\" id=\"tpm\" required value=\"40000\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm\"></div></div><div class=\"mt-6 sm:mt-4 sm:flex sm:flex-row-reverse gap-3\"><button type=\"submit\" class=\"inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:w-auto transition\">Generate API Credentials</button> <button type=\"button\" onclick=\"document.getElementById('create-key-modal').remove()\" class=\"mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto transition\">Cancel</button></div></form></div></div></div></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Modal backdrop --><div id=\"create-key-modal\" class=\"relative z-50\" aria-labelledby=\"modal-title\" role=\"dialog\" aria-modal=\"true\"><div class=\"fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity\"></div><div class=\"fixed inset-0 z-50 w-screen overflow-y-auto\"><div class=\"flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0\"><!-- Modal Panel --><div class=\"relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6 border border-gray-200\"><div class=\"absolute right-0 top-0 hidden pr-4 pt-4 sm:block\"><button type=\"button\" onclick=\"document.getElementById('create-key-modal').remove()\" class=\"rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none\"><span class=\"sr-only\">Close</span> <svg class=\"h-6 w-6\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div><div class=\"sm:flex sm:items-start\"><div class=\"mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full\"><h3 class=\"text-lg font-semibold leading-6 text-gray-900\" id=\"modal-title\">Generate API Key Credentials</h3><div class=\"mt-2\"><p class=\"text-xs text-gray-500\">Select a configured Application. The generated API Key will inherit the App's rate capacity and validation rules.</p></div><!-- Creation Form --><form hx-post=\"/admin/keys/create\" hx-target=\"#new-key-alert\" hx-swap=\"innerHTML\" class=\"mt-6 space-y-4\" onsubmit=\"document.getElementById('create-key-modal').classList.add('hidden'); document.getElementById('new-key-alert').classList.remove('hidden')\"><div><label for=\"app_id\" class=\"block text-xs font-medium text-gray-700\">Select Target Application</label> <select name=\"app_id\" id=\"app_id\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		for _, a := range apps {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<option value=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var2 string
+			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.ResolveAttributeValue(a.ID)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/key_modal.templ`, Line: 53, Col: 31}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var3 string
+			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(a.Name)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/key_modal.templ`, Line: 53, Col: 42}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, " (")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var4 string
+			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(a.ID)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/key_modal.templ`, Line: 53, Col: 52}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, ")</option>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</select></div><div class=\"mt-6 sm:mt-4 sm:flex sm:flex-row-reverse gap-3\"><button type=\"submit\" class=\"inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:w-auto transition\">Generate Key</button> <button type=\"button\" onclick=\"document.getElementById('create-key-modal').remove()\" class=\"mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto transition\">Cancel</button></div></form></div></div></div></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -37,7 +90,7 @@ func KeyModal() templ.Component {
 	})
 }
 
-func KeyCreatedAlert(rawKey string, clientName string) templ.Component {
+func KeyCreatedAlert(rawKey string, appName string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -53,38 +106,38 @@ func KeyCreatedAlert(rawKey string, clientName string) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var2 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var2 == nil {
-			templ_7745c5c3_Var2 = templ.NopComponent
+		templ_7745c5c3_Var5 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var5 == nil {
+			templ_7745c5c3_Var5 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"rounded-md bg-green-50 p-4 border border-green-200 mb-6 shadow-sm animate-pulse\"><div class=\"flex\"><div class=\"flex-shrink-0\"><svg class=\"h-5 w-5 text-green-400\" viewBox=\"0 0 20 20\" fill=\"currentColor\" aria-hidden=\"true\"><path fill-rule=\"evenodd\" d=\"M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z\" clip-rule=\"evenodd\"></path></svg></div><div class=\"ml-3\"><h3 class=\"text-sm font-medium text-green-800\">API Key Provisioned Successfully</h3><div class=\"mt-2 text-xs text-green-700 space-y-2\"><p>Below is the raw API Key generated for client <span class=\"font-bold\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<div class=\"rounded-md bg-green-50 p-4 border border-green-200 mb-6 shadow-sm animate-pulse\"><div class=\"flex\"><div class=\"flex-shrink-0\"><svg class=\"h-5 w-5 text-green-400\" viewBox=\"0 0 20 20\" fill=\"currentColor\" aria-hidden=\"true\"><path fill-rule=\"evenodd\" d=\"M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z\" clip-rule=\"evenodd\"></path></svg></div><div class=\"ml-3\"><h3 class=\"text-sm font-medium text-green-800\">API Key Provisioned Successfully</h3><div class=\"mt-2 text-xs text-green-700 space-y-2\"><p>Below is the raw API Key generated for application <span class=\"font-bold\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var3 string
-		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(clientName)
+		var templ_7745c5c3_Var6 string
+		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(appName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/key_modal.templ`, Line: 119, Col: 88}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/key_modal.templ`, Line: 92, Col: 90}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</span>. Please copy this key now. <strong>It will not be displayed again!</strong></p><div class=\"flex items-center gap-3 mt-2 bg-white p-3 rounded border border-green-300 font-mono text-sm font-bold select-all text-gray-800\">")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var4 string
-		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(rawKey)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/key_modal.templ`, Line: 123, Col: 14}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</span>. Please copy this key now. <strong>It will not be displayed again!</strong></p><div class=\"flex items-center gap-3 mt-2 bg-white p-3 rounded border border-green-300 font-mono text-sm font-bold select-all text-gray-800\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</div></div><div class=\"mt-4\"><button type=\"button\" onclick=\"document.getElementById('new-key-alert').classList.add('hidden')\" class=\"rounded-md bg-green-100 px-3 py-2 text-xs font-semibold text-green-900 hover:bg-green-200 transition\">Dismiss</button></div></div></div></div>")
+		var templ_7745c5c3_Var7 string
+		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(rawKey)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/key_modal.templ`, Line: 96, Col: 14}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</div></div><div class=\"mt-4\"><button type=\"button\" onclick=\"document.getElementById('new-key-alert').classList.add('hidden')\" class=\"rounded-md bg-green-100 px-3 py-2 text-xs font-semibold text-green-900 hover:bg-green-200 transition\">Dismiss</button></div></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

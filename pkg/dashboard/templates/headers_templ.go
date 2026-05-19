@@ -413,12 +413,12 @@ func HeadersTab(items []config.CustomHeader) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, ");</code></pre></div></div></div></div></div></div></details><!-- Table of Custom Headers --><div class=\"bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden\"><div class=\"inline-block min-w-full align-middle\"><table class=\"min-w-full divide-y divide-gray-300\"><thead class=\"bg-gray-50\"><tr><th scope=\"col\" class=\"py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6\">Header Name</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Description</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Required</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Validation Type</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Value Pattern</th><th scope=\"col\" class=\"relative py-3.5 pl-3 pr-4 sm:pr-6\"><span class=\"sr-only\">Actions</span></th></tr></thead> <tbody class=\"divide-y divide-gray-200 bg-white\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, ");</code></pre></div></div></div></div></div></div></details><!-- Table of Custom Headers --><div class=\"bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden\"><div class=\"inline-block min-w-full align-middle\"><table class=\"min-w-full divide-y divide-gray-300\"><thead class=\"bg-gray-50\"><tr><th scope=\"col\" class=\"py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6\">Header Name</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Scope</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Description</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Required</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Validation Type</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Value Pattern</th><th scope=\"col\" class=\"relative py-3.5 pl-3 pr-4 sm:pr-6\"><span class=\"sr-only\">Actions</span></th></tr></thead> <tbody class=\"divide-y divide-gray-200 bg-white\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if len(items) == 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<tr><td colspan=\"6\" class=\"text-center py-8 text-sm text-gray-500 italic\">No Custom Headers defined. Define headers to apply request enforcement.</td></tr>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<tr><td colspan=\"7\" class=\"text-center py-8 text-sm text-gray-500 italic\">No Custom Headers defined. Define headers to apply request enforcement.</td></tr>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -431,106 +431,134 @@ func HeadersTab(items []config.CustomHeader) templ.Component {
 				var templ_7745c5c3_Var27 string
 				templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(item.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/headers.templ`, Line: 189, Col: 21}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/headers.templ`, Line: 190, Col: 21}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "</td><td class=\"px-3 py-4 text-sm text-gray-600 max-w-xs truncate\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "</td><td class=\"whitespace-nowrap px-3 py-4 text-sm\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var28 string
-				templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(item.Description)
-				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/headers.templ`, Line: 192, Col: 28}
-				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "</td><td class=\"whitespace-nowrap px-3 py-4 text-sm\">")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				if item.Required {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "<span class=\"inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20\">Yes</span>")
+				if item.AppID == "" || item.AppID == "global" {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "<span class=\"inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20\">Global</span>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				} else {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "<span class=\"inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10\">No (Optional)</span>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "<span class=\"inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10\">")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var28 string
+					templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(item.AppID)
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/headers.templ`, Line: 199, Col: 24}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "</span>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "</td><td class=\"whitespace-nowrap px-3 py-4 text-sm text-gray-900 font-medium\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "</td><td class=\"px-3 py-4 text-sm text-gray-600 max-w-xs truncate\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var29 string
-				templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(item.Validation)
+				templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(item.Description)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/headers.templ`, Line: 206, Col: 27}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/headers.templ`, Line: 204, Col: 28}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "</td><td class=\"px-3 py-4 text-sm text-gray-500 font-mono text-xs truncate max-w-xs\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "</td><td class=\"whitespace-nowrap px-3 py-4 text-sm\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				if item.ValuePattern != "" {
-					var templ_7745c5c3_Var30 string
-					templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(item.ValuePattern)
-					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/headers.templ`, Line: 210, Col: 30}
-					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
+				if item.Required {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "<span class=\"inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20\">Yes</span>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				} else {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "<span class=\"text-gray-400 italic\">N/A</span>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "<span class=\"inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10\">No (Optional)</span>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "</td><td class=\"relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6\"><button hx-delete=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "</td><td class=\"whitespace-nowrap px-3 py-4 text-sm text-gray-900 font-medium\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var31 string
-				templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.ResolveAttributeValue("/admin/headers/delete?id=" + item.ID)
+				var templ_7745c5c3_Var30 string
+				templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(item.Validation)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/headers.templ`, Line: 217, Col: 60}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/headers.templ`, Line: 218, Col: 27}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var31)
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "\" hx-confirm=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "</td><td class=\"px-3 py-4 text-sm text-gray-500 font-mono text-xs truncate max-w-xs\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				if item.ValuePattern != "" {
+					var templ_7745c5c3_Var31 string
+					templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(item.ValuePattern)
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/headers.templ`, Line: 222, Col: 30}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				} else {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "<span class=\"text-gray-400 italic\">N/A</span>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "</td><td class=\"relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6\"><button hx-delete=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var32 string
-				templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.ResolveAttributeValue("Are you sure you want to remove custom header rule " + item.Name + "?")
+				templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.ResolveAttributeValue("/admin/headers/delete?id=" + item.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/headers.templ`, Line: 218, Col: 95}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/headers.templ`, Line: 229, Col: 60}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var32)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "\" hx-target=\"closest tr\" hx-swap=\"outerHTML\" class=\"text-red-600 hover:text-red-900 transition font-semibold\">Delete</button></td></tr>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "\" hx-confirm=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var33 string
+				templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.ResolveAttributeValue("Are you sure you want to remove custom header rule " + item.Name + "?")
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/headers.templ`, Line: 230, Col: 95}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var33)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "\" hx-target=\"closest tr\" hx-swap=\"outerHTML\" class=\"text-red-600 hover:text-red-900 transition font-semibold\">Delete</button></td></tr>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "</tbody></table></div></div><!-- Modal Target Anchor --><div id=\"modal-container\"></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "</tbody></table></div></div><!-- Modal Target Anchor --><div id=\"modal-container\"></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

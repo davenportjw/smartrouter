@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
+	"strings"
 	"sync"
 
 	"cloud.google.com/go/firestore"
@@ -24,18 +26,32 @@ type Client struct {
 	Priority string `firestore:"priority" json:"priority"` // "high", "medium", "low"
 }
 
-// APIKey represents an authorized router API key mapping to a client.
+// App represents an explicit application belonging to a client.
+type App struct {
+	ID       string `firestore:"id" json:"id"`
+	ClientID string `firestore:"client_id" json:"client_id"`
+	Name     string `firestore:"name" json:"name"`
+	RPM      int    `firestore:"rpm" json:"rpm"`
+	TPM      int    `firestore:"tpm" json:"tpm"`
+	Priority string `firestore:"priority" json:"priority"` // "high", "medium", "low"
+}
+
+// APIKey represents an authorized router API key mapping to a client and app.
 type APIKey struct {
 	KeyHash  string `firestore:"key_hash" json:"key_hash"`
-	ClientID string `firestore:"client_id" json:"client_id"`
+	ClientID string `firestore:"client_id" json:"client_id"` // keep for backwards-compatibility
+	AppID    string `firestore:"app_id" json:"app_id"`
 	Status   string `firestore:"status" json:"status"` // "active", "revoked"
 }
 
 // RoutingRule defines dynamic model rewrites and targets.
 type RoutingRule struct {
 	ID             string `firestore:"id" json:"id"`
+	AppID          string `firestore:"app_id" json:"app_id"`               // bound app boundary
 	ModelPattern   string `firestore:"model_pattern" json:"model_pattern"` // regex or exact match
 	ClientTier     string `firestore:"client_tier" json:"client_tier"`     // "all" or specific tier
+	HeaderName     string `firestore:"header_name" json:"header_name"`     // optional header filter
+	HeaderValue    string `firestore:"header_value" json:"header_value"`   // optional value pattern to match
 	TargetModel    string `firestore:"target_model" json:"target_model"`
 	TargetLocation string `firestore:"target_location" json:"target_location"` // E.g. "us-central1" for Vertex AI
 	FallbackModel  string `firestore:"fallback_model" json:"fallback_model"`
@@ -45,6 +61,7 @@ type RoutingRule struct {
 // CustomHeader defines client-provided custom header verification rules.
 type CustomHeader struct {
 	ID           string `firestore:"id" json:"id"`
+	AppID        string `firestore:"app_id" json:"app_id"`                 // bound app boundary
 	Name         string `firestore:"name" json:"name"`                     // e.g. "X-Client-App-ID"
 	Description  string `firestore:"description" json:"description"`       // e.g. "Identifies the calling application"
 	Required     bool   `firestore:"required" json:"required"`             // Whether the header is mandatory
@@ -62,6 +79,7 @@ type ConfigStore struct {
 	mu      sync.RWMutex
 	keys    map[string]APIKey // Hex-encoded KeyHash -> APIKey
 	clients map[string]Client // ClientID -> Client
+	apps    map[string]App    // AppID -> App
 	rules   []RoutingRule
 	headers []CustomHeader
 }
@@ -69,6 +87,7 @@ type ConfigStore struct {
 // LocalDB represents the JSON schema for the local development database.
 type LocalDB struct {
 	Clients       map[string]Client `json:"clients"`
+	Apps          map[string]App    `json:"apps"`
 	APIKeys       map[string]APIKey `json:"api_keys"`
 	RoutingRules  []RoutingRule     `json:"routing_rules"`
 	CustomHeaders []CustomHeader    `json:"custom_headers"`
@@ -82,6 +101,7 @@ func NewConfigStore(ctx context.Context, projectID string) (*ConfigStore, error)
 		isLocalDev: isLocalDev,
 		keys:       make(map[string]APIKey),
 		clients:    make(map[string]Client),
+		apps:       make(map[string]App),
 	}
 
 	if isLocalDev {
@@ -115,6 +135,7 @@ func (cs *ConfigStore) StartListeners(ctx context.Context) {
 
 	go cs.listenKeys(ctx)
 	go cs.listenClients(ctx)
+	go cs.listenApps(ctx)
 	go cs.listenRules(ctx)
 	go cs.listenHeaders(ctx)
 }
@@ -139,17 +160,45 @@ func (cs *ConfigStore) LookupClient(clientID string) (Client, bool) {
 	return client, ok
 }
 
-// MatchRule evaluates rules to find the best matching target for model and client tier.
-func (cs *ConfigStore) MatchRule(modelName, clientTier string) (RoutingRule, bool) {
+// LookupApp gets app details from the local cache by ID.
+func (cs *ConfigStore) LookupApp(appID string) (App, bool) {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+	app, ok := cs.apps[appID]
+	return app, ok
+}
+
+// MatchRule evaluates rules to find the best matching target for model, tier, and specific app ID.
+func (cs *ConfigStore) MatchRule(modelName, clientTier, appID string, headers map[string]string) (RoutingRule, bool) {
 	cs.mu.RLock()
 	defer cs.mu.RUnlock()
 
 	for _, rule := range cs.rules {
-		// Simple exact matches for now; can support glob/regex patterns in the future
 		modelMatch := rule.ModelPattern == "*" || rule.ModelPattern == modelName
 		tierMatch := rule.ClientTier == "all" || rule.ClientTier == clientTier
+		appMatch := rule.AppID == "" || rule.AppID == "all" || rule.AppID == appID
 
-		if modelMatch && tierMatch {
+		headerMatch := true
+		if rule.HeaderName != "" {
+			val, exists := headers[rule.HeaderName]
+			if !exists {
+				headerMatch = false
+			} else if rule.HeaderValue != "" {
+				if strings.HasPrefix(rule.HeaderValue, "/") && strings.HasSuffix(rule.HeaderValue, "/") {
+					// Regex matching, e.g. /^[a-zA-Z0-9]+$/
+					pattern := rule.HeaderValue[1 : len(rule.HeaderValue)-1]
+					matched, err := regexp.MatchString(pattern, val)
+					if err != nil || !matched {
+						headerMatch = false
+					}
+				} else {
+					// Exact matching
+					headerMatch = (val == rule.HeaderValue)
+				}
+			}
+		}
+
+		if modelMatch && tierMatch && appMatch && headerMatch {
 			return rule, true
 		}
 	}
@@ -255,6 +304,38 @@ func (cs *ConfigStore) listenRules(ctx context.Context) {
 	}
 }
 
+func (cs *ConfigStore) listenApps(ctx context.Context) {
+	it := cs.Client.Collection("apps").Snapshots(ctx)
+	for {
+		snap, err := it.Next()
+		if err != nil {
+			log.Printf("[Firestore] Apps listener error: %v", err)
+			return
+		}
+
+		cs.mu.Lock()
+		cs.apps = make(map[string]App)
+		for {
+			doc, err := snap.Documents.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				log.Printf("[Firestore] Error reading app document snapshot: %v", err)
+				continue
+			}
+			var app App
+			if err := doc.DataTo(&app); err != nil {
+				log.Printf("[Firestore] DataTo error mapping App: %v", err)
+				continue
+			}
+			cs.apps[app.ID] = app
+		}
+		cs.mu.Unlock()
+		log.Printf("[Firestore Cache] Synchronized %d apps", len(cs.apps))
+	}
+}
+
 // initLocalDB prepares local JSON db directory, loads data, and seeds if file does not exist.
 func (cs *ConfigStore) initLocalDB() error {
 	cs.localDBPath = "data/local_db.json"
@@ -281,6 +362,7 @@ func (cs *ConfigStore) initLocalDB() error {
 
 		db := LocalDB{
 			Clients:      make(map[string]Client),
+			Apps:         make(map[string]App),
 			APIKeys:      make(map[string]APIKey),
 			RoutingRules: []RoutingRule{devRule},
 			CustomHeaders: []CustomHeader{
@@ -323,14 +405,57 @@ func (cs *ConfigStore) initLocalDB() error {
 		return fmt.Errorf("failed to unmarshal database JSON: %w", err)
 	}
 
+	if db.Apps == nil {
+		db.Apps = make(map[string]App)
+	}
+
+	// Auto-migrate existing clients and keys to Apps
+	dirty := false
+	for keyHash, key := range db.APIKeys {
+		if key.AppID == "" {
+			defaultAppID := "app-" + key.ClientID
+			key.AppID = defaultAppID
+			db.APIKeys[keyHash] = key
+			dirty = true
+
+			if _, ok := db.Apps[defaultAppID]; !ok {
+				cName := "Default Application"
+				cRPM, cTPM, cPriority := 60, 40000, "medium"
+				if client, exists := db.Clients[key.ClientID]; exists {
+					cRPM = client.RPM
+					cTPM = client.TPM
+					cPriority = client.Priority
+					cName = client.Name + " App"
+				}
+				db.Apps[defaultAppID] = App{
+					ID:       defaultAppID,
+					ClientID: key.ClientID,
+					Name:     cName,
+					RPM:      cRPM,
+					TPM:      cTPM,
+					Priority: cPriority,
+				}
+			}
+		}
+	}
+
+	if dirty {
+		log.Println("[Local Dev] Migrating existing database schemas to explicit App-Centric model...")
+		mdata, err := json.MarshalIndent(db, "", "  ")
+		if err == nil {
+			_ = os.WriteFile(cs.localDBPath, mdata, 0644)
+		}
+	}
+
 	cs.mu.Lock()
 	cs.clients = db.Clients
+	cs.apps = db.Apps
 	cs.keys = db.APIKeys
 	cs.rules = db.RoutingRules
 	cs.headers = db.CustomHeaders
 	cs.mu.Unlock()
 
-	log.Printf("[Local Dev Cache] Loaded %d clients, %d API keys, %d rules, %d headers.", len(cs.clients), len(cs.keys), len(cs.rules), len(cs.headers))
+	log.Printf("[Local Dev Cache] Loaded %d clients, %d apps, %d API keys, %d rules, %d headers.", len(cs.clients), len(cs.apps), len(cs.keys), len(cs.rules), len(cs.headers))
 	return nil
 }
 
@@ -339,6 +464,7 @@ func (cs *ConfigStore) saveLocalDB() error {
 	cs.mu.RLock()
 	db := LocalDB{
 		Clients:       cs.clients,
+		Apps:          cs.apps,
 		APIKeys:       cs.keys,
 		RoutingRules:  cs.rules,
 		CustomHeaders: cs.headers,
@@ -466,9 +592,31 @@ func (cs *ConfigStore) SaveKey(ctx context.Context, key APIKey) error {
 	isDev := cs.isLocalDev
 	cs.mu.RUnlock()
 
+	if key.AppID == "" {
+		key.AppID = "app-" + key.ClientID
+	}
+
 	if isDev {
 		cs.mu.Lock()
 		cs.keys[key.KeyHash] = key
+		if _, exists := cs.apps[key.AppID]; !exists {
+			cName := "Default Application"
+			cRPM, cTPM, cPriority := 60, 40000, "medium"
+			if client, existsClient := cs.clients[key.ClientID]; existsClient {
+				cRPM = client.RPM
+				cTPM = client.TPM
+				cPriority = client.Priority
+				cName = client.Name + " App"
+			}
+			cs.apps[key.AppID] = App{
+				ID:       key.AppID,
+				ClientID: key.ClientID,
+				Name:     cName,
+				RPM:      cRPM,
+				TPM:      cTPM,
+				Priority: cPriority,
+			}
+		}
 		cs.mu.Unlock()
 		return cs.saveLocalDB()
 	}
@@ -583,6 +731,56 @@ func (cs *ConfigStore) DeleteHeader(ctx context.Context, id string) error {
 	return err
 }
 
+// SaveRule persists a routing rule.
+func (cs *ConfigStore) SaveRule(ctx context.Context, rule RoutingRule) error {
+	cs.mu.RLock()
+	isDev := cs.isLocalDev
+	cs.mu.RUnlock()
+
+	if isDev {
+		cs.mu.Lock()
+		found := false
+		for idx, existing := range cs.rules {
+			if existing.ID == rule.ID {
+				cs.rules[idx] = rule
+				found = true
+				break
+			}
+		}
+		if !found {
+			cs.rules = append(cs.rules, rule)
+		}
+		cs.mu.Unlock()
+		return cs.saveLocalDB()
+	}
+
+	_, err := cs.Client.Collection("routing_rules").Doc(rule.ID).Set(ctx, rule)
+	return err
+}
+
+// DeleteRule deletes a routing rule by ID.
+func (cs *ConfigStore) DeleteRule(ctx context.Context, id string) error {
+	cs.mu.RLock()
+	isDev := cs.isLocalDev
+	cs.mu.RUnlock()
+
+	if isDev {
+		cs.mu.Lock()
+		var updated []RoutingRule
+		for _, r := range cs.rules {
+			if r.ID != id {
+				updated = append(updated, r)
+			}
+		}
+		cs.rules = updated
+		cs.mu.Unlock()
+		return cs.saveLocalDB()
+	}
+
+	_, err := cs.Client.Collection("routing_rules").Doc(id).Delete(ctx)
+	return err
+}
+
 // listenHeaders streams live updates for custom headers from Firestore.
 func (cs *ConfigStore) listenHeaders(ctx context.Context) {
 	it := cs.Client.Collection("custom_headers").Snapshots(ctx)
@@ -614,4 +812,68 @@ func (cs *ConfigStore) listenHeaders(ctx context.Context) {
 		cs.mu.Unlock()
 		log.Printf("[Firestore Cache] Synchronized %d custom headers", len(cs.headers))
 	}
+}
+
+// GetAllApps retrieves all apps from local cache or Firestore.
+func (cs *ConfigStore) GetAllApps(ctx context.Context) ([]App, error) {
+	cs.mu.RLock()
+	isDev := cs.isLocalDev
+	cs.mu.RUnlock()
+
+	if isDev {
+		cs.mu.RLock()
+		defer cs.mu.RUnlock()
+		var list []App
+		for _, a := range cs.apps {
+			list = append(list, a)
+		}
+		return list, nil
+	}
+
+	appDocs, err := cs.Client.Collection("apps").Documents(ctx).GetAll()
+	if err != nil {
+		return nil, err
+	}
+	var list []App
+	for _, doc := range appDocs {
+		var app App
+		if err := doc.DataTo(&app); err == nil {
+			list = append(list, app)
+		}
+	}
+	return list, nil
+}
+
+// SaveApp persists an application's details.
+func (cs *ConfigStore) SaveApp(ctx context.Context, app App) error {
+	cs.mu.RLock()
+	isDev := cs.isLocalDev
+	cs.mu.RUnlock()
+
+	if isDev {
+		cs.mu.Lock()
+		cs.apps[app.ID] = app
+		cs.mu.Unlock()
+		return cs.saveLocalDB()
+	}
+
+	_, err := cs.Client.Collection("apps").Doc(app.ID).Set(ctx, app)
+	return err
+}
+
+// DeleteApp deletes an application by ID.
+func (cs *ConfigStore) DeleteApp(ctx context.Context, id string) error {
+	cs.mu.RLock()
+	isDev := cs.isLocalDev
+	cs.mu.RUnlock()
+
+	if isDev {
+		cs.mu.Lock()
+		delete(cs.apps, id)
+		cs.mu.Unlock()
+		return cs.saveLocalDB()
+	}
+
+	_, err := cs.Client.Collection("apps").Doc(id).Delete(ctx)
+	return err
 }

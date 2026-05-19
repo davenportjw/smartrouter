@@ -44,8 +44,11 @@ templ Layout(title string, currentTab string, content templ.Component) {
 						
 						<!-- Navigation Tabs -->
 						<nav class="hidden md:flex space-x-8 h-full items-center">
+							<a href="/admin/apps" class={ "inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium h-full", templ.KV("border-blue-600 text-blue-600", currentTab == "apps"), templ.KV("border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700", currentTab != "apps") }>
+								Applications
+							</a>
 							<a href="/admin/keys" class={ "inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium h-full", templ.KV("border-blue-600 text-blue-600", currentTab == "keys"), templ.KV("border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700", currentTab != "keys") }>
-								API Keys
+								Access
 							</a>
 							<a href="/admin/headers" class={ "inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium h-full", templ.KV("border-blue-600 text-blue-600", currentTab == "headers"), templ.KV("border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700", currentTab != "headers") }>
 								Custom Headers

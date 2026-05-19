@@ -68,7 +68,11 @@ func main() {
 	mux.Handle("/v1/ragCorpora/", geminiProxy)
 
 	// Admin Dashboard & HTMX Operations (wrapped in Firebase auth verification middleware)
-	mux.Handle("/admin/", authStore.Middleware(http.HandlerFunc(dashController.ServeKeys)))
+	mux.Handle("/admin/", authStore.Middleware(http.HandlerFunc(dashController.ServeApps))) // Default route redirects/renders Apps
+	mux.Handle("/admin/apps", authStore.Middleware(http.HandlerFunc(dashController.ServeApps)))
+	mux.Handle("/admin/apps/new", authStore.Middleware(http.HandlerFunc(dashController.ServeAppsNewModal)))
+	mux.Handle("/admin/apps/create", authStore.Middleware(http.HandlerFunc(dashController.CreateApp)))
+	mux.Handle("/admin/apps/delete", authStore.Middleware(http.HandlerFunc(dashController.DeleteApp)))
 	mux.Handle("/admin/keys", authStore.Middleware(http.HandlerFunc(dashController.ServeKeys)))
 	mux.Handle("/admin/keys/new", authStore.Middleware(http.HandlerFunc(dashController.ServeKeysNewModal)))
 	mux.Handle("/admin/keys/create", authStore.Middleware(http.HandlerFunc(dashController.CreateKey)))
@@ -78,6 +82,9 @@ func main() {
 	mux.Handle("/admin/headers/create", authStore.Middleware(http.HandlerFunc(dashController.CreateHeader)))
 	mux.Handle("/admin/headers/delete", authStore.Middleware(http.HandlerFunc(dashController.DeleteHeader)))
 	mux.Handle("/admin/rules", authStore.Middleware(http.HandlerFunc(dashController.ServeRules)))
+	mux.Handle("/admin/rules/new", authStore.Middleware(http.HandlerFunc(dashController.ServeRulesNewModal)))
+	mux.Handle("/admin/rules/create", authStore.Middleware(http.HandlerFunc(dashController.CreateRule)))
+	mux.Handle("/admin/rules/delete", authStore.Middleware(http.HandlerFunc(dashController.DeleteRule)))
 	mux.Handle("/admin/models", authStore.Middleware(http.HandlerFunc(dashController.ServeModels)))
 	mux.Handle("/admin/metrics", authStore.Middleware(http.HandlerFunc(dashController.ServeMetrics)))
 	mux.Handle("/admin/costs", authStore.Middleware(http.HandlerFunc(dashController.ServeCosts)))

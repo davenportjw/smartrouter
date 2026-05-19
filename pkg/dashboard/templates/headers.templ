@@ -166,6 +166,7 @@ const ai = new GoogleGenAI({"{"}
 					<thead class="bg-gray-50">
 						<tr>
 							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Header Name</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Scope</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Description</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Required</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Validation Type</th>
@@ -178,7 +179,7 @@ const ai = new GoogleGenAI({"{"}
 					<tbody class="divide-y divide-gray-200 bg-white">
 						if len(items) == 0 {
 							<tr>
-								<td colspan="6" class="text-center py-8 text-sm text-gray-500 italic">
+								<td colspan="7" class="text-center py-8 text-sm text-gray-500 italic">
 									No Custom Headers defined. Define headers to apply request enforcement.
 								</td>
 							</tr>
@@ -187,6 +188,17 @@ const ai = new GoogleGenAI({"{"}
 								<tr class="hover:bg-gray-50 transition-colors">
 									<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6 font-mono font-semibold text-gray-900">
 										{ item.Name }
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-sm">
+										if item.AppID == "" || item.AppID == "global" {
+											<span class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
+												Global
+											</span>
+										} else {
+											<span class="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
+												{ item.AppID }
+											</span>
+										}
 									</td>
 									<td class="px-3 py-4 text-sm text-gray-600 max-w-xs truncate">
 										{ item.Description }

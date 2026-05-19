@@ -13,10 +13,11 @@ import (
 	"geminirouter/pkg/config"
 )
 
-// KeysViewModel binds keys and their associated client profiles together for the view.
+// KeysViewModel binds keys, their parent clients, and logical apps together for the view.
 type KeysViewModel struct {
 	Key    config.APIKey
 	Client config.Client
+	App    config.App
 }
 
 func KeysTab(items []KeysViewModel) templ.Component {
@@ -40,14 +41,14 @@ func KeysTab(items []KeysViewModel) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"space-y-8\"><!-- Header & Actions --><div class=\"sm:flex sm:items-center sm:justify-between\"><div><h1 class=\"text-2xl font-bold tracking-tight text-gray-900\">API Credentials</h1><p class=\"mt-2 text-sm text-gray-700\">Manage active API keys, client priority profiles, and rate limit profiles.</p></div><div class=\"mt-4 sm:ml-16 sm:mt-0 sm:flex-none\"><button hx-get=\"/admin/keys/new\" hx-target=\"#modal-container\" class=\"block rounded-md bg-blue-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-blue-500 transition\">Create Client & Key</button></div></div><!-- Key Insertion Container for Newly Generated Keys (dynamically injected by HTMX) --><div id=\"new-key-alert\" class=\"hidden\"></div><!-- Expandable Usage Guide --><details class=\"group border border-gray-200 rounded-lg bg-white shadow-sm overflow-hidden\"><summary class=\"flex items-center justify-between cursor-pointer p-4 bg-gray-50 hover:bg-gray-100 transition select-none\"><div class=\"flex items-center gap-3\"><div class=\"p-2 bg-blue-50 text-blue-600 rounded-lg\"><svg class=\"h-5 w-5 text-blue-600\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z\"></path></svg></div><div class=\"text-left\"><span class=\"text-sm font-semibold text-gray-900\">How to configure and use your Smart Router API Keys</span><p class=\"text-xs text-gray-500\">View endpoints, authentication headers, and code examples</p></div></div><div class=\"text-gray-400 group-open:rotate-180 transition-transform duration-200\"><svg class=\"h-5 w-5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M19.5 8.25l-7.5 7.5-7.5-7.5\"></path></svg></div></summary><div class=\"p-6 border-t border-gray-200 bg-white space-y-6 text-sm text-gray-600 text-left\"><div class=\"grid grid-cols-1 md:grid-cols-3 gap-6\"><!-- Endpoint & Auth --><div class=\"md:col-span-1 space-y-4 border-r border-gray-100 pr-6\"><div><h4 class=\"text-xs font-bold uppercase tracking-wider text-gray-500\">Router Endpoint</h4><div class=\"mt-2 flex items-center gap-2\"><code class=\"bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs font-mono select-all dynamic-origin-url\">http://localhost:8080</code></div></div><div><h4 class=\"text-xs font-bold uppercase tracking-wider text-gray-500\">Auth Methods</h4><ul class=\"mt-2 space-y-2 text-xs\"><li class=\"flex items-center gap-2\"><span class=\"px-1.5 py-0.5 bg-blue-50 text-blue-700 font-semibold rounded\">Header</span> <code class=\"font-mono text-gray-700\">x-goog-api-key: YOUR_KEY</code></li><li class=\"flex items-center gap-2\"><span class=\"px-1.5 py-0.5 bg-green-50 text-green-700 font-semibold rounded\">Query</span> <code class=\"font-mono text-gray-700\">?key=YOUR_KEY</code></li><li class=\"flex items-center gap-2\"><span class=\"px-1.5 py-0.5 bg-purple-50 text-purple-700 font-semibold rounded\">Bearer</span> <code class=\"font-mono text-gray-700\">Bearer YOUR_KEY</code></li></ul></div></div><!-- Code Tabs/Examples --><div class=\"md:col-span-2 space-y-4\"><h4 class=\"text-xs font-bold uppercase tracking-wider text-gray-500\">SDK & HTTP Integration Examples</h4><div class=\"space-y-4\"><!-- curl block --><div class=\"rounded-lg overflow-hidden bg-gray-950\"><div class=\"bg-gray-900 px-4 py-1.5 flex justify-between items-center\"><span class=\"text-xs font-semibold text-gray-400 font-mono\">cURL / HTTP</span></div><pre class=\"p-4 text-xs font-mono text-gray-300 overflow-x-auto whitespace-pre-wrap\"><code>curl -X POST \"<span class=\"dynamic-origin-url\">http://localhost:8080</span>/v1/models/gemini-1.5-flash:generateContent\" \\ -H \"x-goog-api-key: YOUR_API_KEY\" \\ -H \"Content-Type: application/json\" \\ -d '")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"space-y-8\"><!-- Header & Actions --><div class=\"sm:flex sm:items-center sm:justify-between\"><div><h1 class=\"text-2xl font-bold tracking-tight text-gray-900\">Access Control</h1><p class=\"mt-2 text-sm text-gray-700\">Manage active API keys and Google Service Account credentials. Access rules inherit their logical application's specific rate capacity and queueing priorities.</p></div><div class=\"mt-4 sm:ml-16 sm:mt-0 sm:flex-none\"><button hx-get=\"/admin/keys/new\" hx-target=\"#modal-container\" class=\"block rounded-md bg-blue-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-blue-500 transition\">Generate API Key</button></div></div><!-- Key Insertion Container for Newly Generated Keys (dynamically injected by HTMX) --><div id=\"new-key-alert\" class=\"hidden\"></div><!-- Expandable Usage Guide --><details class=\"group border border-gray-200 rounded-lg bg-white shadow-sm overflow-hidden\"><summary class=\"flex items-center justify-between cursor-pointer p-4 bg-gray-50 hover:bg-gray-100 transition select-none\"><div class=\"flex items-center gap-3\"><div class=\"p-2 bg-blue-50 text-blue-600 rounded-lg\"><svg class=\"h-5 w-5 text-blue-600\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z\"></path></svg></div><div class=\"text-left\"><span class=\"text-sm font-semibold text-gray-900\">How to configure and authenticate with the Smart Router</span><p class=\"text-xs text-gray-500\">View endpoints, API Key methods, Google Service Account (IAM) setups, and SDK examples</p></div></div><div class=\"text-gray-400 group-open:rotate-180 transition-transform duration-200\"><svg class=\"h-5 w-5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M19.5 8.25l-7.5 7.5-7.5-7.5\"></path></svg></div></summary><div class=\"p-6 border-t border-gray-200 bg-white space-y-8 text-sm text-gray-600 text-left\"><div class=\"grid grid-cols-1 md:grid-cols-3 gap-6\"><!-- Endpoint & Auth --><div class=\"md:col-span-1 space-y-4 border-r border-gray-100 pr-6\"><div><h4 class=\"text-xs font-bold uppercase tracking-wider text-gray-500\">Router Endpoint</h4><div class=\"mt-2 flex items-center gap-2\"><code class=\"bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs font-mono select-all dynamic-origin-url\">http://localhost:8080</code></div></div><div><h4 class=\"text-xs font-bold uppercase tracking-wider text-gray-500\">Auth Options</h4><ul class=\"mt-2 space-y-2 text-xs\"><li class=\"flex items-center gap-2\"><span class=\"px-1.5 py-0.5 bg-blue-50 text-blue-700 font-semibold rounded\">Header</span> <code class=\"font-mono text-gray-700\">x-goog-api-key: YOUR_KEY</code></li><li class=\"flex items-center gap-2\"><span class=\"px-1.5 py-0.5 bg-green-50 text-green-700 font-semibold rounded\">Query</span> <code class=\"font-mono text-gray-700\">?key=YOUR_KEY</code></li><li class=\"flex items-center gap-2\"><span class=\"px-1.5 py-0.5 bg-purple-50 text-purple-700 font-semibold rounded\">Bearer</span> <code class=\"font-mono text-gray-700\">Bearer YOUR_KEY</code></li><li class=\"flex items-center gap-2\"><span class=\"px-1.5 py-0.5 bg-pink-50 text-pink-700 font-semibold rounded\">OIDC JWT</span> <code class=\"font-mono text-gray-700\">Bearer GOOGLE_ID_TOKEN</code></li></ul></div></div><!-- Code Tabs/Examples --><div class=\"md:col-span-2 space-y-4\"><h4 class=\"text-xs font-bold uppercase tracking-wider text-gray-500\">API Key Integration Examples</h4><div class=\"space-y-4\"><!-- curl block --><div class=\"rounded-lg overflow-hidden bg-gray-950\"><div class=\"bg-gray-900 px-4 py-1.5 flex justify-between items-center\"><span class=\"text-xs font-semibold text-gray-400 font-mono\">cURL / HTTP</span></div><pre class=\"p-4 text-xs font-mono text-gray-300 overflow-x-auto whitespace-pre-wrap\"><code>curl -X POST \"<span class=\"dynamic-origin-url\">http://localhost:8080</span>/v1/models/gemini-1.5-flash:generateContent\" \\ -H \"x-goog-api-key: YOUR_API_KEY\" \\ -H \"Content-Type: application/json\" \\ -d '")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs("{")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 102, Col: 10}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 107, Col: 10}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -60,7 +61,7 @@ func KeysTab(items []KeysViewModel) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs("{")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 102, Col: 27}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 107, Col: 27}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
@@ -73,7 +74,7 @@ func KeysTab(items []KeysViewModel) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs("{")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 102, Col: 40}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 107, Col: 40}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -86,7 +87,7 @@ func KeysTab(items []KeysViewModel) templ.Component {
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs("}")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 102, Col: 67}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 107, Col: 67}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
@@ -99,7 +100,7 @@ func KeysTab(items []KeysViewModel) templ.Component {
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs("}")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 102, Col: 73}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 107, Col: 73}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
@@ -112,7 +113,7 @@ func KeysTab(items []KeysViewModel) templ.Component {
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs("}")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 102, Col: 79}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 107, Col: 79}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
@@ -125,7 +126,7 @@ func KeysTab(items []KeysViewModel) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs("{")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 116, Col: 23}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 121, Col: 23}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
@@ -138,7 +139,7 @@ func KeysTab(items []KeysViewModel) templ.Component {
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs("}")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 119, Col: 8}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 124, Col: 8}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
@@ -151,7 +152,7 @@ func KeysTab(items []KeysViewModel) templ.Component {
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs("{")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 143, Col: 95}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 148, Col: 95}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 		if templ_7745c5c3_Err != nil {
@@ -164,7 +165,7 @@ func KeysTab(items []KeysViewModel) templ.Component {
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs("}")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 143, Col: 113}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 148, Col: 113}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {
@@ -177,7 +178,7 @@ func KeysTab(items []KeysViewModel) templ.Component {
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs("{")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 145, Col: 31}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 150, Col: 31}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
@@ -190,222 +191,326 @@ func KeysTab(items []KeysViewModel) templ.Component {
 		var templ_7745c5c3_Var13 string
 		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs("}")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 149, Col: 4}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 154, Col: 4}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, ");</code></pre></div></div></div></div></div></div><!-- Self-executing script to dynamically grab and replace active base domain --><script>\n\t\t\t\t(function() {\n\t\t\t\t\tconst updateOrigins = () => {\n\t\t\t\t\t\tconst origin = window.location.origin;\n\t\t\t\t\t\tdocument.querySelectorAll('.dynamic-origin-url').forEach(el => {\n\t\t\t\t\t\t\tel.innerText = origin;\n\t\t\t\t\t\t});\n\t\t\t\t\t};\n\t\t\t\t\tupdateOrigins();\n\t\t\t\t\t// Re-run if HTMX performs layout/body swap updates\n\t\t\t\t\tdocument.body.addEventListener('htmx:afterSwap', updateOrigins);\n\t\t\t\t})();\n\t\t\t</script></details><!-- Keys Data Table --><div class=\"bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden\"><div class=\"inline-block min-w-full align-middle\"><table class=\"min-w-full divide-y divide-gray-300\"><thead class=\"bg-gray-50\"><tr><th scope=\"col\" class=\"py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6\">Client Name</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Key Hash</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Tier</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Priority</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Limits (RPM/TPM)</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Status</th><th scope=\"col\" class=\"relative py-3.5 pl-3 pr-4 sm:pr-6\"><span class=\"sr-only\">Actions</span></th></tr></thead> <tbody class=\"divide-y divide-gray-200 bg-white\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, ");</code></pre></div></div></div></div></div><!-- Google Service Account Setup --><div class=\"border-t border-gray-200 pt-6 space-y-4\"><div class=\"flex items-center gap-2 text-blue-600\"><svg class=\"h-5 w-5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.57-.598-3.75h-.152c-3.196 0-6.1-1.248-8.25-3.285z\"></path></svg><h4 class=\"text-sm font-bold uppercase tracking-wider\">Google Service Account & IAM Authentication (Zero-Key)</h4></div><p class=\"text-xs text-gray-500 leading-relaxed\">You can interact with the router using native Google Service Accounts or Google Identities directly. Instead of managing custom API keys, authenticate calls via Google OpenID Connect (OIDC) ID Tokens. </p><div class=\"grid grid-cols-1 md:grid-cols-3 gap-6\"><!-- Configuration Step --><div class=\"md:col-span-1 bg-blue-50/50 rounded-lg p-4 border border-blue-100 space-y-3\"><h5 class=\"text-xs font-bold text-blue-900 uppercase\">1. Router Registration</h5><ol class=\"list-decimal pl-4 text-xs text-blue-950 space-y-2\"><li>Navigate to the <a href=\"/admin/apps\" class=\"text-blue-600 hover:underline font-semibold\">Applications</a> tab.</li><li>Add a new Application.</li><li>Set the <strong>Application ID (Slug)</strong> exactly to your Google Service Account's email address (e.g., <code class=\"bg-blue-100/80 px-1 rounded font-mono\">my-service-account@project.iam.gserviceaccount.com</code>).</li><li>Set your desired RPM, TPM, and queueing priorities.</li></ol></div><!-- Invocation Step --><div class=\"md:col-span-2 space-y-3\"><h5 class=\"text-xs font-bold text-gray-900 uppercase\">2. Direct API Invocation</h5><p class=\"text-xs text-gray-500\">When executing requests, fetch an OIDC ID Token representing the Service Account, using the router URL as the audience parameter. Send it in the standard <code class=\"font-mono bg-gray-100 text-gray-700 px-1 rounded\">Authorization</code> header:</p><div class=\"rounded-lg overflow-hidden bg-gray-950\"><div class=\"bg-gray-900 px-4 py-1.5 flex justify-between items-center\"><span class=\"text-xs font-semibold text-gray-400 font-mono\">cURL / Google IAM Integration</span></div><pre class=\"p-4 text-xs font-mono text-gray-300 overflow-x-auto whitespace-pre-wrap\"><code># 1. Generate a Google ID (OIDC) Token bound to the router's audience token=$(gcloud auth print-identity-token --audience=\"<span class=\"dynamic-origin-url\">http://localhost:8080</span>\") # 2. Execute router Gemini API request natively without an API Key curl -X POST \"<span class=\"dynamic-origin-url\">http://localhost:8080</span>/v1/models/gemini-1.5-flash:generateContent\" \\ -H \"Authorization: Bearer $token\" \\ -H \"Content-Type: application/json\" \\ -d '")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var14 string
+		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs("{")
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 203, Col: 10}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "contents\": [")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var15 string
+		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs("{")
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 203, Col: 27}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "parts\":[")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var16 string
+		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs("{")
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 203, Col: 40}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "text\": \"Hello from Service Account!\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var17 string
+		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs("}")
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 203, Col: 81}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "]")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var18 string
+		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs("}")
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 203, Col: 87}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "]")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var19 string
+		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs("}")
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 203, Col: 93}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "'</code></pre></div></div></div></div></div><!-- Self-executing script to dynamically grab and replace active base domain --><script>\n\t\t\t\t(function() {\n\t\t\t\t\tconst updateOrigins = () => {\n\t\t\t\t\t\tconst origin = window.location.origin;\n\t\t\t\t\t\tdocument.querySelectorAll('.dynamic-origin-url').forEach(el => {\n\t\t\t\t\t\t\tel.innerText = origin;\n\t\t\t\t\t\t});\n\t\t\t\t\t};\n\t\t\t\t\tupdateOrigins();\n\t\t\t\t\t// Re-run if HTMX performs layout/body swap updates\n\t\t\t\t\tdocument.body.addEventListener('htmx:afterSwap', updateOrigins);\n\t\t\t\t})();\n\t\t\t</script></details><!-- Keys Data Table --><div class=\"bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden\"><div class=\"inline-block min-w-full align-middle\"><table class=\"min-w-full divide-y divide-gray-300\"><thead class=\"bg-gray-50\"><tr><th scope=\"col\" class=\"py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6\">Bound Application</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Parent Client</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Key Hash</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Billing Tier</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Queueing Priority</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Limits (RPM/TPM)</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Status</th><th scope=\"col\" class=\"relative py-3.5 pl-3 pr-4 sm:pr-6\"><span class=\"sr-only\">Actions</span></th></tr></thead> <tbody class=\"divide-y divide-gray-200 bg-white\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		for _, item := range items {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<tr class=\"hover:bg-gray-50 transition-colors\"><td class=\"whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6\"><div class=\"font-semibold text-gray-900\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var14 string
-			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(item.Client.Name)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 194, Col: 68}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</div><div class=\"text-xs text-gray-400\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var15 string
-			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(item.Client.ID)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 195, Col: 60}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</div></td><td class=\"whitespace-nowrap px-3 py-4 text-sm font-mono text-gray-500 text-xs\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var16 string
-			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(item.Key.KeyHash[:8])
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 198, Col: 31}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "...")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var17 string
-			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(item.Key.KeyHash[len(item.Key.KeyHash)-8:])
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 198, Col: 80}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</td><td class=\"whitespace-nowrap px-3 py-4 text-sm\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var18 = []any{"inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset " + getTierBadgeStyle(item.Client.Tier)}
-			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var18...)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<span class=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var19 string
-			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var18).String())
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 1, Col: 0}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var19)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<tr class=\"hover:bg-gray-50 transition-colors\"><td class=\"whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6\"><div class=\"font-semibold text-gray-900\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var20 string
-			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(item.Client.Tier)
+			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(item.App.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 202, Col: 28}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 248, Col: 65}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</span></td><td class=\"whitespace-nowrap px-3 py-4 text-sm\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</div><div class=\"text-xs text-gray-400 font-mono\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var21 = []any{"inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset " + getPriorityBadgeStyle(item.Client.Priority)}
-			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var21...)
+			var templ_7745c5c3_Var21 string
+			templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(item.App.ID)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 249, Col: 67}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "<span class=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</div></td><td class=\"whitespace-nowrap px-3 py-4 text-sm text-gray-600\"><div class=\"font-medium text-gray-800\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var22 string
-			templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var21).String())
+			templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(item.Client.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 1, Col: 0}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 252, Col: 66}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var22)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</div><div class=\"text-xs text-gray-400 font-mono\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var23 string
-			templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(item.Client.Priority)
+			templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(item.Client.ID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 207, Col: 32}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 253, Col: 70}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</span></td><td class=\"whitespace-nowrap px-3 py-4 text-sm text-gray-600\"><span class=\"font-medium text-gray-900\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</div></td><td class=\"whitespace-nowrap px-3 py-4 text-sm font-mono text-gray-500 text-xs\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var24 string
-			templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(intToString(item.Client.RPM))
+			templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(item.Key.KeyHash[:8])
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 211, Col: 79}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 256, Col: 31}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</span> RPM / <span class=\"font-medium text-gray-900\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "...")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var25 string
-			templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(intToString(item.Client.TPM))
+			templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(item.Key.KeyHash[len(item.Key.KeyHash)-8:])
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 212, Col: 79}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 256, Col: 80}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</span> TPM</td><td class=\"whitespace-nowrap px-3 py-4 text-sm\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</td><td class=\"whitespace-nowrap px-3 py-4 text-sm\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var26 = []any{"inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset " + getTierBadgeStyle(item.Client.Tier)}
+			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var26...)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "<span class=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var27 string
+			templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var26).String())
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 1, Col: 0}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var27)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var28 string
+			templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(item.Client.Tier)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 260, Col: 28}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</span></td><td class=\"whitespace-nowrap px-3 py-4 text-sm\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var29 = []any{"inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset " + getPriorityBadgeStyle(item.App.Priority)}
+			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var29...)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<span class=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var30 string
+			templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var29).String())
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 1, Col: 0}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var30)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var31 string
+			templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(item.App.Priority)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 265, Col: 29}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "</span></td><td class=\"whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-mono text-xs\"><span class=\"font-semibold text-gray-950\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var32 string
+			templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(intToString(item.App.RPM))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 269, Col: 78}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "</span> RPM / <span class=\"font-semibold text-gray-950\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var33 string
+			templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(intToString(item.App.TPM))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 270, Col: 78}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "</span> TPM</td><td class=\"whitespace-nowrap px-3 py-4 text-sm\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if item.Key.Status == "active" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "<span class=\"inline-flex items-center gap-x-1.5 rounded-md bg-green-100 px-2 py-1 text-xs font-medium text-green-700\"><svg class=\"h-1.5 w-1.5 fill-green-500\" viewBox=\"0 0 6 6\" aria-hidden=\"true\"><circle cx=\"3\" cy=\"3\" r=\"3\"></circle></svg> Active</span>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "<span class=\"inline-flex items-center gap-x-1.5 rounded-md bg-green-100 px-2 py-1 text-xs font-medium text-green-700\"><svg class=\"h-1.5 w-1.5 fill-green-500\" viewBox=\"0 0 6 6\" aria-hidden=\"true\"><circle cx=\"3\" cy=\"3\" r=\"3\"></circle></svg> Active</span>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			} else {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "<span class=\"inline-flex items-center gap-x-1.5 rounded-md bg-red-100 px-2 py-1 text-xs font-medium text-red-700\"><svg class=\"h-1.5 w-1.5 fill-red-500\" viewBox=\"0 0 6 6\" aria-hidden=\"true\"><circle cx=\"3\" cy=\"3\" r=\"3\"></circle></svg> Revoked</span>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<span class=\"inline-flex items-center gap-x-1.5 rounded-md bg-red-100 px-2 py-1 text-xs font-medium text-red-700\"><svg class=\"h-1.5 w-1.5 fill-red-500\" viewBox=\"0 0 6 6\" aria-hidden=\"true\"><circle cx=\"3\" cy=\"3\" r=\"3\"></circle></svg> Revoked</span>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</td><td class=\"relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "</td><td class=\"relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if item.Key.Status == "active" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<button hx-post=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "<button hx-post=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var26 string
-				templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.ResolveAttributeValue("/admin/keys/revoke?hash=" + item.Key.KeyHash)
+				var templ_7745c5c3_Var34 string
+				templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.ResolveAttributeValue("/admin/keys/revoke?hash=" + item.Key.KeyHash)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 234, Col: 66}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 292, Col: 66}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var26)
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "\" hx-confirm=\"")
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var34)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var27 string
-				templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.ResolveAttributeValue("Are you sure you want to revoke API credentials for " + item.Client.Name + "?")
-				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 235, Col: 103}
-				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var27)
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "\" hx-confirm=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "\" hx-target=\"closest tr\" hx-swap=\"outerHTML\" class=\"text-red-600 hover:text-red-900 transition font-semibold\">Revoke</button>")
+				var templ_7745c5c3_Var35 string
+				templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.ResolveAttributeValue("Are you sure you want to revoke API credentials for " + item.App.Name + "?")
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/keys.templ`, Line: 293, Col: 100}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var35)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "\" hx-target=\"closest tr\" hx-swap=\"outerHTML\" class=\"text-red-600 hover:text-red-900 transition font-semibold\">Revoke</button>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "</td></tr>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "</td></tr>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "</tbody></table></div></div><!-- Modal Target Anchor --><div id=\"modal-container\"></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "</tbody></table></div></div><!-- Modal Target Anchor --><div id=\"modal-container\"></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

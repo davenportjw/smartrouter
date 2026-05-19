@@ -33,20 +33,309 @@ func RulesTab(rules []config.RoutingRule) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"space-y-8\"><div><h1 class=\"text-2xl font-bold tracking-tight text-gray-900\">Dynamic Routing Rules</h1><p class=\"mt-2 text-sm text-gray-700\">Define dynamic target mapping policies. Re-route models based on customer tier or load metrics.</p></div><div class=\"bg-white shadow-sm border border-gray-200 rounded-lg p-6\"><p class=\"text-sm text-gray-500 italic\">Rules configurator arriving shortly. Matches live rules currently synced: ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"space-y-8\"><!-- Header & Actions --><div class=\"sm:flex sm:items-center sm:justify-between\"><div><h1 class=\"text-2xl font-bold tracking-tight text-gray-900\">Dynamic Routing Rules</h1><p class=\"mt-2 text-sm text-gray-700\">Define smart targets, load metrics, client-tier overrides, and custom application-based traffic segmentation.</p></div><div class=\"mt-4 sm:ml-16 sm:mt-0 sm:flex-none\"><button hx-get=\"/admin/rules/new\" hx-target=\"#modal-container\" class=\"block rounded-md bg-blue-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-blue-500 transition\">Add Routing Rule</button></div></div><!-- Rules Table --><div class=\"bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden\"><div class=\"inline-block min-w-full align-middle\"><table class=\"min-w-full divide-y divide-gray-300\"><thead class=\"bg-gray-50\"><tr><th scope=\"col\" class=\"py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6\">Model Pattern</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Client Tier</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">App Boundary</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Header Condition</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Routed Model</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Location</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Fallback Target</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Priority Weight</th><th scope=\"col\" class=\"relative py-3.5 pl-3 pr-4 sm:pr-6\"><span class=\"sr-only\">Actions</span></th></tr></thead> <tbody class=\"divide-y divide-gray-200 bg-white\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var2 string
-		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(intToString(len(rules)))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/rules.templ`, Line: 18, Col: 103}
+		if len(rules) == 0 {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<tr><td colspan=\"9\" class=\"text-center py-8 text-sm text-gray-500 italic\">No routing rules active. All requests are mapped to their requested models directly.</td></tr>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			for _, item := range rules {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<tr class=\"hover:bg-gray-50 transition-colors\"><td class=\"whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6 font-mono font-semibold text-gray-900\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var2 string
+				templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(item.ModelPattern)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/rules.templ`, Line: 58, Col: 29}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</td><td class=\"whitespace-nowrap px-3 py-4 text-sm\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				if item.ClientTier == "all" {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<span class=\"inline-flex items-center rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-800 ring-1 ring-inset ring-gray-600/20\">All Tiers</span>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				} else if item.ClientTier == "premium" {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<span class=\"inline-flex items-center rounded-md bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10\">Premium</span>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				} else if item.ClientTier == "standard" {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<span class=\"inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10\">Standard</span>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				} else {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<span class=\"inline-flex items-center rounded-md bg-yellow-50 px-2 py-1 text-xs font-medium text-yellow-800 ring-1 ring-inset ring-yellow-600/20\">Free</span>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</td><td class=\"whitespace-nowrap px-3 py-4 text-sm\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				if item.AppID == "" || item.AppID == "all" {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<span class=\"inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20\">Global</span>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				} else {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<span class=\"inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10\">")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var3 string
+					templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(item.AppID)
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/rules.templ`, Line: 86, Col: 24}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</span>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</td><td class=\"px-3 py-4 text-sm text-gray-600\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				if item.HeaderName != "" {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<div class=\"flex flex-col font-mono text-xs\"><span class=\"font-semibold text-blue-600\">")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var4 string
+					templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(item.HeaderName)
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/rules.templ`, Line: 93, Col: 71}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</span> ")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					if item.HeaderValue != "" {
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<span class=\"text-gray-500\">")
+						if templ_7745c5c3_Err != nil {
+							return templ_7745c5c3_Err
+						}
+						var templ_7745c5c3_Var5 string
+						templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs("== " + item.HeaderValue)
+						if templ_7745c5c3_Err != nil {
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/rules.templ`, Line: 95, Col: 67}
+						}
+						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
+						if templ_7745c5c3_Err != nil {
+							return templ_7745c5c3_Err
+						}
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</span>")
+						if templ_7745c5c3_Err != nil {
+							return templ_7745c5c3_Err
+						}
+					} else {
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<span class=\"text-gray-400 italic\">(Present)</span>")
+						if templ_7745c5c3_Err != nil {
+							return templ_7745c5c3_Err
+						}
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</div>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				} else {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<span class=\"text-gray-400 italic\">None</span>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</td><td class=\"whitespace-nowrap px-3 py-4 text-sm text-gray-900 font-medium font-mono text-xs\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var6 string
+				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(item.TargetModel)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/rules.templ`, Line: 105, Col: 28}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</td><td class=\"whitespace-nowrap px-3 py-4 text-sm text-gray-500 font-mono text-xs\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var7 string
+				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(item.TargetLocation)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/rules.templ`, Line: 108, Col: 31}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</td><td class=\"whitespace-nowrap px-3 py-4 text-sm text-gray-500 font-mono text-xs\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				if item.FallbackModel != "" {
+					var templ_7745c5c3_Var8 string
+					templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(item.FallbackModel)
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/rules.templ`, Line: 112, Col: 31}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				} else {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "<span class=\"text-gray-400 italic\">N/A</span>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</td><td class=\"whitespace-nowrap px-3 py-4 text-sm text-center font-semibold text-gray-900\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var9 string
+				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(intToString(item.PriorityWeight))
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/rules.templ`, Line: 118, Col: 44}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</td><td class=\"relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6\"><button hx-delete=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var10 string
+				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue("/admin/rules/delete?id=" + item.ID)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/rules.templ`, Line: 122, Col: 58}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "\" hx-confirm=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var11 string
+				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.ResolveAttributeValue("Are you sure you want to remove routing rule for " + item.ModelPattern + "?")
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/rules.templ`, Line: 123, Col: 101}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "\" hx-target=\"closest tr\" hx-swap=\"outerHTML\" class=\"text-red-600 hover:text-red-900 transition font-semibold\">Delete</button></td></tr>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</tbody></table></div></div><!-- Modal Target Anchor --><div id=\"modal-container\"></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " items.</p></div></div>")
+		return nil
+	})
+}
+
+func RuleModal(apps []config.App) templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var12 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var12 == nil {
+			templ_7745c5c3_Var12 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<!-- Modal backdrop --><div id=\"create-rule-modal\" class=\"relative z-50\" aria-labelledby=\"modal-title\" role=\"dialog\" aria-modal=\"true\"><div class=\"fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity\"></div><div class=\"fixed inset-0 z-50 w-screen overflow-y-auto\"><div class=\"flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0\"><!-- Modal Panel --><div class=\"relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6 border border-gray-200\"><div class=\"absolute right-0 top-0 hidden pr-4 pt-4 sm:block\"><button type=\"button\" onclick=\"document.getElementById('create-rule-modal').remove()\" class=\"rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none\"><span class=\"sr-only\">Close</span> <svg class=\"h-6 w-6\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div><div class=\"sm:flex sm:items-start\"><div class=\"mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full\"><h3 class=\"text-lg font-semibold leading-6 text-gray-900\" id=\"modal-title\">Add Dynamic Routing Rule</h3><div class=\"mt-2\"><p class=\"text-xs text-gray-500\">Define re-routing rules based on requested models, tiers, and application boundary constraints.</p></div><!-- Creation Form --><form hx-post=\"/admin/rules/create\" class=\"mt-6 space-y-4\" onsubmit=\"document.getElementById('create-rule-modal').remove()\"><div class=\"grid grid-cols-2 gap-4\"><div><label for=\"model_pattern\" class=\"block text-xs font-medium text-gray-700\">Model Request Pattern</label> <input type=\"text\" name=\"model_pattern\" id=\"model_pattern\" required placeholder=\"e.g. * or gemini-1.5-pro\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm\"></div><div><label for=\"app_id\" class=\"block text-xs font-medium text-gray-700\">Target Application Scope</label> <select name=\"app_id\" id=\"app_id\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm\"><option value=\"\">Global (All Applications)</option> ")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		for _, a := range apps {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "<option value=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var13 string
+			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.ResolveAttributeValue(a.ID)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/rules.templ`, Line: 194, Col: 32}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var13)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var14 string
+			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(a.Name)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/rules.templ`, Line: 194, Col: 43}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, " (")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var15 string
+			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(a.ID)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/rules.templ`, Line: 194, Col: 53}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, ")</option>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "</select></div></div><div class=\"grid grid-cols-2 gap-4\"><div><label for=\"client_tier\" class=\"block text-xs font-medium text-gray-700\">Client Tier Eligibility</label> <select name=\"client_tier\" id=\"client_tier\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm\"><option value=\"all\">All Tiers</option> <option value=\"free\">Free Tier Only</option> <option value=\"standard\">Standard Tier Only</option> <option value=\"premium\">Premium Tier Only</option></select></div><div><label for=\"priority_weight\" class=\"block text-xs font-medium text-gray-700\">Priority Weight (1-10)</label> <input type=\"number\" name=\"priority_weight\" id=\"priority_weight\" min=\"1\" max=\"10\" value=\"1\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm\"></div></div><div class=\"bg-gray-50 rounded-md p-3 border border-gray-150 space-y-3\"><h4 class=\"text-xs font-bold uppercase tracking-wider text-gray-500\">Header-Based Route Segmentation (Optional)</h4><div class=\"grid grid-cols-2 gap-3\"><div><label for=\"header_name\" class=\"block text-[10px] font-medium text-gray-600\">HTTP Header Name</label> <input type=\"text\" name=\"header_name\" id=\"header_name\" placeholder=\"e.g. X-Client-App-ID\" class=\"mt-1 block w-full rounded-md bg-white border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-xs\"></div><div><label for=\"header_value\" class=\"block text-[10px] font-medium text-gray-600\">Value Match / Pattern</label> <input type=\"text\" name=\"header_value\" id=\"header_value\" placeholder=\"e.g. prod-chat or /canary/\" class=\"mt-1 block w-full rounded-md bg-white border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-xs\"></div></div><p class=\"text-[10px] text-gray-400 leading-relaxed\">If header name is set, this rule only triggers when request contains it. Wrap value with slashes (e.g. <code class=\"bg-gray-100 text-gray-600 px-0.5 font-mono\">/canary/</code>) to perform regex evaluation.</p></div><div class=\"grid grid-cols-2 gap-4\"><div><label for=\"target_model\" class=\"block text-xs font-medium text-gray-700\">Routed Target Model</label> <select name=\"target_model\" id=\"target_model\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm\"><option value=\"gemini-2.5-flash\">gemini-2.5-flash</option> <option value=\"gemini-2.5-pro\">gemini-2.5-pro</option> <option value=\"gemini-2.0-flash\">gemini-2.0-flash</option> <option value=\"gemini-1.5-flash\">gemini-1.5-flash</option> <option value=\"gemini-1.5-pro\">gemini-1.5-pro</option> <option value=\"text-embedding-004\">text-embedding-004</option></select></div><div><label for=\"target_location\" class=\"block text-xs font-medium text-gray-700\">Target Location (GCP)</label> <input type=\"text\" name=\"target_location\" id=\"target_location\" required value=\"us-central1\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm\"></div></div><div class=\"grid grid-cols-1 gap-4\"><div><label for=\"fallback_model\" class=\"block text-xs font-medium text-gray-700\">Fallback Model (Optional)</label> <input type=\"text\" name=\"fallback_model\" id=\"fallback_model\" placeholder=\"e.g. gemini-1.5-flash\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm\"></div></div><div class=\"mt-6 sm:mt-4 sm:flex sm:flex-row-reverse gap-3\"><button type=\"submit\" class=\"inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:w-auto transition\">Save Routing Rule</button> <button type=\"button\" onclick=\"document.getElementById('create-rule-modal').remove()\" class=\"mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto transition\">Cancel</button></div></form></div></div></div></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

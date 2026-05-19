@@ -69,7 +69,7 @@ func (dc *DashboardController) ServeLogin(w http.ResponseWriter, r *http.Request
 	_ = templates.Login(dc.Firebase).Render(r.Context(), w)
 }
 
-// ServeKeys fetches keys and clients and renders the Keys administration view.
+// ServeKeys fetches keys, clients, and apps and renders the Keys administration view.
 func (dc *DashboardController) ServeKeys(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -89,44 +89,77 @@ func (dc *DashboardController) ServeKeys(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Map clients by ID for O(1) lookup
+	// 3. Fetch all Apps
+	apps, err := dc.Store.GetAllApps(ctx)
+	if err != nil {
+		log.Printf("[Dashboard] Error loading apps: %v", err)
+		http.Error(w, "Internal Server Error loading apps", http.StatusInternalServerError)
+		return
+	}
+
+	// Map clients and apps by ID for O(1) lookup
 	clientsMap := make(map[string]config.Client)
 	for _, c := range clients {
 		clientsMap[c.ID] = c
 	}
 
-	// 3. Build combined ViewModels
+	appsMap := make(map[string]config.App)
+	for _, a := range apps {
+		appsMap[a.ID] = a
+	}
+
+	// 4. Build combined ViewModels
 	var viewModels []templates.KeysViewModel
 	for _, key := range keys {
-		clientProfile, ok := clientsMap[key.ClientID]
+		appProfile, ok := appsMap[key.AppID]
 		if !ok {
-			// Profile deleted but key remains, construct fallback profile
-			clientProfile = config.Client{
-				ID:       key.ClientID,
-				Name:     "Unknown Client",
-				Tier:     "free",
-				Priority: "low",
+			// App deleted but key remains, construct fallback profile
+			appProfile = config.App{
+				ID:       key.AppID,
+				ClientID: key.ClientID,
+				Name:     "Unknown App",
+				RPM:      60,
+				TPM:      40000,
+				Priority: "medium",
 			}
 		}
+
+		clientProfile, ok := clientsMap[appProfile.ClientID]
+		if !ok {
+			clientProfile = config.Client{
+				ID:   appProfile.ClientID,
+				Name: "Unknown Client",
+				Tier: "free",
+			}
+		}
+
 		viewModels = append(viewModels, templates.KeysViewModel{
 			Key:    key,
 			Client: clientProfile,
+			App:    appProfile,
 		})
 	}
 
 	w.Header().Set("Content-Type", "text/html")
-	// Render combined view inside layout wrapper
 	content := templates.KeysTab(viewModels)
 	_ = templates.Layout("API Keys", "keys", content).Render(ctx, w)
 }
 
 // ServeKeysNewModal renders the dynamic creation form via HTMX.
 func (dc *DashboardController) ServeKeysNewModal(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	apps, err := dc.Store.GetAllApps(ctx)
+	if err != nil {
+		log.Printf("[Dashboard] Error loading apps for modal: %v", err)
+		http.Error(w, "Failed to load apps", http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/html")
-	_ = templates.KeyModal().Render(r.Context(), w)
+	_ = templates.KeyModal(apps).Render(ctx, w)
 }
 
-// CreateKey handles form submissions, provisions new client profiles, and spits out the raw API key.
+// CreateKey handles form submissions and generates a new API key bound to the selected App.
 func (dc *DashboardController) CreateKey(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -135,16 +168,17 @@ func (dc *DashboardController) CreateKey(w http.ResponseWriter, r *http.Request)
 
 	ctx := r.Context()
 
-	// Parse form fields
-	clientID := r.FormValue("client_id")
-	clientName := r.FormValue("client_name")
-	tier := r.FormValue("tier")
-	priority := r.FormValue("priority")
-	rpmStr := r.FormValue("rpm")
-	tpmStr := r.FormValue("tpm")
+	appID := r.FormValue("app_id")
+	if appID == "" {
+		http.Error(w, "Missing target app selection", http.StatusBadRequest)
+		return
+	}
 
-	rpm, _ := strconv.Atoi(rpmStr)
-	tpm, _ := strconv.Atoi(tpmStr)
+	app, ok := dc.Store.LookupApp(appID)
+	if !ok {
+		http.Error(w, "Application profile not found", http.StatusNotFound)
+		return
+	}
 
 	// 1. Generate cryptographically secure API Key
 	rawKey, err := generateSecureKey()
@@ -157,25 +191,11 @@ func (dc *DashboardController) CreateKey(w http.ResponseWriter, r *http.Request)
 	// Hash key for secure persistence
 	hashedKey := config.HashKey(rawKey)
 
-	// 2. Persist Client profile document
-	err = dc.Store.SaveClient(ctx, config.Client{
-		ID:       clientID,
-		Name:     clientName,
-		Tier:     tier,
-		RPM:      rpm,
-		TPM:      tpm,
-		Priority: priority,
-	})
-	if err != nil {
-		log.Printf("[Dashboard] Error saving client: %v", err)
-		http.Error(w, "Failed to save client profile", http.StatusInternalServerError)
-		return
-	}
-
-	// 3. Persist APIKey document
+	// 2. Persist APIKey document linked to App and Client
 	err = dc.Store.SaveKey(ctx, config.APIKey{
 		KeyHash:  hashedKey,
-		ClientID: clientID,
+		AppID:    app.ID,
+		ClientID: app.ClientID,
 		Status:   "active",
 	})
 	if err != nil {
@@ -186,7 +206,7 @@ func (dc *DashboardController) CreateKey(w http.ResponseWriter, r *http.Request)
 
 	// Render raw API Key inside prominent success warning banner
 	w.Header().Set("Content-Type", "text/html")
-	_ = templates.KeyCreatedAlert(rawKey, clientName).Render(ctx, w)
+	_ = templates.KeyCreatedAlert(rawKey, app.Name).Render(ctx, w)
 }
 
 // RevokeKey marks an API key as inactive dynamically and returns empty block for HTMX replacement.
@@ -233,6 +253,100 @@ func (dc *DashboardController) ServeRules(w http.ResponseWriter, r *http.Request
 	_ = templates.Layout("Routing Rules", "rules", content).Render(ctx, w)
 }
 
+// ServeRulesNewModal renders the dynamic rules creation form via HTMX.
+func (dc *DashboardController) ServeRulesNewModal(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	apps, err := dc.Store.GetAllApps(ctx)
+	if err != nil {
+		log.Printf("[Dashboard] Error loading apps for rule modal: %v", err)
+		http.Error(w, "Failed to load apps", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	_ = templates.RuleModal(apps).Render(ctx, w)
+}
+
+// CreateRule handles dynamic routing rule submission form.
+func (dc *DashboardController) CreateRule(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx := r.Context()
+
+	modelPattern := r.FormValue("model_pattern")
+	appID := r.FormValue("app_id")
+	clientTier := r.FormValue("client_tier")
+	headerName := r.FormValue("header_name")
+	headerValue := r.FormValue("header_value")
+	targetModel := r.FormValue("target_model")
+	targetLocation := r.FormValue("target_location")
+	fallbackModel := r.FormValue("fallback_model")
+	priorityWeightStr := r.FormValue("priority_weight")
+
+	priorityWeight := 1
+	if priorityWeightStr != "" {
+		if pw, err := strconv.Atoi(priorityWeightStr); err == nil {
+			priorityWeight = pw
+		}
+	}
+
+	// Generate unique random ID for this rule
+	idBytes := make([]byte, 8)
+	_, _ = rand.Read(idBytes)
+	id := "rule-" + hex.EncodeToString(idBytes)
+
+	err := dc.Store.SaveRule(ctx, config.RoutingRule{
+		ID:             id,
+		AppID:          appID,
+		ModelPattern:   modelPattern,
+		ClientTier:     clientTier,
+		HeaderName:     headerName,
+		HeaderValue:    headerValue,
+		TargetModel:    targetModel,
+		TargetLocation: targetLocation,
+		FallbackModel:  fallbackModel,
+		PriorityWeight: priorityWeight,
+	})
+	if err != nil {
+		log.Printf("[Dashboard] Error saving routing rule: %v", err)
+		http.Error(w, "Failed to save routing rule", http.StatusInternalServerError)
+		return
+	}
+
+	// Direct standard client browser redirect back to the rules view
+	http.Redirect(w, r, "/admin/rules", http.StatusSeeOther)
+}
+
+// DeleteRule deletes a routing rule dynamically.
+func (dc *DashboardController) DeleteRule(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx := r.Context()
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "Missing routing rule ID", http.StatusBadRequest)
+		return
+	}
+
+	err := dc.Store.DeleteRule(ctx, id)
+	if err != nil {
+		log.Printf("[Dashboard] Error deleting routing rule: %v", err)
+		http.Error(w, "Failed to delete routing rule", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	// Return nothing to HTMX so closest <tr> is removed
+	w.Write([]byte(""))
+}
+
+
 // ServeHeaders fetches headers and renders the Custom Headers administration view.
 func (dc *DashboardController) ServeHeaders(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -251,8 +365,16 @@ func (dc *DashboardController) ServeHeaders(w http.ResponseWriter, r *http.Reque
 
 // ServeHeadersNewModal renders the dynamic headers creation form via HTMX.
 func (dc *DashboardController) ServeHeadersNewModal(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	apps, err := dc.Store.GetAllApps(ctx)
+	if err != nil {
+		log.Printf("[Dashboard] Error loading apps for headers modal: %v", err)
+		http.Error(w, "Failed to load apps", http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/html")
-	_ = templates.HeaderModal().Render(r.Context(), w)
+	_ = templates.HeaderModal(apps).Render(ctx, w)
 }
 
 // CreateHeader handles custom header rule submission form.
@@ -265,6 +387,7 @@ func (dc *DashboardController) CreateHeader(w http.ResponseWriter, r *http.Reque
 	ctx := r.Context()
 
 	name := r.FormValue("name")
+	appID := r.FormValue("app_id")
 	description := r.FormValue("description")
 	requiredStr := r.FormValue("required")
 	validation := r.FormValue("validation")
@@ -279,6 +402,7 @@ func (dc *DashboardController) CreateHeader(w http.ResponseWriter, r *http.Reque
 
 	err := dc.Store.SaveHeader(ctx, config.CustomHeader{
 		ID:           id,
+		AppID:        appID,
 		Name:         name,
 		Description:  description,
 		Required:     required,
@@ -1363,3 +1487,121 @@ func generateClientCostBarSVG(breakdown []templates.ClientCostBreakdown) string 
 	return sb.String()
 }
 
+// ServeApps fetches apps and client configurations and renders the Applications tab view.
+func (dc *DashboardController) ServeApps(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	apps, err := dc.Store.GetAllApps(ctx)
+	if err != nil {
+		log.Printf("[Dashboard] Error loading apps: %v", err)
+		http.Error(w, "Internal Server Error loading apps", http.StatusInternalServerError)
+		return
+	}
+
+	clients, err := dc.Store.GetAllClients(ctx)
+	if err != nil {
+		log.Printf("[Dashboard] Error loading clients: %v", err)
+		http.Error(w, "Internal Server Error loading clients", http.StatusInternalServerError)
+		return
+	}
+
+	clientsMap := make(map[string]config.Client)
+	for _, c := range clients {
+		clientsMap[c.ID] = c
+	}
+
+	var viewModels []templates.AppsViewModel
+	for _, a := range apps {
+		clientProfile, ok := clientsMap[a.ClientID]
+		if !ok {
+			clientProfile = config.Client{
+				ID:   a.ClientID,
+				Name: "Unknown Client",
+				Tier: "free",
+			}
+		}
+		viewModels = append(viewModels, templates.AppsViewModel{
+			App:    a,
+			Client: clientProfile,
+		})
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	content := templates.AppsTab(viewModels)
+	_ = templates.Layout("Applications", "apps", content).Render(ctx, w)
+}
+
+// ServeAppsNewModal renders the dynamic app creation modal form.
+func (dc *DashboardController) ServeAppsNewModal(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	clients, err := dc.Store.GetAllClients(ctx)
+	if err != nil {
+		log.Printf("[Dashboard] Error loading clients for app modal: %v", err)
+		http.Error(w, "Failed to load client organizations", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	_ = templates.AppModal(clients).Render(ctx, w)
+}
+
+// CreateApp handles logical application profile creation submissions.
+func (dc *DashboardController) CreateApp(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx := r.Context()
+
+	appID := r.FormValue("app_id")
+	appName := r.FormValue("app_name")
+	clientID := r.FormValue("client_id")
+	priority := r.FormValue("priority")
+	rpmStr := r.FormValue("rpm")
+	tpmStr := r.FormValue("tpm")
+
+	rpm, _ := strconv.Atoi(rpmStr)
+	tpm, _ := strconv.Atoi(tpmStr)
+
+	err := dc.Store.SaveApp(ctx, config.App{
+		ID:       appID,
+		ClientID: clientID,
+		Name:     appName,
+		RPM:      rpm,
+		TPM:      tpm,
+		Priority: priority,
+	})
+	if err != nil {
+		log.Printf("[Dashboard] Error saving application profile: %v", err)
+		http.Error(w, "Failed to save application profile", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/apps", http.StatusSeeOther)
+}
+
+// DeleteApp deletes an application profile dynamically.
+func (dc *DashboardController) DeleteApp(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx := r.Context()
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "Missing application ID", http.StatusBadRequest)
+		return
+	}
+
+	err := dc.Store.DeleteApp(ctx, id)
+	if err != nil {
+		log.Printf("[Dashboard] Error deleting application profile: %v", err)
+		http.Error(w, "Failed to delete application profile", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(""))
+}

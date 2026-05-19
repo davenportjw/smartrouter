@@ -6,10 +6,11 @@ import (
 )
 
 
-// KeysViewModel binds keys and their associated client profiles together for the view.
+// KeysViewModel binds keys, their parent clients, and logical apps together for the view.
 type KeysViewModel struct {
-	Key      config.APIKey
-	Client   config.Client
+	Key    config.APIKey
+	Client config.Client
+	App    config.App
 }
 
 templ KeysTab(items []KeysViewModel) {
@@ -17,9 +18,9 @@ templ KeysTab(items []KeysViewModel) {
 		<!-- Header & Actions -->
 		<div class="sm:flex sm:items-center sm:justify-between">
 			<div>
-				<h1 class="text-2xl font-bold tracking-tight text-gray-900">API Credentials</h1>
+				<h1 class="text-2xl font-bold tracking-tight text-gray-900">Access Control</h1>
 				<p class="mt-2 text-sm text-gray-700">
-					Manage active API keys, client priority profiles, and rate limit profiles.
+					Manage active API keys and Google Service Account credentials. Access rules inherit their logical application's specific rate capacity and queueing priorities.
 				</p>
 			</div>
 			<div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
@@ -28,7 +29,7 @@ templ KeysTab(items []KeysViewModel) {
 					hx-target="#modal-container"
 					class="block rounded-md bg-blue-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-blue-500 transition"
 				>
-					Create Client & Key
+					Generate API Key
 				</button>
 			</div>
 		</div>
@@ -46,8 +47,8 @@ templ KeysTab(items []KeysViewModel) {
 						</svg>
 					</div>
 					<div class="text-left">
-						<span class="text-sm font-semibold text-gray-900">How to configure and use your Smart Router API Keys</span>
-						<p class="text-xs text-gray-500">View endpoints, authentication headers, and code examples</p>
+						<span class="text-sm font-semibold text-gray-900">How to configure and authenticate with the Smart Router</span>
+						<p class="text-xs text-gray-500">View endpoints, API Key methods, Google Service Account (IAM) setups, and SDK examples</p>
 					</div>
 				</div>
 				<div class="text-gray-400 group-open:rotate-180 transition-transform duration-200">
@@ -57,7 +58,7 @@ templ KeysTab(items []KeysViewModel) {
 				</div>
 			</summary>
 			
-			<div class="p-6 border-t border-gray-200 bg-white space-y-6 text-sm text-gray-600 text-left">
+			<div class="p-6 border-t border-gray-200 bg-white space-y-8 text-sm text-gray-600 text-left">
 				<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
 					<!-- Endpoint & Auth -->
 					<div class="md:col-span-1 space-y-4 border-r border-gray-100 pr-6">
@@ -68,7 +69,7 @@ templ KeysTab(items []KeysViewModel) {
 							</div>
 						</div>
 						<div>
-							<h4 class="text-xs font-bold uppercase tracking-wider text-gray-500">Auth Methods</h4>
+							<h4 class="text-xs font-bold uppercase tracking-wider text-gray-500">Auth Options</h4>
 							<ul class="mt-2 space-y-2 text-xs">
 								<li class="flex items-center gap-2">
 									<span class="px-1.5 py-0.5 bg-blue-50 text-blue-700 font-semibold rounded">Header</span>
@@ -82,13 +83,17 @@ templ KeysTab(items []KeysViewModel) {
 									<span class="px-1.5 py-0.5 bg-purple-50 text-purple-700 font-semibold rounded">Bearer</span>
 									<code class="font-mono text-gray-700">Bearer YOUR_KEY</code>
 								</li>
+								<li class="flex items-center gap-2">
+									<span class="px-1.5 py-0.5 bg-pink-50 text-pink-700 font-semibold rounded">OIDC JWT</span>
+									<code class="font-mono text-gray-700">Bearer GOOGLE_ID_TOKEN</code>
+								</li>
 							</ul>
 						</div>
 					</div>
 
 					<!-- Code Tabs/Examples -->
 					<div class="md:col-span-2 space-y-4">
-						<h4 class="text-xs font-bold uppercase tracking-wider text-gray-500">SDK & HTTP Integration Examples</h4>
+						<h4 class="text-xs font-bold uppercase tracking-wider text-gray-500">API Key Integration Examples</h4>
 						
 						<div class="space-y-4">
 							<!-- curl block -->
@@ -152,6 +157,54 @@ const ai = new GoogleGenAI({"{"}
 						</div>
 					</div>
 				</div>
+
+				<!-- Google Service Account Setup -->
+				<div class="border-t border-gray-200 pt-6 space-y-4">
+					<div class="flex items-center gap-2 text-blue-600">
+						<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.57-.598-3.75h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+						</svg>
+						<h4 class="text-sm font-bold uppercase tracking-wider">Google Service Account & IAM Authentication (Zero-Key)</h4>
+					</div>
+					<p class="text-xs text-gray-500 leading-relaxed">
+						You can interact with the router using native Google Service Accounts or Google Identities directly. Instead of managing custom API keys, authenticate calls via Google OpenID Connect (OIDC) ID Tokens. 
+					</p>
+
+					<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+						<!-- Configuration Step -->
+						<div class="md:col-span-1 bg-blue-50/50 rounded-lg p-4 border border-blue-100 space-y-3">
+							<h5 class="text-xs font-bold text-blue-900 uppercase">1. Router Registration</h5>
+							<ol class="list-decimal pl-4 text-xs text-blue-950 space-y-2">
+								<li>Navigate to the <a href="/admin/apps" class="text-blue-600 hover:underline font-semibold">Applications</a> tab.</li>
+								<li>Add a new Application.</li>
+								<li>Set the <strong>Application ID (Slug)</strong> exactly to your Google Service Account's email address (e.g., <code class="bg-blue-100/80 px-1 rounded font-mono">my-service-account@project.iam.gserviceaccount.com</code>).</li>
+								<li>Set your desired RPM, TPM, and queueing priorities.</li>
+							</ol>
+						</div>
+
+						<!-- Invocation Step -->
+						<div class="md:col-span-2 space-y-3">
+							<h5 class="text-xs font-bold text-gray-900 uppercase">2. Direct API Invocation</h5>
+							<p class="text-xs text-gray-500">
+								When executing requests, fetch an OIDC ID Token representing the Service Account, using the router URL as the audience parameter. Send it in the standard <code class="font-mono bg-gray-100 text-gray-700 px-1 rounded">Authorization</code> header:
+							</p>
+
+							<div class="rounded-lg overflow-hidden bg-gray-950">
+								<div class="bg-gray-900 px-4 py-1.5 flex justify-between items-center">
+									<span class="text-xs font-semibold text-gray-400 font-mono">cURL / Google IAM Integration</span>
+								</div>
+								<pre class="p-4 text-xs font-mono text-gray-300 overflow-x-auto whitespace-pre-wrap"><code># 1. Generate a Google ID (OIDC) Token bound to the router's audience
+token=$(gcloud auth print-identity-token --audience="<span class="dynamic-origin-url">http://localhost:8080</span>")
+
+# 2. Execute router Gemini API request natively without an API Key
+curl -X POST "<span class="dynamic-origin-url">http://localhost:8080</span>/v1/models/gemini-1.5-flash:generateContent" \
+  -H "Authorization: Bearer $token" \
+  -H "Content-Type: application/json" \
+  -d '{"{"}contents": [{"{"}parts":[{"{"}text": "Hello from Service Account!"{"}"}]{"}"}]{"}"}'</code></pre>
+							</div>
+						</div>
+					</div>
+				</div>
 			</div>
 			
 			<!-- Self-executing script to dynamically grab and replace active base domain -->
@@ -176,10 +229,11 @@ const ai = new GoogleGenAI({"{"}
 				<table class="min-w-full divide-y divide-gray-300">
 					<thead class="bg-gray-50">
 						<tr>
-							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Client Name</th>
+							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Bound Application</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Parent Client</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Key Hash</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Tier</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Priority</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Billing Tier</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Queueing Priority</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Limits (RPM/TPM)</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Status</th>
 							<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
@@ -191,8 +245,12 @@ const ai = new GoogleGenAI({"{"}
 						for _, item := range items {
 							<tr class="hover:bg-gray-50 transition-colors">
 								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
-									<div class="font-semibold text-gray-900">{ item.Client.Name }</div>
-									<div class="text-xs text-gray-400">{ item.Client.ID }</div>
+									<div class="font-semibold text-gray-900">{ item.App.Name }</div>
+									<div class="text-xs text-gray-400 font-mono">{ item.App.ID }</div>
+								</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600">
+									<div class="font-medium text-gray-800">{ item.Client.Name }</div>
+									<div class="text-xs text-gray-400 font-mono">{ item.Client.ID }</div>
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm font-mono text-gray-500 text-xs">
 									{ item.Key.KeyHash[:8] }...{ item.Key.KeyHash[len(item.Key.KeyHash)-8:] }
@@ -203,13 +261,13 @@ const ai = new GoogleGenAI({"{"}
 									</span>
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm">
-									<span class={ "inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset " + getPriorityBadgeStyle(item.Client.Priority) }>
-										{ item.Client.Priority }
+									<span class={ "inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset " + getPriorityBadgeStyle(item.App.Priority) }>
+										{ item.App.Priority }
 									</span>
 								</td>
-								<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600">
-									<span class="font-medium text-gray-900">{ intToString(item.Client.RPM) }</span> RPM /
-									<span class="font-medium text-gray-900">{ intToString(item.Client.TPM) }</span> TPM
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-mono text-xs">
+									<span class="font-semibold text-gray-950">{ intToString(item.App.RPM) }</span> RPM /
+									<span class="font-semibold text-gray-950">{ intToString(item.App.TPM) }</span> TPM
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm">
 									if item.Key.Status == "active" {
@@ -232,7 +290,7 @@ const ai = new GoogleGenAI({"{"}
 									if item.Key.Status == "active" {
 										<button
 											hx-post={ "/admin/keys/revoke?hash=" + item.Key.KeyHash }
-											hx-confirm={ "Are you sure you want to revoke API credentials for " + item.Client.Name + "?" }
+											hx-confirm={ "Are you sure you want to revoke API credentials for " + item.App.Name + "?" }
 											hx-target="closest tr"
 											hx-swap="outerHTML"
 											class="text-red-600 hover:text-red-900 transition font-semibold"
