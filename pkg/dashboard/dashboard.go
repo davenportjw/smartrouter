@@ -32,6 +32,7 @@ type DashboardController struct {
 	ProjectID   string
 	Location    string
 	TokenSource oauth2.TokenSource
+	HTTPClient  *http.Client
 }
 
 // NewDashboardController initializes a new dashboard controller.
@@ -46,6 +47,7 @@ func NewDashboardController(store *config.ConfigStore, projectID, location strin
 		ProjectID: projectID,
 		Location:  location,
 		TokenSource: ts,
+		HTTPClient:  &http.Client{Timeout: 15 * time.Second},
 		Firebase: templates.FirebaseConfig{
 			APIKey:            os.Getenv("FIREBASE_API_KEY"),
 			AuthDomain:        os.Getenv("FIREBASE_AUTH_DOMAIN"),
@@ -56,6 +58,13 @@ func NewDashboardController(store *config.ConfigStore, projectID, location strin
 			IsLocalDev:        os.Getenv("LOCAL_DEV") == "true",
 		},
 	}
+}
+
+func (dc *DashboardController) getHTTPClient() *http.Client {
+	if dc.HTTPClient == nil {
+		return &http.Client{Timeout: 15 * time.Second}
+	}
+	return dc.HTTPClient
 }
 
 // ServeLogin renders the Firebase-enabled login view.
@@ -517,13 +526,13 @@ func generateSecureKey() (string, error) {
 
 // Helper functions for location compatibility matching
 func getMultiRegionParent(loc string) string {
-	if strings.HasPrefix(loc, "us-") {
+	if loc == "us" || strings.HasPrefix(loc, "us-") {
 		return "us"
 	}
-	if strings.HasPrefix(loc, "europe-") || strings.HasPrefix(loc, "eu-") {
+	if loc == "eu" || strings.HasPrefix(loc, "europe-") || strings.HasPrefix(loc, "eu-") {
 		return "eu"
 	}
-	if strings.HasPrefix(loc, "asia-") {
+	if loc == "asia" || strings.HasPrefix(loc, "asia-") {
 		return "asia"
 	}
 	return ""
@@ -536,8 +545,9 @@ func isLocationCompatible(routerLoc, modelLoc string) bool {
 	if routerLoc == modelLoc {
 		return true
 	}
-	parent := getMultiRegionParent(routerLoc)
-	return parent != "" && parent == modelLoc
+	routerParent := getMultiRegionParent(routerLoc)
+	modelParent := getMultiRegionParent(modelLoc)
+	return routerParent != "" && routerParent == modelParent
 }
 
 // aggregateModelStats compiles real-time or high-fidelity simulated metrics per active model.
@@ -673,10 +683,18 @@ func (dc *DashboardController) RefreshModels(w http.ResponseWriter, r *http.Requ
 		activeStatus[m.ID] = m.Active
 	}
 
-	locationsToFetch := []string{dc.Location}
-	parentLoc := getMultiRegionParent(dc.Location)
-	if parentLoc != "" {
-		locationsToFetch = append(locationsToFetch, parentLoc)
+	var locationsToFetch []string
+	locations, fetchLocErr := dc.fetchLocations(ctx)
+	if fetchLocErr == nil {
+		for _, l := range locations {
+			if isLocationCompatible(dc.Location, l.ID) {
+				locationsToFetch = append(locationsToFetch, l.ID)
+			}
+		}
+	}
+	// Fallback to local location if listing failed or returned nothing
+	if len(locationsToFetch) == 0 {
+		locationsToFetch = []string{dc.Location}
 	}
 
 	for _, loc := range locationsToFetch {
@@ -707,20 +725,21 @@ func (dc *DashboardController) RefreshModels(w http.ResponseWriter, r *http.Requ
 		endpoints, err := dc.fetchEndpoints(ctx, loc)
 		if err == nil {
 			for _, ep := range endpoints {
-				for _, dm := range ep.DeployedModels {
-					// dm.ModelPath is the resource name
-					if !config.IsValidModelName(dm.ModelPath) {
-						continue
-					}
-					active := activeStatus[dm.ModelPath] // retain existing state
-					_ = dc.Store.SaveModel(ctx, config.ModelConfig{
-						ID:          dm.ModelPath,
-						DisplayName: dm.DisplayName,
-						Location:    loc,
-						Type:        "endpoint",
-						Active:      active,
-					})
+				if !config.IsValidModelName(ep.Name) {
+					continue
 				}
+				displayName := ep.DisplayName
+				if len(ep.DeployedModels) > 0 {
+					displayName = ep.DeployedModels[0].DisplayName
+				}
+				active := activeStatus[ep.Name] // retain existing state
+				_ = dc.Store.SaveModel(ctx, config.ModelConfig{
+					ID:          ep.Name,
+					DisplayName: displayName,
+					Location:    loc,
+					Type:        "endpoint",
+					Active:      active,
+				})
 			}
 		} else {
 			log.Printf("[Dashboard] fetchEndpoints failed for loc %q: %v", loc, err)
@@ -798,7 +817,7 @@ func (dc *DashboardController) gcpGet(ctx context.Context, url string) ([]byte, 
 	}
 
 	req.Header.Set("Authorization", "Bearer "+token.AccessToken)
-	client := &http.Client{Timeout: 15 * time.Second}
+	client := dc.getHTTPClient()
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
@@ -990,7 +1009,7 @@ func (dc *DashboardController) gcpPost(ctx context.Context, url string, body int
 	req.Header.Set("Authorization", "Bearer "+token.AccessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 15 * time.Second}
+	client := dc.getHTTPClient()
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err

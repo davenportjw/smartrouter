@@ -245,4 +245,13 @@ if [ -n "$SERVICE_URL" ]; then
     echo -e "Gemini Smart Router API Endpoint:"
     echo -e "👉 ${GREEN}$SERVICE_URL${NC}"
     echo -e "------------------------------------------------------------\n"
+
+    log_info "Initiating post-deployment verification tests..."
+    export SERVICE_URL="$SERVICE_URL"
+    if go run cmd/verify/main.go; then
+        log_success "Post-deployment verification tests passed!"
+    else
+        log_error "Post-deployment verification tests failed! Please check logs."
+        exit 1
+    fi
 fi

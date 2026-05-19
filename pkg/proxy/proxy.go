@@ -173,11 +173,11 @@ func NewRouterProxy(store *config.ConfigStore, projectID, location string) (*Rou
 				targetModel = req.Header.Get("X-Requested-Model")
 			}
 
-			parts := strings.Split(req.URL.Path, "/models/")
-			if len(parts) < 2 {
+			idx := strings.Index(req.URL.Path, "/models/")
+			if idx == -1 {
 				return
 			}
-			modelAndAction := parts[1]
+			modelAndAction := req.URL.Path[idx+len("/models/"):]
 			actionParts := strings.Split(modelAndAction, ":")
 
 			var action string
@@ -185,9 +185,13 @@ func NewRouterProxy(store *config.ConfigStore, projectID, location string) (*Rou
 				action = ":" + actionParts[1]
 			}
 
-			newPath := fmt.Sprintf("/v1/projects/%s/locations/%s/publishers/google/models/%s%s",
-				rp.ProjectID, modelLoc, targetModel, action)
-			req.URL.Path = newPath
+			if strings.HasPrefix(targetModel, "projects/") {
+				req.URL.Path = "/v1/" + targetModel + action
+			} else {
+				newPath := fmt.Sprintf("/v1/projects/%s/locations/%s/publishers/google/models/%s%s",
+					rp.ProjectID, modelLoc, targetModel, action)
+				req.URL.Path = newPath
+			}
 		} else if resource == "reasoningEngines" || resource == "ragCorpora" {
 			remainingPath := strings.Join(pathParts[2:], "/")
 			newPath := fmt.Sprintf("/%s/projects/%s/locations/%s/%s",
@@ -294,9 +298,9 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if len(pathParts) >= 3 {
 		resource := pathParts[2]
 		if resource == "models" {
-			parts := strings.Split(r.URL.Path, "/models/")
-			if len(parts) >= 2 {
-				modelAndAction := parts[1]
+			idx := strings.Index(r.URL.Path, "/models/")
+			if idx != -1 {
+				modelAndAction := r.URL.Path[idx+len("/models/"):]
 				actionParts := strings.Split(modelAndAction, ":")
 				requestedModel := actionParts[0]
 

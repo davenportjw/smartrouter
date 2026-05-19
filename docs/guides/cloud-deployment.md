@@ -64,3 +64,13 @@ Invokes Terraform inside `/terraform` to provision and configure cloud resources
 2. Triggers a remote Google **Cloud Build** task to containerize the Go proxy.
 3. Deploys the container to a **Google Cloud Run** service.
 4. Outputs your live Smart Router Endpoint URL!
+
+### Phase 6: Post-Deployment Verification Tests
+Immediately after deployment, the pipeline automatically invokes the Go verification tool (`go run cmd/verify/main.go`):
+* **Programmatic Seeding**: Connects directly to your native Cloud Firestore instance to safely seed a temporary test client, application profile, custom API key, and high-priority routing rule.
+* **Integration Checks**: Makes active upstream REST queries through the newly deployed Cloud Run service URL to test key functionality:
+  1. Standard generation requests (routing to `gemini-2.5-flash`).
+  2. Rules-based routing (header overrides routing `gemini-1.5-pro` to `gemini-2.5-pro`).
+  3. Security boundaries (unauthenticated requests returning `401 Unauthorized`).
+* **Automatic Cleanup**: Thoroughly deletes all seeded test data from Firestore immediately upon completion, leaving the production environment in a clean state.
+* **Pipeline Safety**: If any verification scenario fails, the deployment pipeline terminates with an exit code of `1`.

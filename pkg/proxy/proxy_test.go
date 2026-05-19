@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"geminirouter/pkg/config"
+	"geminirouter/pkg/dashboard"
 
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/oauth2"
@@ -1618,6 +1619,224 @@ func (h *hostCapturingRoundTripper) RoundTrip(req *http.Request) (*http.Response
 	req.URL.Host = h.Target.Host
 	req.Host = h.Target.Host
 	return http.DefaultTransport.RoundTrip(req)
+}
+
+type mockGCPRoundTripper struct {
+	Target *url.URL
+}
+
+func (m *mockGCPRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.URL.Scheme = m.Target.Scheme
+	req.URL.Host = m.Target.Host
+	req.Host = m.Target.Host
+	return http.DefaultTransport.RoundTrip(req)
+}
+
+func TestProxyModelDiscoveryAndRoutingWorkflow(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+
+	ctx := context.Background()
+	store, err := config.NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to initialize config store: %v", err)
+	}
+
+	// Seed initial App, Client, Key
+	app := config.App{ID: "app-discovery", ClientID: "client-discovery", RPM: 100, TPM: 10000}
+	client := config.Client{ID: "client-discovery", Tier: "premium"}
+	key := config.APIKey{KeyHash: config.HashKey("key-discovery-test"), AppID: "app-discovery", Status: "active"}
+	_ = store.SaveClient(ctx, client)
+	_ = store.SaveApp(ctx, app)
+	_ = store.SaveKey(ctx, key)
+	_ = store.DeleteHeader(ctx, "header-1")
+	_ = store.DeleteRule(ctx, "rule-1")
+
+	// Instantiate dashboard controller
+	dash := dashboard.NewDashboardController(store, "test-project", "us-central1")
+
+	// Set up mock local server to act as the GCP Vertex AI API
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if strings.Contains(r.URL.Path, "/models") {
+			w.Write([]byte(`{
+				"models": [
+					{
+						"name": "projects/test-project/locations/us-central1/models/gemini-custom-us",
+						"displayName": "Gemini US Custom Weights (Mock)",
+						"versionId": "v1",
+						"createTime": "2026-05-19T13:00:00Z",
+						"baseModelSource": {
+							"modelGardenSource": {
+								"publicModelName": "gemini-2.5-flash"
+							}
+						}
+					}
+				]
+			}`))
+		} else if strings.Contains(r.URL.Path, "/endpoints") {
+			w.Write([]byte(`{
+				"endpoints": [
+					{
+						"name": "projects/test-project/locations/us-central1/endpoints/ep-custom-us",
+						"displayName": "US Serving Endpoint (Mock)",
+						"createTime": "2026-05-19T13:00:00Z",
+						"deployedModels": [
+							{
+								"id": "deployed-1",
+								"model": "projects/test-project/locations/us-central1/models/gemini-custom-us",
+								"displayName": "Gemini US Custom Deployed",
+								"createTime": "2026-05-19T13:00:00Z"
+							}
+						]
+					}
+				]
+			}`))
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer mockServer.Close()
+
+	mockServerURL, _ := url.Parse(mockServer.URL)
+	dash.HTTPClient = &http.Client{
+		Transport: &mockGCPRoundTripper{Target: mockServerURL},
+	}
+
+	var receivedPath string
+	var mu sync.Mutex
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		receivedPath = r.URL.Path
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status": "success"}`))
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+	rp, _ := NewRouterProxy(store, "test-project", "us-central1")
+	rp.TokenSource = &mockTokenSource{}
+	rp.Target = backendURL
+	capturer := &hostCapturingRoundTripper{Target: backendURL}
+	rp.Proxy.Transport = capturer
+
+	// 1. Verify custom model (gemini-custom-us) and endpoint (ep-custom-us) are not registered/active
+	targetModelID := "projects/test-project/locations/us-central1/models/gemini-custom-us"
+	targetEndpointID := "projects/test-project/locations/us-central1/endpoints/ep-custom-us"
+
+	_, ok := store.LookupActiveModel(targetModelID)
+	if ok {
+		t.Fatalf("gemini-custom-us should not be active before discovery")
+	}
+	_, ok = store.LookupActiveModel(targetEndpointID)
+	if ok {
+		t.Fatalf("ep-custom-us should not be active before discovery")
+	}
+
+	// 2. Perform a Refresh call via Dashboard Controller
+	wRec := httptest.NewRecorder()
+	reqRefresh := httptest.NewRequest("POST", "/admin/models/refresh", nil)
+	dash.RefreshModels(wRec, reqRefresh)
+
+	if wRec.Code != http.StatusSeeOther {
+		t.Fatalf("expected status 303 redirect from RefreshModels, got %d", wRec.Code)
+	}
+
+	// 3. Verify models and endpoints were discovered and persisted
+	models, err := store.GetAllModels(ctx)
+	if err != nil {
+		t.Fatalf("failed to fetch models: %v", err)
+	}
+
+	var foundModel, foundEndpoint *config.ModelConfig
+	for _, m := range models {
+		if m.ID == targetModelID {
+			mCopy := m
+			foundModel = &mCopy
+		}
+		if m.ID == targetEndpointID {
+			mCopy := m
+			foundEndpoint = &mCopy
+		}
+	}
+
+	if foundModel == nil {
+		t.Fatalf("expected to find discovered model %q", targetModelID)
+	}
+	if foundEndpoint == nil {
+		t.Fatalf("expected to find discovered endpoint %q", targetEndpointID)
+	}
+
+	if foundModel.Active || foundEndpoint.Active {
+		t.Fatalf("discovered items should not be active by default")
+	}
+
+	// 4. Toggle/Activate the custom model and endpoint
+	wRecToggle1 := httptest.NewRecorder()
+	form1 := url.Values{}
+	form1.Add("model_id", targetModelID)
+	form1.Add("active", "true")
+	reqToggle1 := httptest.NewRequest("POST", "/admin/models/toggle", strings.NewReader(form1.Encode()))
+	reqToggle1.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	dash.ToggleModel(wRecToggle1, reqToggle1)
+
+	wRecToggle2 := httptest.NewRecorder()
+	form2 := url.Values{}
+	form2.Add("model_id", targetEndpointID)
+	form2.Add("active", "true")
+	reqToggle2 := httptest.NewRequest("POST", "/admin/models/toggle", strings.NewReader(form2.Encode()))
+	reqToggle2.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	dash.ToggleModel(wRecToggle2, reqToggle2)
+
+	// Verify active status
+	activeModel, ok := store.LookupActiveModel(targetModelID)
+	if !ok || !activeModel.Active {
+		t.Fatalf("expected model %q to be active", targetModelID)
+	}
+	activeEndpoint, ok := store.LookupActiveModel(targetEndpointID)
+	if !ok || !activeEndpoint.Active {
+		t.Fatalf("expected endpoint %q to be active", targetEndpointID)
+	}
+
+	// 5. Test Proxy Path Rewriter for custom model path
+	reqProxy1 := httptest.NewRequest("POST", "/v1/models/"+targetModelID+":generateContent?key=key-discovery-test", strings.NewReader(`{}`))
+	reqProxy1.Header.Set("x-goog-api-key", "key-discovery-test")
+	rrProxy1 := httptest.NewRecorder()
+	rp.ServeHTTP(rrProxy1, reqProxy1)
+
+	if rrProxy1.Code != http.StatusOK {
+		t.Fatalf("expected proxy response code 200, got %d. Body: %s", rrProxy1.Code, rrProxy1.Body.String())
+	}
+
+	mu.Lock()
+	path1 := receivedPath
+	mu.Unlock()
+
+	expectedPath1 := "/v1/" + targetModelID + ":generateContent"
+	if path1 != expectedPath1 {
+		t.Errorf("expected path rewrite for custom model to be %q, got %q", expectedPath1, path1)
+	}
+
+	// 6. Test Proxy Path Rewriter for custom endpoint path
+	reqProxy2 := httptest.NewRequest("POST", "/v1/models/"+targetEndpointID+":generateContent?key=key-discovery-test", strings.NewReader(`{}`))
+	reqProxy2.Header.Set("x-goog-api-key", "key-discovery-test")
+	rrProxy2 := httptest.NewRecorder()
+	rp.ServeHTTP(rrProxy2, reqProxy2)
+
+	if rrProxy2.Code != http.StatusOK {
+		t.Fatalf("expected proxy response code 200, got %d. Body: %s", rrProxy2.Code, rrProxy2.Body.String())
+	}
+
+	mu.Lock()
+	path2 := receivedPath
+	mu.Unlock()
+
+	expectedPath2 := "/v1/" + targetEndpointID + ":generateContent"
+	if path2 != expectedPath2 {
+		t.Errorf("expected path rewrite for custom endpoint to be %q, got %q", expectedPath2, path2)
+	}
+
+	os.RemoveAll("data/local_db.json")
 }
 
 
