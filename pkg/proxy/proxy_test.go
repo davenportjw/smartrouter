@@ -2162,8 +2162,8 @@ func TestPublisherModelsDiscovery(t *testing.T) {
 		t.Errorf("expected model type 'foundation', got %q", found.Type)
 	}
 
-	if !found.Active {
-		t.Errorf("newly discovered foundation model should be active by default")
+	if found.Active {
+		t.Errorf("newly discovered foundation model should be inactive by default")
 	}
 
 	os.RemoveAll("data/local_db.json")
@@ -2251,8 +2251,8 @@ func TestFirstStartDiscoveryBootstrap(t *testing.T) {
 		t.Errorf("expected bootstrapped model type 'foundation', got %q", found.Type)
 	}
 
-	if !found.Active {
-		t.Errorf("bootstrapped foundation model should be active by default")
+	if found.Active {
+		t.Errorf("bootstrapped foundation model should be inactive by default")
 	}
 
 	os.RemoveAll("data/local_db.json")

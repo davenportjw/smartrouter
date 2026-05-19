@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -14,6 +16,35 @@ import (
 	"geminirouter/pkg/dashboard"
 	"geminirouter/pkg/proxy"
 )
+
+// getGCPRegion queries the local GCP metadata server to fetch the current Cloud Run/GCE region.
+func getGCPRegion() string {
+	client := &http.Client{Timeout: 1 * time.Second}
+	req, err := http.NewRequest("GET", "http://metadata.google.internal/computeMetadata/v1/instance/region", nil)
+	if err != nil {
+		return "us-central1"
+	}
+	req.Header.Set("Metadata-Flavor", "Google")
+	resp, err := client.Do(req)
+	if err != nil {
+		return "us-central1"
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "us-central1"
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "us-central1"
+	}
+	// Metadata server returns: projects/[NUM]/regions/[REGION]
+	val := strings.TrimSpace(string(body))
+	parts := strings.Split(val, "/regions/")
+	if len(parts) == 2 {
+		return parts[1]
+	}
+	return "us-central1"
+}
 
 func main() {
 	port := os.Getenv("PORT")
@@ -29,7 +60,11 @@ func main() {
 
 	location := os.Getenv("GEMINI_LOCATION")
 	if location == "" {
-		location = "us-central1"
+		if os.Getenv("LOCAL_DEV") == "true" {
+			location = "us-central1"
+		} else {
+			location = getGCPRegion()
+		}
 	}
 
 	ctx := context.Background()
@@ -107,6 +142,7 @@ func main() {
 	mux.Handle("/admin/models/toggle", authStore.Middleware(http.HandlerFunc(dashController.ToggleModel)))
 	mux.Handle("/admin/metrics", authStore.Middleware(http.HandlerFunc(dashController.ServeMetrics)))
 	mux.Handle("/admin/costs", authStore.Middleware(http.HandlerFunc(dashController.ServeCosts)))
+	mux.Handle("/admin/toggle-simulation", authStore.Middleware(http.HandlerFunc(dashController.ToggleSimulation)))
 
 	// Authentication endpoints
 	mux.HandleFunc("/login", dashController.ServeLogin)
@@ -118,7 +154,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:    ":" + port,
-		Handler: mux,
+		Handler: injectSimulationContext(mux),
 	}
 
 	// Listen for system signals to shut down gracefully
@@ -145,4 +181,16 @@ func main() {
 	}
 
 	log.Println("Server exiting cleanly.")
+}
+
+// injectSimulationContext extracts the simulate_metrics cookie and injects its value into the request context.
+func injectSimulationContext(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		simulate := false
+		if cookie, err := r.Cookie("simulate_metrics"); err == nil && cookie.Value == "true" {
+			simulate = true
+		}
+		ctx := context.WithValue(r.Context(), "simulate_metrics", simulate)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }
