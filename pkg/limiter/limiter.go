@@ -13,6 +13,8 @@ type ClientLimiter struct {
 	rpmLimiter *rate.Limiter
 	tpmLimiter *rate.Limiter
 	priority   string // "high", "medium", "low"
+	rpm        int
+	tpm        int
 }
 
 // NewClientLimiter creates a rate limiter for a client based on RPM and TPM settings.
@@ -30,6 +32,8 @@ func NewClientLimiter(rpm, tpm int, priority string) *ClientLimiter {
 		rpmLimiter: rate.NewLimiter(rate.Limit(float64(rpm)/60.0), rpm),
 		tpmLimiter: rate.NewLimiter(rate.Limit(float64(tpm)/60.0), tpm),
 		priority:   priority,
+		rpm:        rpm,
+		tpm:        tpm,
 	}
 }
 
@@ -46,8 +50,18 @@ func NewRateLimiterRegistry() *RateLimiterRegistry {
 	}
 }
 
-// UpdateLimiter dynamically updates or adds a client rate limiter.
+// UpdateLimiter creates a rate limiter for a client if one does not exist, or
+// replaces it only when the RPM, TPM, or priority settings have changed.
+// This preserves token bucket state across requests.
 func (rl *RateLimiterRegistry) UpdateLimiter(clientID string, rpm, tpm int, priority string) {
+	rl.mu.RLock()
+	existing, exists := rl.limiters[clientID]
+	rl.mu.RUnlock()
+
+	if exists && existing.rpm == rpm && existing.tpm == tpm && existing.priority == priority {
+		return
+	}
+
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 	rl.limiters[clientID] = NewClientLimiter(rpm, tpm, priority)

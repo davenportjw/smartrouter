@@ -2,6 +2,8 @@ package proxy
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
@@ -726,6 +728,275 @@ func TestRouterProxyGoogleIdentityAuth(t *testing.T) {
 	os.RemoveAll("data/local_db.json")
 }
 
+// --- Regression Tests: Double-write protection in proxy ServeHTTP ---
 
+// failingTokenSource simulates an OAuth2 token fetch failure.
+type failingTokenSource struct{}
 
+func (f *failingTokenSource) Token() (*oauth2.Token, error) {
+	return nil, fmt.Errorf("simulated token source failure")
+}
 
+func TestServeHTTP_DirectorError_ReturnsCleanErrorResponse(t *testing.T) {
+	// Regression test: When the Director encounters an error (e.g., token fetch failure),
+	// the proxy must return a proper HTTP error response without forwarding to upstream.
+	// Previously, the proxy would stream upstream data first, then attempt to write an
+	// error response, causing double-writes and potential panics.
+
+	t.Setenv("LOCAL_DEV", "true")
+
+	ctx := context.Background()
+	store, err := config.NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to initialize config store: %v", err)
+	}
+
+	// Seed minimal data: client, app, key
+	testClient := config.Client{
+		ID:       "client-dw",
+		Name:     "Double-Write Test Client",
+		Tier:     "standard",
+		RPM:      100,
+		TPM:      50000,
+		Priority: "low",
+	}
+	testApp := config.App{
+		ID:       "app-dw",
+		ClientID: "client-dw",
+		Name:     "Double-Write Test App",
+		RPM:      100,
+		TPM:      50000,
+		Priority: "low",
+	}
+	testKeyStr := "gr_key_doublewrite_test_99"
+	testKey := config.APIKey{
+		KeyHash: config.HashKey(testKeyStr),
+		AppID:   "app-dw",
+		Status:  "active",
+	}
+
+	_ = store.SaveClient(ctx, testClient)
+	_ = store.SaveApp(ctx, testApp)
+	_ = store.SaveKey(ctx, testKey)
+
+	// Clear seeded headers and rules to avoid interference
+	_ = store.DeleteHeader(ctx, "header-1")
+	_ = store.DeleteRule(ctx, "rule-1")
+
+	// Track whether the upstream was actually called
+	upstreamCalled := false
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamCalled = true
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"candidates": [{"content": "hello"}]}`))
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+	rp, err := NewRouterProxy(store, "test-project", "us-central1")
+	if err != nil {
+		t.Fatalf("failed to create RouterProxy: %v", err)
+	}
+
+	// Inject the failing token source to trigger a Director error
+	rp.TokenSource = &failingTokenSource{}
+	rp.Target = backendURL
+	// Wrap the mock transport in errorInterceptTransport so the Director's
+	// X-Router-Error header is intercepted before hitting the upstream.
+	rp.Proxy.Transport = &errorInterceptTransport{base: &mockRoundTripper{Target: backendURL}}
+
+	req := httptest.NewRequest("POST", "/v1/models/gemini-1.5-flash:generateContent?key="+testKeyStr, nil)
+	req.Header.Set("x-goog-api-key", testKeyStr)
+	rr := httptest.NewRecorder()
+
+	// This must not panic
+	rp.ServeHTTP(rr, req)
+
+	// The response should be an error, not a 200 with mixed content
+	if rr.Code == http.StatusOK {
+		t.Errorf("expected an error status code when token fetch fails, got 200")
+	}
+
+	// The response should be a 500 internal server error
+	if rr.Code != http.StatusInternalServerError {
+		t.Errorf("expected status 500, got %d", rr.Code)
+	}
+
+	// The body must be valid JSON, not corrupted/mixed content
+	body := rr.Body.String()
+	var errResp map[string]interface{}
+	if err := json.Unmarshal([]byte(body), &errResp); err != nil {
+		t.Errorf("response body is not valid JSON: %q (parse error: %v)", body, err)
+	}
+
+	// The error response should mention credentials
+	if !strings.Contains(body, "credentials") && !strings.Contains(body, "token") && !strings.Contains(body, "error") {
+		t.Errorf("error response should contain meaningful error info, got: %q", body)
+	}
+
+	// The upstream should NOT have been called when the Director fails
+	if upstreamCalled {
+		t.Errorf("upstream backend was called despite Director error; request should have been aborted before proxying")
+	}
+
+	os.RemoveAll("data/local_db.json")
+}
+
+func TestServeHTTP_DirectorError_NoPanic(t *testing.T) {
+	// Regression test: Verify that a Director error does not cause a panic
+	// from double-writing to the ResponseWriter.
+
+	t.Setenv("LOCAL_DEV", "true")
+
+	ctx := context.Background()
+	store, err := config.NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to initialize config store: %v", err)
+	}
+
+	testClient := config.Client{
+		ID:       "client-np",
+		Name:     "No-Panic Test Client",
+		Tier:     "premium",
+		RPM:      200,
+		TPM:      100000,
+		Priority: "high",
+	}
+	testApp := config.App{
+		ID:       "app-np",
+		ClientID: "client-np",
+		Name:     "No-Panic Test App",
+		RPM:      200,
+		TPM:      100000,
+		Priority: "high",
+	}
+	keyStr := "gr_key_nopanic_test_42"
+	testKey := config.APIKey{
+		KeyHash: config.HashKey(keyStr),
+		AppID:   "app-np",
+		Status:  "active",
+	}
+
+	_ = store.SaveClient(ctx, testClient)
+	_ = store.SaveApp(ctx, testApp)
+	_ = store.SaveKey(ctx, testKey)
+	_ = store.DeleteHeader(ctx, "header-1")
+	_ = store.DeleteRule(ctx, "rule-1")
+
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status": "should not reach here"}`))
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+	rp, err := NewRouterProxy(store, "test-project", "us-central1")
+	if err != nil {
+		t.Fatalf("failed to create RouterProxy: %v", err)
+	}
+	rp.TokenSource = &failingTokenSource{}
+	rp.Target = backendURL
+	rp.Proxy.Transport = &errorInterceptTransport{base: &mockRoundTripper{Target: backendURL}}
+
+	// Send multiple requests in sequence to stress the double-write path.
+	// If the bug exists, one of these will panic.
+	for i := 0; i < 10; i++ {
+		req := httptest.NewRequest("POST", "/v1/models/gemini-1.5-flash:generateContent?key="+keyStr, nil)
+		req.Header.Set("x-goog-api-key", keyStr)
+		rr := httptest.NewRecorder()
+
+		// Must not panic
+		rp.ServeHTTP(rr, req)
+
+		if rr.Code == http.StatusOK {
+			t.Errorf("iteration %d: expected error status when token fetch fails, got 200", i)
+		}
+	}
+
+	os.RemoveAll("data/local_db.json")
+}
+
+func TestServeHTTP_DirectorError_SingleWrite(t *testing.T) {
+	// Regression test: The response must be written exactly once.
+	// Verify that the Content-Length and body are consistent (no partial/double writes).
+
+	t.Setenv("LOCAL_DEV", "true")
+
+	ctx := context.Background()
+	store, err := config.NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to initialize config store: %v", err)
+	}
+
+	testClient := config.Client{
+		ID:       "client-sw",
+		Name:     "Single-Write Test Client",
+		Tier:     "standard",
+		RPM:      100,
+		TPM:      50000,
+		Priority: "medium",
+	}
+	testApp := config.App{
+		ID:       "app-sw",
+		ClientID: "client-sw",
+		Name:     "Single-Write Test App",
+		RPM:      100,
+		TPM:      50000,
+		Priority: "medium",
+	}
+	keyStr := "gr_key_singlewrite_test_77"
+	testKey := config.APIKey{
+		KeyHash: config.HashKey(keyStr),
+		AppID:   "app-sw",
+		Status:  "active",
+	}
+
+	_ = store.SaveClient(ctx, testClient)
+	_ = store.SaveApp(ctx, testApp)
+	_ = store.SaveKey(ctx, testKey)
+	_ = store.DeleteHeader(ctx, "header-1")
+	_ = store.DeleteRule(ctx, "rule-1")
+
+	// Backend that writes a large body to make double-write obvious
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"candidates": [{"content": {"parts": [{"text": "This is a large response that should never appear in the error case"}]}}]}`))
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+	rp, err := NewRouterProxy(store, "test-project", "us-central1")
+	if err != nil {
+		t.Fatalf("failed to create RouterProxy: %v", err)
+	}
+	rp.TokenSource = &failingTokenSource{}
+	rp.Target = backendURL
+	rp.Proxy.Transport = &errorInterceptTransport{base: &mockRoundTripper{Target: backendURL}}
+
+	req := httptest.NewRequest("POST", "/v1/models/gemini-1.5-flash:generateContent?key="+keyStr, nil)
+	req.Header.Set("x-goog-api-key", keyStr)
+	rr := httptest.NewRecorder()
+
+	rp.ServeHTTP(rr, req)
+
+	body := rr.Body.String()
+
+	// The body must NOT contain upstream response content mixed with error message
+	if strings.Contains(body, "candidates") {
+		t.Errorf("response body contains upstream content mixed with error; double-write detected: %q", body)
+	}
+
+	// Verify body is parseable as a single JSON object (not two concatenated objects)
+	decoder := json.NewDecoder(strings.NewReader(body))
+	var first json.RawMessage
+	if err := decoder.Decode(&first); err != nil {
+		t.Errorf("failed to parse first JSON object in body: %v", err)
+	}
+	var second json.RawMessage
+	if decoder.Decode(&second) == nil {
+		t.Errorf("response body contains multiple JSON objects (double-write): %q", body)
+	}
+
+	os.RemoveAll("data/local_db.json")
+}

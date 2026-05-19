@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -21,6 +22,40 @@ import (
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/idtoken"
 )
+
+// errorInterceptTransport wraps an http.RoundTripper to short-circuit requests
+// when the Director has flagged an error via the X-Router-Error header.
+// This prevents sending a broken request upstream and lets the reverse proxy
+// write a proper error response instead of double-writing after the fact.
+type errorInterceptTransport struct {
+	base http.RoundTripper
+}
+
+func (t *errorInterceptTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if routerErr := req.Header.Get("X-Router-Error"); routerErr != "" {
+		// Remove the internal header so it doesn't leak upstream
+		req.Header.Del("X-Router-Error")
+
+		var statusCode int
+		var body string
+		switch routerErr {
+		case "TokenError":
+			statusCode = http.StatusInternalServerError
+			body = `{"error": {"message": "Failed to retrieve Google Cloud credentials."}}`
+		default:
+			statusCode = http.StatusInternalServerError
+			body = `{"error": {"message": "Internal router error."}}`
+		}
+
+		return &http.Response{
+			StatusCode: statusCode,
+			Header:     http.Header{"Content-Type": {"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(body)),
+			Request:    req,
+		}, nil
+	}
+	return t.base.RoundTrip(req)
+}
 
 // RouterProxy wraps the httputil.ReverseProxy to add custom routing and logging.
 type RouterProxy struct {
@@ -114,6 +149,7 @@ func NewRouterProxy(store *config.ConfigStore, projectID, location string) (*Rou
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(target)
+	proxy.Transport = &errorInterceptTransport{base: http.DefaultTransport}
 
 	originalDirector := proxy.Director
 	proxy.Director = func(req *http.Request) {
@@ -374,19 +410,11 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(delay)
 	}
 
-	// Execute standard reverse proxy
+	// Execute standard reverse proxy.
+	// Director errors (e.g. token fetch failure) are handled by the
+	// errorInterceptTransport which returns a synthetic error response
+	// instead of hitting the upstream, avoiding double-writes.
 	rp.Proxy.ServeHTTP(wrapped, r)
-
-	// Access internal headers we populated during Director
-	routerError := r.Header.Get("X-Router-Error")
-	if routerError == "ClientNotFound" {
-		http.Error(w, `{"error": {"message": "Client configuration missing."}}`, http.StatusInternalServerError)
-		return
-	}
-	if routerError == "TokenError" {
-		http.Error(w, `{"error": {"message": "Failed to retrieve Google Cloud credentials."}}`, http.StatusInternalServerError)
-		return
-	}
 
 	latency := time.Since(startTime).Milliseconds()
 
