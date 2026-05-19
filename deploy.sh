@@ -228,6 +228,14 @@ gcloud run deploy gemini-smart-router \
   --project "$GOOGLE_CLOUD_PROJECT" \
   --quiet
 
+log_info "Triggering Google Cloud Build and Deploying active Go traffic generator to Cloud Run..."
+gcloud run deploy gemini-traffic-generator \
+  --source ./generator \
+  --region us-central1 \
+  --service-account "gemini-router-runner@$GOOGLE_CLOUD_PROJECT.iam.gserviceaccount.com" \
+  --project "$GOOGLE_CLOUD_PROJECT" \
+  --quiet
+
 log_success "Deployment completed successfully!"
 
 # Get Cloud Run service URL

@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -71,18 +73,19 @@ func (rw *responseWriterWrapper) Flush() {
 
 // StructuredLog defines the JSON format for our server metrics.
 type StructuredLog struct {
-	Severity     string `json:"severity"`
-	Time         string `json:"time"`
-	Method       string `json:"method"`
-	Path         string `json:"path"`
-	Client       string `json:"client_id,omitempty"`
-	Tier         string `json:"tier,omitempty"`
-	ModelIn      string `json:"model_requested,omitempty"`
-	ModelOut     string `json:"model_routed,omitempty"`
-	Status       int    `json:"status"`
-	LatencyMs    int64  `json:"latency_ms"`
-	BytesSent    int64  `json:"bytes_sent"`
-	ErrorMessage string `json:"error_message,omitempty"`
+	Severity      string            `json:"severity"`
+	Time          string            `json:"time"`
+	Method        string            `json:"method"`
+	Path          string            `json:"path"`
+	Client        string            `json:"client_id,omitempty"`
+	Tier          string            `json:"tier,omitempty"`
+	ModelIn       string            `json:"model_requested,omitempty"`
+	ModelOut      string            `json:"model_routed,omitempty"`
+	Status        int               `json:"status"`
+	LatencyMs     int64             `json:"latency_ms"`
+	BytesSent     int64             `json:"bytes_sent"`
+	ErrorMessage  string            `json:"error_message,omitempty"`
+	CustomHeaders map[string]string `json:"custom_headers,omitempty"`
 }
 
 // NewRouterProxy creates a new reverse proxy pointing to the upstream Gemini API.
@@ -114,71 +117,46 @@ func NewRouterProxy(store *config.ConfigStore, projectID, location string) (*Rou
 		originalDirector(req)
 		req.Host = target.Host
 
-		// 1. Extract and Validate API Key
-		clientKey := extractAPIKey(req)
-		keyData, ok := rp.Store.LookupKey(clientKey)
-		if !ok {
-			// In director, we can't easily abort request. But we can flag it
-			req.Header.Set("X-Router-Error", "Unauthorized")
+		// 1. Check for context errors passed from ServeHTTP
+		if val := req.Header.Get("X-Router-Error"); val != "" {
 			return
 		}
 
-		client, ok := rp.Store.LookupClient(keyData.ClientID)
-		if !ok {
-			req.Header.Set("X-Router-Error", "ClientNotFound")
+		// 2. Remove client-side credentials
+		query := req.URL.Query()
+		query.Del("key")
+		req.URL.RawQuery = query.Encode()
+		req.Header.Del("x-goog-api-key")
+
+		// 3. Fetch OAuth2 token for upstream Vertex AI API
+		token, err := rp.TokenSource.Token()
+		if err != nil {
+			log.Printf("[Proxy] Error retrieving Google Cloud token: %v", err)
+			req.Header.Set("X-Router-Error", "TokenError")
 			return
 		}
+		req.Header.Set("Authorization", "Bearer "+token.AccessToken)
 
-		// Save context variables inside request headers so we can access them in logs or downstream
-		req.Header.Set("X-Client-ID", client.ID)
-		req.Header.Set("X-Client-Tier", client.Tier)
-		req.Header.Set("X-Client-Priority", client.Priority)
-		req.Header.Set("X-Client-RPM", string(rune(client.RPM)))
-		req.Header.Set("X-Client-TPM", string(rune(client.TPM)))
-
-		// 2. Parse path parts to identify API version and resource type
+		// 4. Rewrite URL paths to project-level GCP endpoints
 		pathParts := strings.Split(req.URL.Path, "/")
 		if len(pathParts) < 3 {
 			return
 		}
-		version := pathParts[1]  // e.g. "v1", "v1beta", "v1beta1"
-		resource := pathParts[2] // e.g. "models", "reasoningEngines", "ragCorpora"
+		version := pathParts[1]
+		resource := pathParts[2]
 
 		if resource == "models" {
-			// Format: /v1beta/models/gemini-1.5-pro:generateContent
+			targetModel := req.Header.Get("X-Routed-Model")
+			if targetModel == "" {
+				targetModel = req.Header.Get("X-Requested-Model")
+			}
+
 			parts := strings.Split(req.URL.Path, "/models/")
 			if len(parts) < 2 {
 				return
 			}
 			modelAndAction := parts[1]
 			actionParts := strings.Split(modelAndAction, ":")
-			requestedModel := actionParts[0]
-
-			req.Header.Set("X-Requested-Model", requestedModel)
-
-			// Apply dynamic routing rules
-			targetModel := requestedModel
-			routedRule, matched := rp.Store.MatchRule(requestedModel, client.Tier)
-			if matched {
-				targetModel = routedRule.TargetModel
-			}
-
-			req.Header.Set("X-Routed-Model", targetModel)
-
-			// Remove client-side credentials
-			query := req.URL.Query()
-			query.Del("key")
-			req.URL.RawQuery = query.Encode()
-			req.Header.Del("x-goog-api-key")
-
-			// Fetch OAuth2 token for upstream
-			token, err := rp.TokenSource.Token()
-			if err != nil {
-				log.Printf("[Proxy] Error retrieving Google Cloud token: %v", err)
-				req.Header.Set("X-Router-Error", "TokenError")
-				return
-			}
-			req.Header.Set("Authorization", "Bearer "+token.AccessToken)
 
 			var action string
 			if len(actionParts) > 1 {
@@ -188,24 +166,7 @@ func NewRouterProxy(store *config.ConfigStore, projectID, location string) (*Rou
 			newPath := fmt.Sprintf("/v1/projects/%s/locations/%s/publishers/google/models/%s%s",
 				rp.ProjectID, rp.Location, targetModel, action)
 			req.URL.Path = newPath
-
 		} else if resource == "reasoningEngines" || resource == "ragCorpora" {
-			// Remove client-side credentials
-			query := req.URL.Query()
-			query.Del("key")
-			req.URL.RawQuery = query.Encode()
-			req.Header.Del("x-goog-api-key")
-
-			// Fetch OAuth2 token for upstream
-			token, err := rp.TokenSource.Token()
-			if err != nil {
-				log.Printf("[Proxy] Error retrieving Google Cloud token: %v", err)
-				req.Header.Set("X-Router-Error", "TokenError")
-				return
-			}
-			req.Header.Set("Authorization", "Bearer "+token.AccessToken)
-
-			// Reconstruct path with GCP project and location
 			remainingPath := strings.Join(pathParts[2:], "/")
 			newPath := fmt.Sprintf("/%s/projects/%s/locations/%s/%s",
 				version, rp.ProjectID, rp.Location, remainingPath)
@@ -259,6 +220,81 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Populate client and model context headers on the original request
+	r.Header.Set("X-Client-ID", client.ID)
+	r.Header.Set("X-Client-Tier", client.Tier)
+	r.Header.Set("X-Client-Priority", client.Priority)
+	r.Header.Set("X-Client-RPM", fmt.Sprintf("%d", client.RPM))
+	r.Header.Set("X-Client-TPM", fmt.Sprintf("%d", client.TPM))
+
+	pathParts := strings.Split(r.URL.Path, "/")
+	if len(pathParts) >= 3 {
+		resource := pathParts[2]
+		if resource == "models" {
+			parts := strings.Split(r.URL.Path, "/models/")
+			if len(parts) >= 2 {
+				modelAndAction := parts[1]
+				actionParts := strings.Split(modelAndAction, ":")
+				requestedModel := actionParts[0]
+
+				r.Header.Set("X-Requested-Model", requestedModel)
+
+				// Apply dynamic routing rules
+				targetModel := requestedModel
+				routedRule, matched := rp.Store.MatchRule(requestedModel, client.Tier)
+				if matched {
+					targetModel = routedRule.TargetModel
+				}
+				r.Header.Set("X-Routed-Model", targetModel)
+			}
+		}
+	}
+
+	// 1.5. Validate custom headers
+	for _, h := range rp.Store.GetHeaders() {
+		val := r.Header.Get(h.Name)
+		if h.Required && val == "" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(fmt.Sprintf(`{"error": {"code": 400, "message": "Missing required custom header: %s (%s)"}}`, h.Name, h.Description)))
+			return
+		}
+		if val != "" {
+			switch h.Validation {
+			case "non-empty":
+				if strings.TrimSpace(val) == "" {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusBadRequest)
+					w.Write([]byte(fmt.Sprintf(`{"error": {"code": 400, "message": "Custom header %s cannot be empty"}}`, h.Name)))
+					return
+				}
+			case "regex":
+				matched, err := regexp.MatchString(h.ValuePattern, val)
+				if err != nil || !matched {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusBadRequest)
+					w.Write([]byte(fmt.Sprintf(`{"error": {"code": 400, "message": "Header %s does not match required pattern: %s"}}`, h.Name, h.ValuePattern)))
+					return
+				}
+			case "enum":
+				options := strings.Split(h.ValuePattern, ",")
+				valid := false
+				for _, opt := range options {
+					if strings.TrimSpace(opt) == val {
+						valid = true
+						break
+					}
+				}
+				if !valid {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusBadRequest)
+					w.Write([]byte(fmt.Sprintf(`{"error": {"code": 400, "message": "Header %s must be one of: %s"}}`, h.Name, h.ValuePattern)))
+					return
+				}
+			}
+		}
+	}
+
 	// Sync local rate limiter with current client configurations from cache
 	// (Runs in-memory O(1) update inside registry)
 	rp.Limiter.UpdateLimiter(client.ID, client.RPM, client.TPM, client.Priority)
@@ -300,18 +336,26 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	latency := time.Since(startTime).Milliseconds()
 
+	logHeaders := make(map[string]string)
+	for _, h := range rp.Store.GetHeaders() {
+		if val := r.Header.Get(h.Name); val != "" {
+			logHeaders[h.Name] = val
+		}
+	}
+
 	logEntry := StructuredLog{
-		Severity:  "INFO",
-		Time:      startTime.UTC().Format(time.RFC3339),
-		Method:    r.Method,
-		Path:      r.URL.Path,
-		Client:    r.Header.Get("X-Client-ID"),
-		Tier:      r.Header.Get("X-Client-Tier"),
-		ModelIn:   r.Header.Get("X-Requested-Model"),
-		ModelOut:  r.Header.Get("X-Routed-Model"),
-		Status:    wrapped.statusCode,
-		LatencyMs: latency,
-		BytesSent: wrapped.bytesWritten,
+		Severity:      "INFO",
+		Time:          startTime.UTC().Format(time.RFC3339),
+		Method:        r.Method,
+		Path:          r.URL.Path,
+		Client:        r.Header.Get("X-Client-ID"),
+		Tier:          r.Header.Get("X-Client-Tier"),
+		ModelIn:       r.Header.Get("X-Requested-Model"),
+		ModelOut:      r.Header.Get("X-Routed-Model"),
+		Status:        wrapped.statusCode,
+		LatencyMs:     latency,
+		BytesSent:     wrapped.bytesWritten,
+		CustomHeaders: logHeaders,
 	}
 
 	if wrapped.statusCode >= 400 {
@@ -324,7 +368,7 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	logJSON, err := json.Marshal(logEntry)
 	if err == nil {
-		log.Println(string(logJSON))
+		_, _ = os.Stdout.WriteString(string(logJSON) + "\n")
 	} else {
 		log.Printf("[Proxy] Error encoding log: %v", err)
 	}

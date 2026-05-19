@@ -68,12 +68,12 @@ func Layout(title string, currentTab string, content templ.Component) templ.Comp
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var5 = []any{"inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium h-full", templ.KV("border-blue-600 text-blue-600", currentTab == "rules"), templ.KV("border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700", currentTab != "rules")}
+		var templ_7745c5c3_Var5 = []any{"inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium h-full", templ.KV("border-blue-600 text-blue-600", currentTab == "headers"), templ.KV("border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700", currentTab != "headers")}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var5...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<a href=\"/admin/rules\" class=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<a href=\"/admin/headers\" class=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -86,16 +86,16 @@ func Layout(title string, currentTab string, content templ.Component) templ.Comp
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\">Routing Rules</a> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\">Custom Headers</a> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var7 = []any{"inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium h-full", templ.KV("border-blue-600 text-blue-600", currentTab == "models"), templ.KV("border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700", currentTab != "models")}
+		var templ_7745c5c3_Var7 = []any{"inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium h-full", templ.KV("border-blue-600 text-blue-600", currentTab == "rules"), templ.KV("border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700", currentTab != "rules")}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var7...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<a href=\"/admin/models\" class=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<a href=\"/admin/rules\" class=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -108,16 +108,16 @@ func Layout(title string, currentTab string, content templ.Component) templ.Comp
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\">Models</a> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\">Routing Rules</a> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var9 = []any{"inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium h-full", templ.KV("border-blue-600 text-blue-600", currentTab == "metrics"), templ.KV("border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700", currentTab != "metrics")}
+		var templ_7745c5c3_Var9 = []any{"inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium h-full", templ.KV("border-blue-600 text-blue-600", currentTab == "models"), templ.KV("border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700", currentTab != "models")}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var9...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<a href=\"/admin/metrics\" class=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<a href=\"/admin/models\" class=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -130,16 +130,16 @@ func Layout(title string, currentTab string, content templ.Component) templ.Comp
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\">Monitoring</a> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\">Models</a> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var11 = []any{"inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium h-full", templ.KV("border-blue-600 text-blue-600", currentTab == "costs"), templ.KV("border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700", currentTab != "costs")}
+		var templ_7745c5c3_Var11 = []any{"inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium h-full", templ.KV("border-blue-600 text-blue-600", currentTab == "metrics"), templ.KV("border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700", currentTab != "metrics")}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var11...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<a href=\"/admin/costs\" class=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<a href=\"/admin/metrics\" class=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -152,7 +152,29 @@ func Layout(title string, currentTab string, content templ.Component) templ.Comp
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\">Cost Analytics</a></nav><!-- Right side: Logout button --><div class=\"flex items-center gap-4\"><a href=\"/logout\" class=\"rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition\">Sign Out</a></div></div></div></header><!-- Main Layout Wrapper --><main class=\"flex-grow py-10 bg-gray-50\"><div class=\"mx-auto max-w-7xl px-4 sm:px-6 lg:px-8\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\">Monitoring</a> ")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var13 = []any{"inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium h-full", templ.KV("border-blue-600 text-blue-600", currentTab == "costs"), templ.KV("border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700", currentTab != "costs")}
+		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var13...)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<a href=\"/admin/costs\" class=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var14 string
+		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var13).String())
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/layout.templ`, Line: 1, Col: 0}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var14)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\">Cost Analytics</a></nav><!-- Right side: Logout button --><div class=\"flex items-center gap-4\"><a href=\"/logout\" class=\"rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition\">Sign Out</a></div></div></div></header><!-- Main Layout Wrapper --><main class=\"flex-grow py-10 bg-gray-50\"><div class=\"mx-auto max-w-7xl px-4 sm:px-6 lg:px-8\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -160,7 +182,7 @@ func Layout(title string, currentTab string, content templ.Component) templ.Comp
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</div></main><!-- Google Clean Footer --><footer class=\"bg-white border-t border-gray-200 py-6 mt-auto\"><div class=\"mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center text-xs text-gray-500\">&copy; 2026 Gemini Smart Router. Developed with Google-first best practices.</div></footer></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</div></main><!-- Google Clean Footer --><footer class=\"bg-white border-t border-gray-200 py-6 mt-auto\"><div class=\"mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center text-xs text-gray-500\">&copy; 2026 Gemini Smart Router. Developed with Google-first best practices.</div></footer></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

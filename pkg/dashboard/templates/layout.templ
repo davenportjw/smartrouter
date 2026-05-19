@@ -47,6 +47,9 @@ templ Layout(title string, currentTab string, content templ.Component) {
 							<a href="/admin/keys" class={ "inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium h-full", templ.KV("border-blue-600 text-blue-600", currentTab == "keys"), templ.KV("border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700", currentTab != "keys") }>
 								API Keys
 							</a>
+							<a href="/admin/headers" class={ "inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium h-full", templ.KV("border-blue-600 text-blue-600", currentTab == "headers"), templ.KV("border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700", currentTab != "headers") }>
+								Custom Headers
+							</a>
 							<a href="/admin/rules" class={ "inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium h-full", templ.KV("border-blue-600 text-blue-600", currentTab == "rules"), templ.KV("border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700", currentTab != "rules") }>
 								Routing Rules
 							</a>

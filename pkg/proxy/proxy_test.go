@@ -2,7 +2,9 @@ package proxy
 
 import (
 	"context"
+	"net/http"
 	"net/http/httptest"
+	"net/http/httputil"
 	"net/url"
 	"os"
 	"testing"
@@ -167,3 +169,150 @@ func TestRouterProxyCompatibility(t *testing.T) {
 	// Clean up test config DB file if created
 	os.RemoveAll("data/local_db.json")
 }
+
+func TestRouterProxyCustomHeaders(t *testing.T) {
+	os.Setenv("LOCAL_DEV", "true")
+	defer os.Unsetenv("LOCAL_DEV")
+
+	ctx := context.Background()
+	store, err := config.NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to initialize config store: %v", err)
+	}
+
+	// Pre-seed database with a test client and active API key
+	testClient := config.Client{
+		ID:       "test-client-headers",
+		Name:     "Test Client with Headers",
+		Tier:     "standard",
+		RPM:      100,
+		TPM:      10000,
+		Priority: "medium",
+	}
+	testKeyStr := "gr_key_headers_test_12345"
+	testKey := config.APIKey{
+		KeyHash:  config.HashKey(testKeyStr),
+		ClientID: "test-client-headers",
+		Status:   "active",
+	}
+
+	_ = store.SaveClient(ctx, testClient)
+	_ = store.SaveKey(ctx, testKey)
+
+	// Pre-seed custom header verification rules
+	headersRule1 := config.CustomHeader{
+		ID:           "rule-h1",
+		Name:         "X-Required-Header",
+		Description:  "A required header",
+		Required:     true,
+		Validation:   "non-empty",
+		ValuePattern: "",
+	}
+	headersRule2 := config.CustomHeader{
+		ID:           "rule-h2",
+		Name:         "X-Version-Header",
+		Description:  "Optional format regex header",
+		Required:     false,
+		Validation:   "regex",
+		ValuePattern: "^v[0-9]+$",
+	}
+	headersRule3 := config.CustomHeader{
+		ID:           "rule-h3",
+		Name:         "X-Env-Header",
+		Description:  "Required environment enum",
+		Required:     true,
+		Validation:   "enum",
+		ValuePattern: "dev,staging,prod",
+	}
+
+	_ = store.DeleteHeader(ctx, "header-1")
+
+	_ = store.SaveHeader(ctx, headersRule1)
+	_ = store.SaveHeader(ctx, headersRule2)
+	_ = store.SaveHeader(ctx, headersRule3)
+
+	// Setup local mock backend target server
+	backendReceivedAllHeaders := false
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check if headers are received cleanly
+		if r.Header.Get("X-Required-Header") == "value" && r.Header.Get("X-Env-Header") == "staging" && r.Header.Get("X-Version-Header") == "v2" {
+			backendReceivedAllHeaders = true
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status": "ok"}`))
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+	rp, err := NewRouterProxy(store, "test-project", "us-central1")
+	if err != nil {
+		t.Fatalf("failed to create RouterProxy: %v", err)
+	}
+	rp.TokenSource = &mockTokenSource{}
+	rp.Target = backendURL
+	rp.Proxy = httputil.NewSingleHostReverseProxy(backendURL) // Direct httputil proxy to mock backend
+
+	// Overwrite Director to perform same routing and verify they are passed
+	originalDirector := rp.Proxy.Director
+	rp.Proxy.Director = func(req *http.Request) {
+		originalDirector(req)
+		// We do NOT scrub custom headers since Vertex accepts them!
+	}
+
+	tests := []struct {
+		name           string
+		requestHeaders map[string]string
+		expectedStatus int
+	}{
+		{
+			name:           "Missing required X-Required-Header",
+			requestHeaders: map[string]string{"X-Env-Header": "prod"},
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name:           "Missing required X-Env-Header",
+			requestHeaders: map[string]string{"X-Required-Header": "value"},
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name:           "Invalid regex validation on X-Version-Header",
+			requestHeaders: map[string]string{"X-Required-Header": "value", "X-Env-Header": "dev", "X-Version-Header": "beta1"},
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name:           "Invalid enum validation on X-Env-Header",
+			requestHeaders: map[string]string{"X-Required-Header": "value", "X-Env-Header": "local"},
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name:           "Valid custom headers, correct regex and enum",
+			requestHeaders: map[string]string{"X-Required-Header": "value", "X-Env-Header": "staging", "X-Version-Header": "v2"},
+			expectedStatus: http.StatusOK,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			backendReceivedAllHeaders = false // reset
+			req := httptest.NewRequest("POST", "/v1/models/gemini-1.5-flash:generateContent?key="+testKeyStr, nil)
+			req.Header.Set("x-goog-api-key", testKeyStr)
+			for k, v := range tt.requestHeaders {
+				req.Header.Set(k, v)
+			}
+
+			rr := httptest.NewRecorder()
+			rp.ServeHTTP(rr, req)
+
+			if rr.Code != tt.expectedStatus {
+				t.Errorf("expected status %d, got %d. Response: %s", tt.expectedStatus, rr.Code, rr.Body.String())
+			}
+
+			if tt.expectedStatus == http.StatusOK && !backendReceivedAllHeaders {
+				t.Errorf("custom headers were not correctly forwarded to the backend")
+			}
+		})
+	}
+
+	os.RemoveAll("data/local_db.json")
+}
+

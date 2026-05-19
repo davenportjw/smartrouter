@@ -66,6 +66,13 @@ resource "google_project_iam_member" "monitoring_access" {
   member  = "serviceAccount:${google_service_account.router_sa.email}"
 }
 
+# IAM: Cloud Logging Viewer
+resource "google_project_iam_member" "logging_access" {
+  project = var.project_id
+  role    = "roles/logging.viewer"
+  member  = "serviceAccount:${google_service_account.router_sa.email}"
+}
+
 # IAM: Firebase Auth Admin Access for backend session validation
 resource "google_project_iam_member" "firebase_auth_access" {
   project = var.project_id
@@ -189,5 +196,58 @@ resource "google_identity_platform_config" "auth_config" {
   depends_on = [
     google_project_service.apis
   ]
+}
+
+# Cloud Run Service for Traffic Generator (Deployed initially with Google Placeholder)
+resource "google_cloud_run_v2_service" "generator_service" {
+  depends_on = [
+    google_project_service.apis,
+    google_service_account.router_sa
+  ]
+
+  name     = "gemini-traffic-generator"
+  location = var.region
+  ingress  = "INGRESS_TRAFFIC_ALL"
+
+  template {
+    service_account = google_service_account.router_sa.email
+
+    annotations = {
+      "run.googleapis.com/cpu-throttling" = "false"
+    }
+
+    containers {
+      image = "gcr.io/cloudrun/placeholder"
+
+      ports {
+        container_port = 8080
+      }
+
+      env {
+        name  = "ROUTER_URL"
+        value = google_cloud_run_v2_service.router_service.uri
+      }
+
+      env {
+        name  = "GOOGLE_CLOUD_PROJECT"
+        value = var.project_id
+      }
+
+      resources {
+        limits = {
+          cpu    = "1"
+          memory = "512Mi"
+        }
+      }
+    }
+  }
+
+  lifecycle {
+    ignore_changes = [
+      client,
+      client_version,
+      template[0].containers[0].image,
+    ]
+  }
 }
 

@@ -233,6 +233,94 @@ func (dc *DashboardController) ServeRules(w http.ResponseWriter, r *http.Request
 	_ = templates.Layout("Routing Rules", "rules", content).Render(ctx, w)
 }
 
+// ServeHeaders fetches headers and renders the Custom Headers administration view.
+func (dc *DashboardController) ServeHeaders(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	headers, err := dc.Store.GetAllHeaders(ctx)
+	if err != nil {
+		log.Printf("[Dashboard] Error loading custom_headers: %v", err)
+		http.Error(w, "Internal Server Error loading custom headers", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	content := templates.HeadersTab(headers)
+	_ = templates.Layout("Custom Headers", "headers", content).Render(ctx, w)
+}
+
+// ServeHeadersNewModal renders the dynamic headers creation form via HTMX.
+func (dc *DashboardController) ServeHeadersNewModal(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html")
+	_ = templates.HeaderModal().Render(r.Context(), w)
+}
+
+// CreateHeader handles custom header rule submission form.
+func (dc *DashboardController) CreateHeader(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx := r.Context()
+
+	name := r.FormValue("name")
+	description := r.FormValue("description")
+	requiredStr := r.FormValue("required")
+	validation := r.FormValue("validation")
+	valuePattern := r.FormValue("value_pattern")
+
+	required := requiredStr == "true"
+
+	// Generate unique random ID for this rule
+	idBytes := make([]byte, 8)
+	_, _ = rand.Read(idBytes)
+	id := "header-" + hex.EncodeToString(idBytes)
+
+	err := dc.Store.SaveHeader(ctx, config.CustomHeader{
+		ID:           id,
+		Name:         name,
+		Description:  description,
+		Required:     required,
+		Validation:   validation,
+		ValuePattern: valuePattern,
+	})
+	if err != nil {
+		log.Printf("[Dashboard] Error saving custom header: %v", err)
+		http.Error(w, "Failed to save custom header rule", http.StatusInternalServerError)
+		return
+	}
+
+	// Direct standard client browser redirect back to the full headers view
+	http.Redirect(w, r, "/admin/headers", http.StatusSeeOther)
+}
+
+// DeleteHeader deletes a custom header rule dynamically.
+func (dc *DashboardController) DeleteHeader(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx := r.Context()
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "Missing header rule ID", http.StatusBadRequest)
+		return
+	}
+
+	err := dc.Store.DeleteHeader(ctx, id)
+	if err != nil {
+		log.Printf("[Dashboard] Error deleting custom header: %v", err)
+		http.Error(w, "Failed to delete custom header rule", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	// Return nothing to HTMX so closest <tr> is removed
+	w.Write([]byte(""))
+}
+
 
 
 // Helper cryptographically secure API key generator
@@ -307,7 +395,7 @@ func (dc *DashboardController) gcpGet(ctx context.Context, url string) ([]byte, 
 	}
 
 	req.Header.Set("Authorization", "Bearer "+token.AccessToken)
-	client := &http.Client{}
+	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
@@ -499,7 +587,7 @@ func (dc *DashboardController) gcpPost(ctx context.Context, url string, body int
 	req.Header.Set("Authorization", "Bearer "+token.AccessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
@@ -545,8 +633,8 @@ func estimateTokensAndCost(model string, bytesSent int64) (int, int, float64) {
 
 // fetchCloudMonitoringMetrics collects revision volume and latency details from Cloud Monitoring.
 func (dc *DashboardController) fetchCloudMonitoringMetrics(ctx context.Context) (templates.MetricsViewModel, error) {
-	// If running locally or GCP token is not initialized, serve high-fidelity mock metrics
-	if dc.Firebase.IsLocalDev || dc.TokenSource == nil {
+	// If running locally without real project or GCP token is not initialized, serve high-fidelity mock metrics
+	if dc.ProjectID == "dev-project" || dc.TokenSource == nil {
 		return dc.generateMockMetrics(), nil
 	}
 
@@ -783,7 +871,7 @@ func (dc *DashboardController) generateMockMetrics() templates.MetricsViewModel 
 
 // fetchCostAnalyticsData queries Cloud Logging logs or mocks billing transactions.
 func (dc *DashboardController) fetchCostAnalyticsData(ctx context.Context) (templates.CostsViewModel, error) {
-	if dc.Firebase.IsLocalDev || dc.TokenSource == nil {
+	if dc.ProjectID == "dev-project" || dc.TokenSource == nil {
 		return dc.generateMockCosts(), nil
 	}
 

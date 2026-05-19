@@ -42,6 +42,16 @@ type RoutingRule struct {
 	PriorityWeight int    `firestore:"priority_weight" json:"priority_weight"`
 }
 
+// CustomHeader defines client-provided custom header verification rules.
+type CustomHeader struct {
+	ID           string `firestore:"id" json:"id"`
+	Name         string `firestore:"name" json:"name"`                     // e.g. "X-Client-App-ID"
+	Description  string `firestore:"description" json:"description"`       // e.g. "Identifies the calling application"
+	Required     bool   `firestore:"required" json:"required"`             // Whether the header is mandatory
+	Validation   string `firestore:"validation" json:"validation"`         // "non-empty", "regex", "enum"
+	ValuePattern string `firestore:"value_pattern" json:"value_pattern"`   // Regex format or comma-separated enum values
+}
+
 // ConfigStore manages Firestore connections and a fast in-memory configuration cache.
 type ConfigStore struct {
 	Client      *firestore.Client
@@ -53,13 +63,15 @@ type ConfigStore struct {
 	keys    map[string]APIKey // Hex-encoded KeyHash -> APIKey
 	clients map[string]Client // ClientID -> Client
 	rules   []RoutingRule
+	headers []CustomHeader
 }
 
 // LocalDB represents the JSON schema for the local development database.
 type LocalDB struct {
-	Clients      map[string]Client `json:"clients"`
-	APIKeys      map[string]APIKey `json:"api_keys"`
-	RoutingRules []RoutingRule     `json:"routing_rules"`
+	Clients       map[string]Client `json:"clients"`
+	APIKeys       map[string]APIKey `json:"api_keys"`
+	RoutingRules  []RoutingRule     `json:"routing_rules"`
+	CustomHeaders []CustomHeader    `json:"custom_headers"`
 }
 
 // NewConfigStore initializes a Firestore connection and caches configuration, or uses local file for dev.
@@ -104,6 +116,7 @@ func (cs *ConfigStore) StartListeners(ctx context.Context) {
 	go cs.listenKeys(ctx)
 	go cs.listenClients(ctx)
 	go cs.listenRules(ctx)
+	go cs.listenHeaders(ctx)
 }
 
 // LookupKey finds a matching active API key in the local cache.
@@ -270,6 +283,16 @@ func (cs *ConfigStore) initLocalDB() error {
 			Clients:      make(map[string]Client),
 			APIKeys:      make(map[string]APIKey),
 			RoutingRules: []RoutingRule{devRule},
+			CustomHeaders: []CustomHeader{
+				{
+					ID:           "header-1",
+					Name:         "X-Client-App-ID",
+					Description:  "Identifies the calling client application",
+					Required:     true,
+					Validation:   "regex",
+					ValuePattern: "^[a-zA-Z0-9-]+$",
+				},
+			},
 		}
 
 		data, err := json.MarshalIndent(db, "", "  ")
@@ -284,6 +307,7 @@ func (cs *ConfigStore) initLocalDB() error {
 		log.Println("[Local Dev] Seeded successfully.")
 		log.Println("[Local Dev] ------------------------------------------------------------")
 		log.Println("[Local Dev] Pre-seeded Router Rule: All requests (*) -> gemini-1.5-flash")
+		log.Println("[Local Dev] Pre-seeded Custom Header: X-Client-App-ID (regex validation)")
 		log.Println("[Local Dev] Please generate API Credentials via dashboard: http://localhost:8080/admin/keys")
 		log.Println("[Local Dev] ------------------------------------------------------------")
 	}
@@ -303,9 +327,10 @@ func (cs *ConfigStore) initLocalDB() error {
 	cs.clients = db.Clients
 	cs.keys = db.APIKeys
 	cs.rules = db.RoutingRules
+	cs.headers = db.CustomHeaders
 	cs.mu.Unlock()
 
-	log.Printf("[Local Dev Cache] Loaded %d clients, %d API keys, %d rules.", len(cs.clients), len(cs.keys), len(cs.rules))
+	log.Printf("[Local Dev Cache] Loaded %d clients, %d API keys, %d rules, %d headers.", len(cs.clients), len(cs.keys), len(cs.rules), len(cs.headers))
 	return nil
 }
 
@@ -313,9 +338,10 @@ func (cs *ConfigStore) initLocalDB() error {
 func (cs *ConfigStore) saveLocalDB() error {
 	cs.mu.RLock()
 	db := LocalDB{
-		Clients:      cs.clients,
-		APIKeys:      cs.keys,
-		RoutingRules: cs.rules,
+		Clients:       cs.clients,
+		APIKeys:       cs.keys,
+		RoutingRules:  cs.rules,
+		CustomHeaders: cs.headers,
 	}
 	cs.mu.RUnlock()
 
@@ -472,4 +498,120 @@ func (cs *ConfigStore) RevokeKey(ctx context.Context, hash string) error {
 		{Path: "status", Value: "revoked"},
 	})
 	return err
+}
+
+// GetHeaders returns all cached custom headers.
+func (cs *ConfigStore) GetHeaders() []CustomHeader {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+	h := make([]CustomHeader, len(cs.headers))
+	copy(h, cs.headers)
+	return h
+}
+
+// GetAllHeaders returns custom headers from the local cache or Firestore.
+func (cs *ConfigStore) GetAllHeaders(ctx context.Context) ([]CustomHeader, error) {
+	cs.mu.RLock()
+	isDev := cs.isLocalDev
+	cs.mu.RUnlock()
+
+	if isDev {
+		return cs.GetHeaders(), nil
+	}
+
+	headerDocs, err := cs.Client.Collection("custom_headers").Documents(ctx).GetAll()
+	if err != nil {
+		return nil, err
+	}
+	var list []CustomHeader
+	for _, doc := range headerDocs {
+		var h CustomHeader
+		if err := doc.DataTo(&h); err == nil {
+			list = append(list, h)
+		}
+	}
+	return list, nil
+}
+
+// SaveHeader persists a custom header rule.
+func (cs *ConfigStore) SaveHeader(ctx context.Context, h CustomHeader) error {
+	cs.mu.RLock()
+	isDev := cs.isLocalDev
+	cs.mu.RUnlock()
+
+	if isDev {
+		cs.mu.Lock()
+		found := false
+		for idx, existing := range cs.headers {
+			if existing.ID == h.ID {
+				cs.headers[idx] = h
+				found = true
+				break
+			}
+		}
+		if !found {
+			cs.headers = append(cs.headers, h)
+		}
+		cs.mu.Unlock()
+		return cs.saveLocalDB()
+	}
+
+	_, err := cs.Client.Collection("custom_headers").Doc(h.ID).Set(ctx, h)
+	return err
+}
+
+// DeleteHeader deletes a custom header rule by ID.
+func (cs *ConfigStore) DeleteHeader(ctx context.Context, id string) error {
+	cs.mu.RLock()
+	isDev := cs.isLocalDev
+	cs.mu.RUnlock()
+
+	if isDev {
+		cs.mu.Lock()
+		var updated []CustomHeader
+		for _, h := range cs.headers {
+			if h.ID != id {
+				updated = append(updated, h)
+			}
+		}
+		cs.headers = updated
+		cs.mu.Unlock()
+		return cs.saveLocalDB()
+	}
+
+	_, err := cs.Client.Collection("custom_headers").Doc(id).Delete(ctx)
+	return err
+}
+
+// listenHeaders streams live updates for custom headers from Firestore.
+func (cs *ConfigStore) listenHeaders(ctx context.Context) {
+	it := cs.Client.Collection("custom_headers").Snapshots(ctx)
+	for {
+		snap, err := it.Next()
+		if err != nil {
+			log.Printf("[Firestore] Headers listener error: %v", err)
+			return
+		}
+
+		cs.mu.Lock()
+		cs.headers = nil
+		for {
+			doc, err := snap.Documents.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				log.Printf("[Firestore] Error reading header document snapshot: %v", err)
+				continue
+			}
+			var h CustomHeader
+			if err := doc.DataTo(&h); err != nil {
+				log.Printf("[Firestore] DataTo error mapping CustomHeader: %v", err)
+				continue
+			}
+			cs.headers = append(cs.headers, h)
+		}
+		cs.mu.Unlock()
+		log.Printf("[Firestore Cache] Synchronized %d custom headers", len(cs.headers))
+	}
 }
