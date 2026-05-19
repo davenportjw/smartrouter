@@ -1585,22 +1585,22 @@ func TestProxyRegionalModelRouting(t *testing.T) {
 	}
 
 	locationHeader := rr.Header().Get("X-Routed-Model-Location")
-	if locationHeader != "us" {
-		t.Errorf("expected X-Routed-Model-Location to be 'us', got %q", locationHeader)
+	if locationHeader != "us-central1" {
+		t.Errorf("expected X-Routed-Model-Location to be 'us-central1', got %q", locationHeader)
 	}
 
 	mu.Lock()
 	path := receivedPath
 	mu.Unlock()
 
-	// The request host should be rewritten to "us-aiplatform.googleapis.com"
-	expectedHost := "us-aiplatform.googleapis.com"
+	// The request host should be rewritten to "us-central1-aiplatform.googleapis.com"
+	expectedHost := "us-central1-aiplatform.googleapis.com"
 	if capturer.CapturedHost != expectedHost {
 		t.Errorf("expected rewritten host to be %q, got %q", expectedHost, capturer.CapturedHost)
 	}
 
-	// The path location should be rewritten from "us-central1" to "us"
-	expectedPath := "/v1/projects/test-project/locations/us/publishers/google/models/gemini-custom-us:generateContent"
+	// The path location should be rewritten to "us-central1"
+	expectedPath := "/v1/projects/test-project/locations/us-central1/publishers/google/models/gemini-custom-us:generateContent"
 	if path != expectedPath {
 		t.Errorf("expected rewritten path to be %q, got %q", expectedPath, path)
 	}
@@ -1834,6 +1834,234 @@ func TestProxyModelDiscoveryAndRoutingWorkflow(t *testing.T) {
 	expectedPath2 := "/v1/" + targetEndpointID + ":generateContent"
 	if path2 != expectedPath2 {
 		t.Errorf("expected path rewrite for custom endpoint to be %q, got %q", expectedPath2, path2)
+	}
+
+	os.RemoveAll("data/local_db.json")
+}
+
+func TestExtractLocationFromResourceName(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"valid custom model path", "projects/test-project/locations/us-central1/models/gemini-custom", "us-central1"},
+		{"valid serving endpoint path", "projects/test-project/locations/europe-west9/endpoints/my-endpoint", "europe-west9"},
+		{"valid multi-region location path", "projects/test-project/locations/us/models/model-a", "us"},
+		{"invalid foundation model name", "gemini-2.5-flash", ""},
+		{"invalid prefix", "locations/us-central1/models/gemini-custom", ""},
+		{"empty path", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := config.ExtractLocationFromResourceName(tt.input)
+			if actual != tt.expected {
+				t.Errorf("expected location to be %q, got %q", tt.expected, actual)
+			}
+		})
+	}
+}
+
+func TestProxySmallestCompatibleLocationRouting(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+
+	ctx := context.Background()
+	store, err := config.NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to initialize config store: %v", err)
+	}
+
+	// Seed App, Client, Key
+	app := config.App{ID: "app-1", ClientID: "client-1", RPM: 100, TPM: 10000}
+	client := config.Client{ID: "client-1", Tier: "premium"}
+	key := config.APIKey{KeyHash: config.HashKey("key-1"), AppID: "app-1", Status: "active"}
+	_ = store.SaveClient(ctx, client)
+	_ = store.SaveApp(ctx, app)
+	_ = store.SaveKey(ctx, key)
+	_ = store.DeleteHeader(ctx, "header-1")
+	_ = store.DeleteRule(ctx, "rule-1")
+
+	// Seed foundation model residing in "us" multiregion (e.g., gemini-3.5-pro)
+	foundationModel := config.ModelConfig{
+		ID:          "gemini-3.5-pro",
+		DisplayName: "Gemini 3.5 Pro",
+		Location:    "us",
+		Type:        "foundation",
+		Active:      true,
+	}
+	_ = store.SaveModel(ctx, foundationModel)
+
+	var receivedPath string
+	var mu sync.Mutex
+
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		receivedPath = r.URL.Path
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status": "success"}`))
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+
+	// Scenario A: Router deployed in specific region "us-central1" (Level 1)
+	// compatible with model's region "us" (Level 2), but "us-central1" is smaller/more specific!
+	rp1, _ := NewRouterProxy(store, "test-project", "us-central1")
+	rp1.TokenSource = &mockTokenSource{}
+	rp1.Target = backendURL
+	capturer1 := &hostCapturingRoundTripper{Target: backendURL}
+	rp1.Proxy.Transport = capturer1
+
+	req1 := httptest.NewRequest("POST", "/v1/models/gemini-3.5-pro:generateContent?key=key-1", strings.NewReader(`{}`))
+	req1.Header.Set("x-goog-api-key", "key-1")
+	rr1 := httptest.NewRecorder()
+
+	rp1.ServeHTTP(rr1, req1)
+
+	if rr1.Code != http.StatusOK {
+		t.Fatalf("expected proxy response code 200, got %d", rr1.Code)
+	}
+
+	// Location should be downscaled/resolved to the smaller compatible location (us-central1)
+	locationHeader1 := rr1.Header().Get("X-Routed-Model-Location")
+	if locationHeader1 != "us-central1" {
+		t.Errorf("expected X-Routed-Model-Location to be 'us-central1', got %q", locationHeader1)
+	}
+
+	expectedHost1 := "us-central1-aiplatform.googleapis.com"
+	if capturer1.CapturedHost != expectedHost1 {
+		t.Errorf("expected host to be %q, got %q", expectedHost1, capturer1.CapturedHost)
+	}
+
+	mu.Lock()
+	path1 := receivedPath
+	mu.Unlock()
+
+	expectedPath1 := "/v1/projects/test-project/locations/us-central1/publishers/google/models/gemini-3.5-pro:generateContent"
+	if path1 != expectedPath1 {
+		t.Errorf("expected Scenario A rewritten path to be %q, got %q", expectedPath1, path1)
+	}
+
+	// Scenario B: Router deployed in multi-region "us" (Level 2)
+	rp2, _ := NewRouterProxy(store, "test-project", "us")
+	rp2.TokenSource = &mockTokenSource{}
+	rp2.Target = backendURL
+	capturer2 := &hostCapturingRoundTripper{Target: backendURL}
+	rp2.Proxy.Transport = capturer2
+
+	req2 := httptest.NewRequest("POST", "/v1/models/gemini-3.5-pro:generateContent?key=key-1", strings.NewReader(`{}`))
+	req2.Header.Set("x-goog-api-key", "key-1")
+	rr2 := httptest.NewRecorder()
+
+	rp2.ServeHTTP(rr2, req2)
+
+	if rr2.Code != http.StatusOK {
+		t.Fatalf("expected proxy response code 200, got %d", rr2.Code)
+	}
+
+	// Location remains "us" because that is the smallest compatible location between both
+	locationHeader2 := rr2.Header().Get("X-Routed-Model-Location")
+	if locationHeader2 != "us" {
+		t.Errorf("expected X-Routed-Model-Location to be 'us', got %q", locationHeader2)
+	}
+
+	expectedHost2 := "us-aiplatform.googleapis.com"
+	if capturer2.CapturedHost != expectedHost2 {
+		t.Errorf("expected host to be %q, got %q", expectedHost2, capturer2.CapturedHost)
+	}
+
+	mu.Lock()
+	path2 := receivedPath
+	mu.Unlock()
+
+	expectedPath2 := "/v1/projects/test-project/locations/us/publishers/google/models/gemini-3.5-pro:generateContent"
+	if path2 != expectedPath2 {
+		t.Errorf("expected Scenario B rewritten path to be %q, got %q", expectedPath2, path2)
+	}
+
+	os.RemoveAll("data/local_db.json")
+}
+
+func TestProxyIncompatibleLocationRouting(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+
+	ctx := context.Background()
+	store, err := config.NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to initialize config store: %v", err)
+	}
+
+	// Seed App, Client, Key
+	app := config.App{ID: "app-1", ClientID: "client-1", RPM: 100, TPM: 10000}
+	client := config.Client{ID: "client-1", Tier: "premium"}
+	key := config.APIKey{KeyHash: config.HashKey("key-1"), AppID: "app-1", Status: "active"}
+	_ = store.SaveClient(ctx, client)
+	_ = store.SaveApp(ctx, app)
+	_ = store.SaveKey(ctx, key)
+	_ = store.DeleteHeader(ctx, "header-1")
+	_ = store.DeleteRule(ctx, "rule-1")
+
+	// Seed foundation model residing in "europe-west9" region (router will be in "us")
+	foundationModel := config.ModelConfig{
+		ID:          "gemini-3.5-europe",
+		DisplayName: "Gemini 3.5 Europe",
+		Location:    "europe-west9",
+		Type:        "foundation",
+		Active:      true,
+	}
+	_ = store.SaveModel(ctx, foundationModel)
+
+	var receivedPath string
+	var mu sync.Mutex
+
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		receivedPath = r.URL.Path
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status": "success"}`))
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+
+	// Instantiate proxy in "us-central1"
+	rp, _ := NewRouterProxy(store, "test-project", "us-central1")
+	rp.TokenSource = &mockTokenSource{}
+	rp.Target = backendURL
+	capturer := &hostCapturingRoundTripper{Target: backendURL}
+	rp.Proxy.Transport = capturer
+
+	req := httptest.NewRequest("POST", "/v1/models/gemini-3.5-europe:generateContent?key=key-1", strings.NewReader(`{}`))
+	req.Header.Set("x-goog-api-key", "key-1")
+	rr := httptest.NewRecorder()
+
+	rp.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected proxy response code 200, got %d", rr.Code)
+	}
+
+	// Must route to model's specific europe-west9 region because it is incompatible with router's us-central1 location
+	locationHeader := rr.Header().Get("X-Routed-Model-Location")
+	if locationHeader != "europe-west9" {
+		t.Errorf("expected X-Routed-Model-Location to be 'europe-west9', got %q", locationHeader)
+	}
+
+	expectedHost := "europe-west9-aiplatform.googleapis.com"
+	if capturer.CapturedHost != expectedHost {
+		t.Errorf("expected host to be %q, got %q", expectedHost, capturer.CapturedHost)
+	}
+
+	mu.Lock()
+	path := receivedPath
+	mu.Unlock()
+
+	expectedPath := "/v1/projects/test-project/locations/europe-west9/publishers/google/models/gemini-3.5-europe:generateContent"
+	if path != expectedPath {
+		t.Errorf("expected incompatible model rewritten path to be %q, got %q", expectedPath, path)
 	}
 
 	os.RemoveAll("data/local_db.json")

@@ -171,9 +171,9 @@ func (cs *ConfigStore) seedFirestoreModelsIfEmpty(ctx context.Context) error {
 		{ID: "gemini-3.0-pro", DisplayName: "Gemini 3.0 Pro", Location: "global", Type: "foundation", Active: true},
 		{ID: "gemini-3.1-flash", DisplayName: "Gemini 3.1 Flash", Location: "global", Type: "foundation", Active: true},
 		{ID: "gemini-3.1-pro", DisplayName: "Gemini 3.1 Pro", Location: "global", Type: "foundation", Active: true},
-		{ID: "gemini-3.5-flash", DisplayName: "Gemini 3.5 Flash", Location: "global", Type: "foundation", Active: true},
-		{ID: "gemini-3.5-pro", DisplayName: "Gemini 3.5 Pro", Location: "global", Type: "foundation", Active: true},
-		{ID: "gemini-3.5-flash-lite", DisplayName: "Gemini 3.5 Flash Lite", Location: "global", Type: "foundation", Active: true},
+		{ID: "gemini-3.5-flash", DisplayName: "Gemini 3.5 Flash", Location: "us", Type: "foundation", Active: true},
+		{ID: "gemini-3.5-pro", DisplayName: "Gemini 3.5 Pro", Location: "us", Type: "foundation", Active: true},
+		{ID: "gemini-3.5-flash-lite", DisplayName: "Gemini 3.5 Flash Lite", Location: "us", Type: "foundation", Active: true},
 		{ID: "text-embedding-004", DisplayName: "Text Embedding 004", Location: "global", Type: "foundation", Active: true},
 		{ID: "multimodal-embedding-001", DisplayName: "Multimodal Embedding 001", Location: "global", Type: "foundation", Active: true},
 		{ID: "gemini-dynamic", DisplayName: "Gemini Dynamic Complexity Router", Location: "global", Type: "foundation", Active: true},
@@ -181,7 +181,7 @@ func (cs *ConfigStore) seedFirestoreModelsIfEmpty(ctx context.Context) error {
 
 	for _, m := range defaultModels {
 		docRef := cs.Client.Collection("models").Doc(m.ID)
-		_, err := docRef.Get(ctx)
+		snap, err := docRef.Get(ctx)
 		if err != nil {
 			// Model does not exist in Firestore, seed it!
 			_, err = docRef.Set(ctx, m)
@@ -189,6 +189,20 @@ func (cs *ConfigStore) seedFirestoreModelsIfEmpty(ctx context.Context) error {
 				log.Printf("[ConfigStore] Failed to seed model %s: %v", m.ID, err)
 			} else {
 				log.Printf("[ConfigStore] Seeded missing model %s to Firestore", m.ID)
+			}
+		} else {
+			// Verify location and update if mismatched
+			var existing ModelConfig
+			if err := snap.DataTo(&existing); err == nil {
+				if existing.Location != m.Location {
+					existing.Location = m.Location
+					_, err = docRef.Set(ctx, existing)
+					if err != nil {
+						log.Printf("[ConfigStore] Failed to migrate model location for %s: %v", m.ID, err)
+					} else {
+						log.Printf("[ConfigStore] Migrated model location for %s to %q in Firestore", m.ID, m.Location)
+					}
+				}
 			}
 		}
 	}
@@ -637,9 +651,9 @@ func (cs *ConfigStore) initLocalDB() error {
 				{ID: "gemini-3.0-pro", DisplayName: "Gemini 3.0 Pro", Location: "global", Type: "foundation", Active: true},
 				{ID: "gemini-3.1-flash", DisplayName: "Gemini 3.1 Flash", Location: "global", Type: "foundation", Active: true},
 				{ID: "gemini-3.1-pro", DisplayName: "Gemini 3.1 Pro", Location: "global", Type: "foundation", Active: true},
-				{ID: "gemini-3.5-flash", DisplayName: "Gemini 3.5 Flash", Location: "global", Type: "foundation", Active: true},
-				{ID: "gemini-3.5-pro", DisplayName: "Gemini 3.5 Pro", Location: "global", Type: "foundation", Active: true},
-				{ID: "gemini-3.5-flash-lite", DisplayName: "Gemini 3.5 Flash Lite", Location: "global", Type: "foundation", Active: true},
+				{ID: "gemini-3.5-flash", DisplayName: "Gemini 3.5 Flash", Location: "us", Type: "foundation", Active: true},
+				{ID: "gemini-3.5-pro", DisplayName: "Gemini 3.5 Pro", Location: "us", Type: "foundation", Active: true},
+				{ID: "gemini-3.5-flash-lite", DisplayName: "Gemini 3.5 Flash Lite", Location: "us", Type: "foundation", Active: true},
 				{ID: "text-embedding-004", DisplayName: "Text Embedding 004", Location: "global", Type: "foundation", Active: true},
 				{ID: "multimodal-embedding-001", DisplayName: "Multimodal Embedding 001", Location: "global", Type: "foundation", Active: true},
 				{ID: "gemini-dynamic", DisplayName: "Gemini Dynamic Complexity Router", Location: "global", Type: "foundation", Active: true},
@@ -751,14 +765,22 @@ func (cs *ConfigStore) initLocalDB() error {
 			{ID: "gemini-3.0-pro", DisplayName: "Gemini 3.0 Pro", Location: "global", Type: "foundation", Active: true},
 			{ID: "gemini-3.1-flash", DisplayName: "Gemini 3.1 Flash", Location: "global", Type: "foundation", Active: true},
 			{ID: "gemini-3.1-pro", DisplayName: "Gemini 3.1 Pro", Location: "global", Type: "foundation", Active: true},
-			{ID: "gemini-3.5-flash", DisplayName: "Gemini 3.5 Flash", Location: "global", Type: "foundation", Active: true},
-			{ID: "gemini-3.5-pro", DisplayName: "Gemini 3.5 Pro", Location: "global", Type: "foundation", Active: true},
-			{ID: "gemini-3.5-flash-lite", DisplayName: "Gemini 3.5 Flash Lite", Location: "global", Type: "foundation", Active: true},
+			{ID: "gemini-3.5-flash", DisplayName: "Gemini 3.5 Flash", Location: "us", Type: "foundation", Active: true},
+			{ID: "gemini-3.5-pro", DisplayName: "Gemini 3.5 Pro", Location: "us", Type: "foundation", Active: true},
+			{ID: "gemini-3.5-flash-lite", DisplayName: "Gemini 3.5 Flash Lite", Location: "us", Type: "foundation", Active: true},
 			{ID: "text-embedding-004", DisplayName: "Text Embedding 004", Location: "global", Type: "foundation", Active: true},
 			{ID: "multimodal-embedding-001", DisplayName: "Multimodal Embedding 001", Location: "global", Type: "foundation", Active: true},
 			{ID: "gemini-dynamic", DisplayName: "Gemini Dynamic Complexity Router", Location: "global", Type: "foundation", Active: true},
 		}
 		dirty = true
+	}
+
+	// Ensure existing models locations are correct (e.g. gemini-3.5 models updated to "us")
+	for i, m := range db.Models {
+		if strings.HasPrefix(m.ID, "gemini-3.5-") && m.Location == "global" {
+			db.Models[i].Location = "us"
+			dirty = true
+		}
 	}
 
 	if dirty {
@@ -1252,6 +1274,83 @@ func (cs *ConfigStore) DeleteApp(ctx context.Context, id string) error {
 
 	_, err := cs.Client.Collection("apps").Doc(id).Delete(ctx)
 	return err
+}
+
+// GetMultiRegionParent returns the multi-region group identifier ("us", "eu", "asia", etc.) for a given region code.
+func GetMultiRegionParent(loc string) string {
+	if loc == "us" || strings.HasPrefix(loc, "us-") {
+		return "us"
+	}
+	if loc == "eu" || strings.HasPrefix(loc, "europe-") || strings.HasPrefix(loc, "eu-") {
+		return "eu"
+	}
+	if loc == "asia" || strings.HasPrefix(loc, "asia-") {
+		return "asia"
+	}
+	return ""
+}
+
+// IsLocationCompatible returns true if the modelLoc is compatible with the router's serving boundary.
+func IsLocationCompatible(routerLoc, modelLoc string) bool {
+	if modelLoc == "global" || modelLoc == "" {
+		return true
+	}
+	if routerLoc == modelLoc {
+		return true
+	}
+	routerParent := GetMultiRegionParent(routerLoc)
+	modelParent := GetMultiRegionParent(modelLoc)
+	return routerParent != "" && routerParent == modelParent
+}
+
+// GetLocationLevel returns the specificity level (1 = specific region, 2 = multi-region, 3 = global).
+func GetLocationLevel(loc string) int {
+	if loc == "global" || loc == "" {
+		return 3
+	}
+	if strings.Contains(loc, "-") {
+		return 1 // Specific region (e.g., us-central1)
+	}
+	return 2 // Multi-region (e.g., us)
+}
+
+// GetSmallestCompatibleLocation returns the most specific (smallest) compatible location between locA and locB.
+func GetSmallestCompatibleLocation(locA, locB string) string {
+	if locA == "global" || locA == "" {
+		return locB
+	}
+	if locB == "global" || locB == "" {
+		return locA
+	}
+	if locA == locB {
+		return locA
+	}
+
+	if IsLocationCompatible(locA, locB) {
+		levelA := GetLocationLevel(locA)
+		levelB := GetLocationLevel(locB)
+		if levelA < levelB {
+			return locA
+		}
+		return locB
+	}
+
+	// Fall back to locB (model location) if they are not compatible (e.g. routing to europe-west9 from us)
+	return locB
+}
+
+// ExtractLocationFromResourceName parses a GCP resource name to extract the location segment.
+func ExtractLocationFromResourceName(name string) string {
+	if !strings.HasPrefix(name, "projects/") {
+		return ""
+	}
+	parts := strings.Split(name, "/")
+	for i, part := range parts {
+		if part == "locations" && i+1 < len(parts) {
+			return parts[i+1]
+		}
+	}
+	return ""
 }
 
 // IsValidModelName validates standard and custom Vertex AI model names.

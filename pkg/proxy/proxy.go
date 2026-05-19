@@ -380,10 +380,8 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 				// Resolve and set the routed model's location
 				modelLoc := rp.Location // default to router's location
-				if activeModel, exists := rp.Store.LookupActiveModel(targetModel); exists && activeModel.Location != "" {
-					if activeModel.Location != "global" {
-						modelLoc = activeModel.Location
-					}
+				if activeModel, exists := rp.Store.LookupActiveModel(targetModel); exists {
+					modelLoc = config.GetSmallestCompatibleLocation(rp.Location, activeModel.Location)
 				}
 				r.Header.Set("X-Routed-Model-Location", modelLoc)
 			}

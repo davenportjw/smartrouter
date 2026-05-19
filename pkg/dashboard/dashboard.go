@@ -277,7 +277,7 @@ func (dc *DashboardController) ServeRulesNewModal(w http.ResponseWriter, r *http
 	var activeCompatibleModels []config.ModelConfig
 	if err == nil {
 		for _, m := range allModels {
-			if m.Active && isLocationCompatible(dc.Location, m.Location) {
+			if m.Active && config.IsLocationCompatible(dc.Location, m.Location) {
 				activeCompatibleModels = append(activeCompatibleModels, m)
 			}
 		}
@@ -524,32 +524,6 @@ func generateSecureKey() (string, error) {
 	return "gr_key_" + hex.EncodeToString(bytes), nil
 }
 
-// Helper functions for location compatibility matching
-func getMultiRegionParent(loc string) string {
-	if loc == "us" || strings.HasPrefix(loc, "us-") {
-		return "us"
-	}
-	if loc == "eu" || strings.HasPrefix(loc, "europe-") || strings.HasPrefix(loc, "eu-") {
-		return "eu"
-	}
-	if loc == "asia" || strings.HasPrefix(loc, "asia-") {
-		return "asia"
-	}
-	return ""
-}
-
-func isLocationCompatible(routerLoc, modelLoc string) bool {
-	if modelLoc == "global" || modelLoc == "" {
-		return true
-	}
-	if routerLoc == modelLoc {
-		return true
-	}
-	routerParent := getMultiRegionParent(routerLoc)
-	modelParent := getMultiRegionParent(modelLoc)
-	return routerParent != "" && routerParent == modelParent
-}
-
 // aggregateModelStats compiles real-time or high-fidelity simulated metrics per active model.
 func (dc *DashboardController) aggregateModelStats(ctx context.Context) map[string]templates.ModelStats {
 	stats := make(map[string]templates.ModelStats)
@@ -618,7 +592,7 @@ func (dc *DashboardController) ServeModels(w http.ResponseWriter, r *http.Reques
 
 	for _, m := range allModels {
 		// Only show models compatible with this router instance's serving location
-		if !isLocationCompatible(dc.Location, m.Location) {
+		if !config.IsLocationCompatible(dc.Location, m.Location) {
 			continue
 		}
 
@@ -652,7 +626,7 @@ func (dc *DashboardController) ServeModels(w http.ResponseWriter, r *http.Reques
 	vm := templates.ModelsViewModel{
 		ProjectID:        dc.ProjectID,
 		Location:         dc.Location,
-		ParentLocation:   getMultiRegionParent(dc.Location),
+		ParentLocation:   config.GetMultiRegionParent(dc.Location),
 		AvailableModels:  availableModels,
 		DiscoveredModels: discoveredModels,
 		Locations:        locations,
@@ -687,7 +661,7 @@ func (dc *DashboardController) RefreshModels(w http.ResponseWriter, r *http.Requ
 	locations, fetchLocErr := dc.fetchLocations(ctx)
 	if fetchLocErr == nil {
 		for _, l := range locations {
-			if isLocationCompatible(dc.Location, l.ID) {
+			if config.IsLocationCompatible(dc.Location, l.ID) {
 				locationsToFetch = append(locationsToFetch, l.ID)
 			}
 		}
@@ -709,10 +683,17 @@ func (dc *DashboardController) RefreshModels(w http.ResponseWriter, r *http.Requ
 					continue
 				}
 				active := activeStatus[m.Name] // retain existing state
+
+				// Extract specific location and resolve smallest compatible location
+				modelLoc := loc
+				if extLoc := config.ExtractLocationFromResourceName(m.Name); extLoc != "" {
+					modelLoc = config.GetSmallestCompatibleLocation(loc, extLoc)
+				}
+
 				_ = dc.Store.SaveModel(ctx, config.ModelConfig{
 					ID:          m.Name,
 					DisplayName: m.DisplayName,
-					Location:    loc,
+					Location:    modelLoc,
 					Type:        "custom",
 					Active:      active,
 				})
@@ -733,10 +714,17 @@ func (dc *DashboardController) RefreshModels(w http.ResponseWriter, r *http.Requ
 					displayName = ep.DeployedModels[0].DisplayName
 				}
 				active := activeStatus[ep.Name] // retain existing state
+
+				// Extract specific location and resolve smallest compatible location
+				modelLoc := loc
+				if extLoc := config.ExtractLocationFromResourceName(ep.Name); extLoc != "" {
+					modelLoc = config.GetSmallestCompatibleLocation(loc, extLoc)
+				}
+
 				_ = dc.Store.SaveModel(ctx, config.ModelConfig{
 					ID:          ep.Name,
 					DisplayName: displayName,
-					Location:    loc,
+					Location:    modelLoc,
 					Type:        "endpoint",
 					Active:      active,
 				})
@@ -2043,7 +2031,7 @@ func (dc *DashboardController) ServeComplexityEditModal(w http.ResponseWriter, r
 	var activeCompatibleModels []config.ModelConfig
 	if err == nil {
 		for _, m := range allModels {
-			if m.Active && isLocationCompatible(dc.Location, m.Location) {
+			if m.Active && config.IsLocationCompatible(dc.Location, m.Location) {
 				activeCompatibleModels = append(activeCompatibleModels, m)
 			}
 		}

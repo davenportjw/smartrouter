@@ -62,22 +62,30 @@ If a `premium` client sends a request to `gemini-2.5-flash` and provides the hea
 
 ## 🌐 3. Regional & Multiregional Model Compatibility Routing
 
-To align with standard enterprise security architectures and lower latencies, the Smart Router dynamically regulates and steers traffic based on the serving location of your physical model deployments.
+To align with standard enterprise security architectures, Lower Latencies, and Data Residency requirements, the Smart Router dynamically regulates and steers traffic using the **most specific compatible regional boundary available**.
 
-### Serving Location Compatibility Rules
-When a router is instantiated in a primary serving region (configured via `GEMINI_LOCATION`), operators can only route traffic to models residing in:
-1. **The Local Region itself**: e.g., `us-central1` (lowest latency, ideal for data sovereignty).
-2. **The Parent Multiregion parent**: e.g., `us` if the router is deployed in a `us-` region, or `eu` if deployed in a `europe-` region.
-3. **The Global Baseline**: `global` (for standard pre-seeded baseline foundation models).
+### Serving Location Compatibility & Coercion Rules
+When a router is instantiated in a primary serving region (configured via `GEMINI_LOCATION`, e.g. `us-central1`), operators can route traffic to models residing in compatible locations. However, to optimize regional locality and data paths, **the reverse proxy always downscales routing to the smallest compatible location where possible**:
+1. **Specific regional locations** (e.g., `us-central1`) are Level 1 (Smallest).
+2. **Multi-regions** (e.g., `us`, `eu`) are Level 2.
+3. **Global baselines** (`global`) are Level 3 (Broadest).
 
-Incompatible routes are filtered out and prevented at both the configuration and routing layers, guaranteeing that EU traffic stays within EU boundaries (e.g., routed from an EU router strictly to EU models).
+For example:
+* If the router is in `us-central1` (Level 1) and the target model supports `us` (Level 2), the proxy automatically routes to **`us-central1`** (the smallest compatible location).
+* If the model is pinned to `europe-west9` (Level 1) and the router is in `us` (Level 2), they are incompatible. The proxy preserves the model's location **`europe-west9`** to ensure routing succeeds.
+
+Incompatible routes (e.g., routing from an EU router strictly to a model residing in a `us-` region) are filtered out and prevented, guaranteeing that regional boundaries are enforced.
+
+### Exact Location Extraction during Model Discovery
+When refreshing custom models and endpoints via `/admin/models/refresh`, the Smart Router extracts the exact regional code from the model or endpoint's GCP resource path (e.g., `projects/{project}/locations/us-central1/models/custom-weights` -> `us-central1`).
+It stores this model configuration utilizing the most specific location possible, so routing decisions automatically benefit from precise locality routing.
 
 ### Dynamic Host & Path Rewriting in the Proxy
-When a request is dynamically routed to a compatible model in a different serving region (for instance, routing to a custom tuned model in the parent `us` multiregion from a `us-central1` router):
-- The reverse proxy automatically intercepts and rewrites the request hostname:
-  `{model_location}-aiplatform.googleapis.com`
-- The location path component is dynamically updated to target `modelLoc` instead of the default `rp.Location`:
-  `/v1/projects/{project}/locations/{model_location}/publishers/google/models/...`
+When a request is dynamically routed to a model:
+- The reverse proxy automatically intercepts and rewrites the request hostname using the resolved smallest compatible location:
+  `{resolved_location}-aiplatform.googleapis.com`
+- The location path component is dynamically updated to target the resolved location:
+  `/v1/projects/{project}/locations/{resolved_location}/publishers/google/models/...`
 - The Google OAuth2 access token remains authenticated across all regional endpoints.
 
 ---
