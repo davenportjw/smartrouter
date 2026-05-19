@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -95,9 +96,9 @@ func TestRouterProxyCompatibility(t *testing.T) {
 		{
 			name:         "Standard Model request path translation",
 			method:       "POST",
-			inputPath:    "/v1/models/gemini-1.5-flash:generateContent",
+			inputPath:    "/v1/models/gemini-2.5-flash:generateContent",
 			apiKey:       testKeyStr,
-			expectedPath: "/v1/projects/test-project/locations/us-central1/publishers/google/models/gemini-1.5-flash:generateContent",
+			expectedPath: "/v1/projects/test-project/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent",
 			expectAuth:   true,
 			expectKeyDel: true,
 		},
@@ -320,7 +321,7 @@ func TestRouterProxyCustomHeaders(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			backendReceivedAllHeaders = false // reset
-			req := httptest.NewRequest("POST", "/v1/models/gemini-1.5-flash:generateContent?key="+testKeyStr, nil)
+			req := httptest.NewRequest("POST", "/v1/models/gemini-2.5-flash:generateContent?key="+testKeyStr, nil)
 			req.Header.Set("x-goog-api-key", testKeyStr)
 			for k, v := range tt.requestHeaders {
 				req.Header.Set(k, v)
@@ -392,7 +393,7 @@ func TestRouterProxyHeaderRouting(t *testing.T) {
 	// Seed Dynamic Routing Rules
 	rule1 := config.RoutingRule{
 		ID:             "rule-exact-header",
-		ModelPattern:   "gemini-1.5-flash",
+		ModelPattern:   "gemini-2.5-flash-lite",
 		ClientTier:     "all",
 		HeaderName:     "X-Route-High-Priority",
 		HeaderValue:    "true",
@@ -402,11 +403,11 @@ func TestRouterProxyHeaderRouting(t *testing.T) {
 	}
 	rule2 := config.RoutingRule{
 		ID:             "rule-regex-header",
-		ModelPattern:   "gemini-1.5-flash",
+		ModelPattern:   "gemini-2.5-flash-lite",
 		ClientTier:     "all",
 		HeaderName:     "X-Route-Version",
 		HeaderValue:    "/^canary-[a-z]+$/",
-		TargetModel:    "gemini-2.0-flash",
+		TargetModel:    "gemini-2.5-flash",
 		TargetLocation: "us-central1",
 		PriorityWeight: 3,
 	}
@@ -414,7 +415,7 @@ func TestRouterProxyHeaderRouting(t *testing.T) {
 		ID:             "rule-catchall",
 		ModelPattern:   "*",
 		ClientTier:     "all",
-		TargetModel:    "gemini-1.5-flash",
+		TargetModel:    "gemini-2.5-flash",
 		TargetLocation: "us-central1",
 		PriorityWeight: 1,
 	}
@@ -459,24 +460,24 @@ func TestRouterProxyHeaderRouting(t *testing.T) {
 		{
 			name:          "Matches Rule 2: regex header route override",
 			headers:       map[string]string{"X-Route-Version": "canary-alpha"},
-			expectedModel: "gemini-2.0-flash",
+			expectedModel: "gemini-2.5-flash",
 		},
 		{
 			name:          "Does not match rule 2 (invalid regex value), matches default",
 			headers:       map[string]string{"X-Route-Version": "canary-1234"},
-			expectedModel: "gemini-1.5-flash",
+			expectedModel: "gemini-2.5-flash",
 		},
 		{
 			name:          "No headers supplied, falls back to default rule",
 			headers:       map[string]string{},
-			expectedModel: "gemini-1.5-flash",
+			expectedModel: "gemini-2.5-flash",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			lastRoutedModel = "" // reset
-			req := httptest.NewRequest("POST", "/v1/models/gemini-1.5-flash:generateContent?key="+testKeyStr, nil)
+			req := httptest.NewRequest("POST", "/v1/models/gemini-2.5-flash-lite:generateContent?key="+testKeyStr, nil)
 			req.Header.Set("x-goog-api-key", testKeyStr)
 			for k, v := range tt.headers {
 				req.Header.Set(k, v)
@@ -550,7 +551,7 @@ func TestRouterProxyAppCentricFlows(t *testing.T) {
 	_ = store.SaveRule(ctx, config.RoutingRule{
 		ID:             "rule-app-1-routing",
 		AppID:          "app-1",
-		ModelPattern:   "gemini-1.5-flash",
+		ModelPattern:   "gemini-2.5-flash",
 		ClientTier:     "all",
 		TargetModel:    "gemini-2.5-pro",
 		TargetLocation: "us-central1",
@@ -579,7 +580,7 @@ func TestRouterProxyAppCentricFlows(t *testing.T) {
 	rp.Proxy.Transport = &mockRoundTripper{Target: backendURL}
 
 	// Test Case 1: Request without App-specific required header should fail (400 Bad Request)
-	req1 := httptest.NewRequest("POST", "/v1/models/gemini-1.5-flash:generateContent?key="+keyStr, nil)
+	req1 := httptest.NewRequest("POST", "/v1/models/gemini-2.5-flash:generateContent?key="+keyStr, nil)
 	req1.Header.Set("x-goog-api-key", keyStr)
 	rr1 := httptest.NewRecorder()
 	rp.ServeHTTP(rr1, req1)
@@ -589,7 +590,7 @@ func TestRouterProxyAppCentricFlows(t *testing.T) {
 	}
 
 	// Test Case 2: Request with correct App-specific header should pass and apply App-specific routing
-	req2 := httptest.NewRequest("POST", "/v1/models/gemini-1.5-flash:generateContent?key="+keyStr, nil)
+	req2 := httptest.NewRequest("POST", "/v1/models/gemini-2.5-flash:generateContent?key="+keyStr, nil)
 	req2.Header.Set("x-goog-api-key", keyStr)
 	req2.Header.Set("X-App-Secret", "app-one-super-token")
 	rr2 := httptest.NewRecorder()
@@ -643,7 +644,7 @@ func TestRouterProxyGoogleIdentityAuth(t *testing.T) {
 	_ = store.SaveRule(ctx, config.RoutingRule{
 		ID:             "rule-sa-routing",
 		AppID:          serviceAccountEmail,
-		ModelPattern:   "gemini-1.5-flash",
+		ModelPattern:   "gemini-2.5-flash",
 		ClientTier:     "all",
 		TargetModel:    "gemini-2.5-pro",
 		TargetLocation: "us-central1",
@@ -683,7 +684,7 @@ func TestRouterProxyGoogleIdentityAuth(t *testing.T) {
 	rp.Proxy.Transport = &mockRoundTripper{Target: backendURL}
 
 	// Test Case 1: Standard request with Google OIDC Bearer token in Authorization header
-	req1 := httptest.NewRequest("POST", "/v1/models/gemini-1.5-flash:generateContent", nil)
+	req1 := httptest.NewRequest("POST", "/v1/models/gemini-2.5-flash:generateContent", nil)
 	req1.Header.Set("Authorization", "Bearer "+mockTokenStr)
 	rr1 := httptest.NewRecorder()
 	rp.ServeHTTP(rr1, req1)
@@ -704,7 +705,7 @@ func TestRouterProxyGoogleIdentityAuth(t *testing.T) {
 	unregisteredToken := jwt.NewWithClaims(jwt.SigningMethodHS256, unregisteredClaims)
 	unregisteredTokenStr, _ := unregisteredToken.SignedString([]byte("mock-signing-key"))
 
-	req2 := httptest.NewRequest("POST", "/v1/models/gemini-1.5-flash:generateContent", nil)
+	req2 := httptest.NewRequest("POST", "/v1/models/gemini-2.5-flash:generateContent", nil)
 	req2.Header.Set("Authorization", "Bearer "+unregisteredTokenStr)
 	rr2 := httptest.NewRecorder()
 	rp.ServeHTTP(rr2, req2)
@@ -714,7 +715,7 @@ func TestRouterProxyGoogleIdentityAuth(t *testing.T) {
 	}
 
 	// Test Case 3: Malformed JWT should fail with 401
-	req3 := httptest.NewRequest("POST", "/v1/models/gemini-1.5-flash:generateContent", nil)
+	req3 := httptest.NewRequest("POST", "/v1/models/gemini-2.5-flash:generateContent", nil)
 	req3.Header.Set("Authorization", "Bearer eyJ.invalid.jwt")
 	rr3 := httptest.NewRecorder()
 	rp.ServeHTTP(rr3, req3)
@@ -725,6 +726,324 @@ func TestRouterProxyGoogleIdentityAuth(t *testing.T) {
 
 	os.RemoveAll("data/local_db.json")
 }
+
+func TestRequestSchedulerOrdering(t *testing.T) {
+	os.Setenv("LOCAL_DEV", "true")
+	os.Setenv("ROUTER_CONCURRENCY_LIMIT", "1")
+	os.Setenv("ROUTER_MAX_QUEUE_SIZE", "5")
+	defer func() {
+		os.Unsetenv("LOCAL_DEV")
+		os.Unsetenv("ROUTER_CONCURRENCY_LIMIT")
+		os.Unsetenv("ROUTER_MAX_QUEUE_SIZE")
+	}()
+
+	ctx := context.Background()
+	store, err := config.NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to initialize config store: %v", err)
+	}
+
+	// Create high and low priority apps
+	appLow := config.App{ID: "app-low", ClientID: "client-1", RPM: 10, TPM: 1000, Priority: "low"}
+	appHigh := config.App{ID: "app-high", ClientID: "client-1", RPM: 10, TPM: 1000, Priority: "high"}
+	
+	client1 := config.Client{ID: "client-1", Tier: "premium"}
+
+	keyLow := config.APIKey{KeyHash: config.HashKey("key-low"), AppID: "app-low", Status: "active"}
+	keyHigh := config.APIKey{KeyHash: config.HashKey("key-high"), AppID: "app-high", Status: "active"}
+
+	_ = store.SaveClient(ctx, client1)
+	_ = store.SaveApp(ctx, appLow)
+	_ = store.SaveApp(ctx, appHigh)
+	_ = store.SaveKey(ctx, keyLow)
+	_ = store.SaveKey(ctx, keyHigh)
+	_ = store.DeleteHeader(ctx, "header-1")
+
+	// Channel to coordinate request execution
+	proceedChan := make(chan struct{})
+	var orderMu sync.Mutex
+	var executionOrder []string
+
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// We receive App ID in the header
+		appID := r.Header.Get("X-App-ID")
+		orderMu.Lock()
+		executionOrder = append(executionOrder, appID)
+		orderMu.Unlock()
+
+		// Block until signaled to proceed
+		<-proceedChan
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+	rp, _ := NewRouterProxy(store, "test-project", "us-central1")
+	rp.TokenSource = &mockTokenSource{}
+	rp.Target = backendURL
+	rp.Proxy.Transport = &mockRoundTripper{Target: backendURL}
+
+	// 1. First request (Low Priority): should execute immediately and block the concurrency slot
+	req1 := httptest.NewRequest("POST", "/v1/models/gemini-2.5-flash:generateContent?key=key-low", nil)
+	req1.Header.Set("x-goog-api-key", "key-low")
+	rr1 := httptest.NewRecorder()
+
+	go func() {
+		rp.ServeHTTP(rr1, req1)
+	}()
+
+	// Give goroutine time to enter handler
+	time.Sleep(100 * time.Millisecond)
+
+	// 2. Second request (Low Priority): should enqueue
+	req2 := httptest.NewRequest("POST", "/v1/models/gemini-2.5-flash:generateContent?key=key-low", nil)
+	req2.Header.Set("x-goog-api-key", "key-low")
+	rr2 := httptest.NewRecorder()
+
+	go func() {
+		rp.ServeHTTP(rr2, req2)
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+
+	// 3. Third request (High Priority): should enqueue and jump ahead of the second request
+	req3 := httptest.NewRequest("POST", "/v1/models/gemini-2.5-flash:generateContent?key=key-high", nil)
+	req3.Header.Set("x-goog-api-key", "key-high")
+	rr3 := httptest.NewRecorder()
+
+	go func() {
+		rp.ServeHTTP(rr3, req3)
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Release the concurrency slot one-by-one
+	proceedChan <- struct{}{} // Release first request
+	time.Sleep(100 * time.Millisecond)
+
+	proceedChan <- struct{}{} // Release second dispatched request (which should be the high priority one!)
+	time.Sleep(100 * time.Millisecond)
+
+	proceedChan <- struct{}{} // Release final request
+	time.Sleep(100 * time.Millisecond)
+
+	orderMu.Lock()
+	expectedOrder := []string{"app-low", "app-high", "app-low"}
+	if len(executionOrder) != 3 {
+		t.Fatalf("expected 3 executions, got %d: %v", len(executionOrder), executionOrder)
+	}
+	for i, v := range expectedOrder {
+		if executionOrder[i] != v {
+			t.Errorf("expected index %d to be %s, got %s", i, v, executionOrder[i])
+		}
+	}
+	orderMu.Unlock()
+
+	os.RemoveAll("data/local_db.json")
+}
+
+func TestRequestSchedulerQueueFull(t *testing.T) {
+	os.Setenv("LOCAL_DEV", "true")
+	os.Setenv("ROUTER_CONCURRENCY_LIMIT", "1")
+	os.Setenv("ROUTER_MAX_QUEUE_SIZE", "1")
+	defer func() {
+		os.Unsetenv("LOCAL_DEV")
+		os.Unsetenv("ROUTER_CONCURRENCY_LIMIT")
+		os.Unsetenv("ROUTER_MAX_QUEUE_SIZE")
+	}()
+
+	ctx := context.Background()
+	store, _ := config.NewConfigStore(ctx, "test-project")
+
+	app := config.App{ID: "app-1", ClientID: "client-1", RPM: 10, TPM: 1000, Priority: "medium"}
+	client1 := config.Client{ID: "client-1", Tier: "standard"}
+	key := config.APIKey{KeyHash: config.HashKey("key-1"), AppID: "app-1", Status: "active"}
+
+	_ = store.SaveClient(ctx, client1)
+	_ = store.SaveApp(ctx, app)
+	_ = store.SaveKey(ctx, key)
+	_ = store.DeleteHeader(ctx, "header-1")
+
+	blockChan := make(chan struct{})
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-blockChan
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+	rp, _ := NewRouterProxy(store, "test-project", "us-central1")
+	rp.TokenSource = &mockTokenSource{}
+	rp.Target = backendURL
+	rp.Proxy.Transport = &mockRoundTripper{Target: backendURL}
+
+	// Request 1: Consumes active slot
+	req1 := httptest.NewRequest("POST", "/v1/models/gemini-2.5-flash:generateContent?key=key-1", nil)
+	req1.Header.Set("x-goog-api-key", "key-1")
+	rr1 := httptest.NewRecorder()
+	go func() { rp.ServeHTTP(rr1, req1) }()
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Request 2: Fills the 1 queue slot
+	req2 := httptest.NewRequest("POST", "/v1/models/gemini-2.5-flash:generateContent?key=key-1", nil)
+	req2.Header.Set("x-goog-api-key", "key-1")
+	rr2 := httptest.NewRecorder()
+	go func() { rp.ServeHTTP(rr2, req2) }()
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Request 3: Should fail immediately with 429 (Queue Full)
+	req3 := httptest.NewRequest("POST", "/v1/models/gemini-2.5-flash:generateContent?key=key-1", nil)
+	req3.Header.Set("x-goog-api-key", "key-1")
+	rr3 := httptest.NewRecorder()
+	rp.ServeHTTP(rr3, req3)
+
+	if rr3.Code != http.StatusTooManyRequests {
+		t.Errorf("expected status 429 for full queue, got %d. Body: %s", rr3.Code, rr3.Body.String())
+	}
+	if !strings.Contains(rr3.Body.String(), "request queue is full") {
+		t.Errorf("expected queue full error message, got: %s", rr3.Body.String())
+	}
+
+	close(blockChan)
+	os.RemoveAll("data/local_db.json")
+}
+
+func TestRequestSchedulerClientDisconnect(t *testing.T) {
+	os.Setenv("LOCAL_DEV", "true")
+	os.Setenv("ROUTER_CONCURRENCY_LIMIT", "1")
+	os.Setenv("ROUTER_MAX_QUEUE_SIZE", "5")
+	defer func() {
+		os.Unsetenv("LOCAL_DEV")
+		os.Unsetenv("ROUTER_CONCURRENCY_LIMIT")
+		os.Unsetenv("ROUTER_MAX_QUEUE_SIZE")
+	}()
+
+	ctx := context.Background()
+	store, _ := config.NewConfigStore(ctx, "test-project")
+
+	app := config.App{ID: "app-1", ClientID: "client-1", RPM: 10, TPM: 1000, Priority: "medium"}
+	client1 := config.Client{ID: "client-1", Tier: "standard"}
+	key := config.APIKey{KeyHash: config.HashKey("key-1"), AppID: "app-1", Status: "active"}
+
+	_ = store.SaveClient(ctx, client1)
+	_ = store.SaveApp(ctx, app)
+	_ = store.SaveKey(ctx, key)
+	_ = store.DeleteHeader(ctx, "header-1")
+
+	var executedCount int
+	var mu sync.Mutex
+
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		executedCount++
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+	rp, _ := NewRouterProxy(store, "test-project", "us-central1")
+	rp.TokenSource = &mockTokenSource{}
+	rp.Target = backendURL
+	rp.Proxy.Transport = &mockRoundTripper{Target: backendURL}
+
+	// Hold the slot
+	_, err := rp.Scheduler.Enqueue(ctx, "medium", "standard")
+	if err != nil {
+		t.Fatalf("enqueue block failed: %v", err)
+	}
+
+	// Send Request 2 with cancellable context
+	cancelCtx, cancel := context.WithCancel(ctx)
+	req2 := httptest.NewRequest("POST", "/v1/models/gemini-2.5-flash:generateContent?key=key-1", nil)
+	req2 = req2.WithContext(cancelCtx)
+	rr2 := httptest.NewRecorder()
+
+	go func() {
+		rp.ServeHTTP(rr2, req2)
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Cancel Request 2
+	cancel()
+	time.Sleep(100 * time.Millisecond)
+
+	// Release slot
+	rp.Scheduler.Release()
+	time.Sleep(100 * time.Millisecond)
+
+	mu.Lock()
+	if executedCount != 0 {
+		t.Errorf("expected 0 executed requests in backend (since client disconnected while enqueued), got %d", executedCount)
+	}
+	mu.Unlock()
+
+	os.RemoveAll("data/local_db.json")
+}
+
+func TestProxyUpstream429Retry(t *testing.T) {
+	os.Setenv("LOCAL_DEV", "true")
+	defer os.Unsetenv("LOCAL_DEV")
+
+	ctx := context.Background()
+	store, _ := config.NewConfigStore(ctx, "test-project")
+
+	app := config.App{ID: "app-1", ClientID: "client-1", RPM: 10, TPM: 1000, Priority: "medium"}
+	client1 := config.Client{ID: "client-1", Tier: "standard"}
+	key := config.APIKey{KeyHash: config.HashKey("key-1"), AppID: "app-1", Status: "active"}
+
+	_ = store.SaveClient(ctx, client1)
+	_ = store.SaveApp(ctx, app)
+	_ = store.SaveKey(ctx, key)
+	_ = store.DeleteHeader(ctx, "header-1")
+
+	attempts := 0
+	var mu sync.Mutex
+
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		attempts++
+		currentAttempt := attempts
+		mu.Unlock()
+
+		if currentAttempt < 3 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			w.Write([]byte(`{"error": "Too many requests upstream"}`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status": "success"}`))
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+	rp, _ := NewRouterProxy(store, "test-project", "us-central1")
+	rp.TokenSource = &mockTokenSource{}
+	rp.Target = backendURL
+	rp.Proxy.Transport = &mockRoundTripper{Target: backendURL}
+
+	req := httptest.NewRequest("POST", "/v1/models/gemini-2.5-flash:generateContent?key=key-1", strings.NewReader(`{"input": "test"}`))
+	req.Header.Set("x-goog-api-key", "key-1")
+	rr := httptest.NewRecorder()
+
+	rp.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected final status 200 after retries, got %d. Body: %s", rr.Code, rr.Body.String())
+	}
+
+	mu.Lock()
+	if attempts != 3 {
+		t.Errorf("expected 3 total attempts upstream, got %d", attempts)
+	}
+	mu.Unlock()
+
+	os.RemoveAll("data/local_db.json")
+}
+
 
 
 

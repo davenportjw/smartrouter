@@ -1,15 +1,18 @@
 package proxy
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -28,6 +31,7 @@ type RouterProxy struct {
 	Proxy       *httputil.ReverseProxy
 	Store       *config.ConfigStore
 	Limiter     *limiter.RateLimiterRegistry
+	Scheduler   *RequestScheduler
 	TokenSource oauth2.TokenSource
 	ProjectID   string
 	Location    string
@@ -104,10 +108,25 @@ func NewRouterProxy(store *config.ConfigStore, projectID, location string) (*Rou
 		return nil, fmt.Errorf("failed to get default token source: %w", err)
 	}
 
+	maxQueueSize := 1000
+	if val := os.Getenv("ROUTER_MAX_QUEUE_SIZE"); val != "" {
+		if limit, err := strconv.Atoi(val); err == nil && limit > 0 {
+			maxQueueSize = limit
+		}
+	}
+
+	activeLimit := 100
+	if val := os.Getenv("ROUTER_CONCURRENCY_LIMIT"); val != "" {
+		if limit, err := strconv.Atoi(val); err == nil && limit > 0 {
+			activeLimit = limit
+		}
+	}
+
 	rp := &RouterProxy{
 		Target:      target,
 		Store:       store,
 		Limiter:     limiter.NewRateLimiterRegistry(),
+		Scheduler:   NewRequestScheduler(maxQueueSize, activeLimit),
 		TokenSource: ts,
 		ProjectID:   projectID,
 		Location:    location,
@@ -368,10 +387,47 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Apply queueing delay if a wait-time was assigned for priority
+	// Enqueue request in priority-based queue
+	queueItem, err := rp.Scheduler.Enqueue(r.Context(), app.Priority, client.Tier)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		w.Write([]byte(`{
+			"error": {
+				"code": 429,
+				"message": "Router is under high load and request queue is full.",
+				"status": "RESOURCE_EXHAUSTED"
+			}
+		}`))
+		return
+	}
+
+	// Wait for scheduling slot or context cancellation
+	select {
+	case <-r.Context().Done():
+		return
+	case <-queueItem.Done:
+		// Slot acquired!
+	}
+	defer rp.Scheduler.Release()
+
+	// Apply queueing delay using cancelable select if a wait-time was assigned for priority
 	if delay > 0 {
 		log.Printf("[Proxy Queue] Delaying request for app %s by %v due to priority queueing", app.ID, delay)
-		time.Sleep(delay)
+		select {
+		case <-r.Context().Done():
+			return
+		case <-time.After(delay):
+		}
+	}
+
+	// Wrap the transport dynamically with the retry transport wrapper
+	if rp.Proxy.Transport != nil {
+		if _, ok := rp.Proxy.Transport.(*retryTransport); !ok {
+			rp.Proxy.Transport = &retryTransport{base: rp.Proxy.Transport}
+		}
+	} else {
+		rp.Proxy.Transport = &retryTransport{base: http.DefaultTransport}
 	}
 
 	// Execute standard reverse proxy
@@ -475,5 +531,75 @@ func parseGoogleIdentity(ctx context.Context, tokenStr string, host string) (str
 		return "", fmt.Errorf("missing email claim in validated token")
 	}
 	return email, nil
+}
+
+// retryTransport wraps a base http.RoundTripper to support dynamic retries and backoff for 429s.
+type retryTransport struct {
+	base http.RoundTripper
+}
+
+func (t *retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Buffer request body if present
+	var bodyBytes []byte
+	if req.Body != nil {
+		var err error
+		bodyBytes, err = io.ReadAll(req.Body)
+		if err != nil {
+			return nil, err
+		}
+		req.Body.Close()
+	}
+
+	maxRetries := 3
+	baseBackoff := 500 * time.Millisecond
+
+	var resp *http.Response
+	var err error
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			// Backoff before retry: exponential backoff
+			backoff := baseBackoff * time.Duration(1<<(attempt-1))
+			select {
+			case <-req.Context().Done():
+				return nil, req.Context().Err()
+			case <-time.After(backoff):
+			}
+			log.Printf("[Retry Transport] Retrying request upstream (attempt %d/%d) after %v due to 429", attempt, maxRetries, backoff)
+		}
+
+		// Re-populate request body from buffer
+		if bodyBytes != nil {
+			req.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+		}
+
+		resp, err = t.base.RoundTrip(req)
+		if err != nil {
+			if attempt < maxRetries {
+				log.Printf("[Retry Transport] Upstream roundtrip error on attempt %d: %v, retrying...", attempt, err)
+				continue
+			}
+			return nil, err
+		}
+
+		// If status code is NOT 429, return response immediately
+		if resp.StatusCode != http.StatusTooManyRequests {
+			return resp, nil
+		}
+
+		// Upstream returned 429. If we have attempts left, close the body and loop to retry.
+		if attempt < maxRetries {
+			resp.Body.Close()
+			continue
+		}
+
+		// No attempts left, return the final 429 response to the client
+		return resp, nil
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
 }
 

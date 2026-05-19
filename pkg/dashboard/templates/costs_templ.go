@@ -147,7 +147,7 @@ func CostsTab(vm CostsViewModel) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			if sess.ModelRouted == "gemini-2.5-pro" || sess.ModelRouted == "gemini-1.5-pro" {
+			if sess.ModelRouted == "gemini-2.5-pro" {
 				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<span class=\"inline-flex items-center rounded-md bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err

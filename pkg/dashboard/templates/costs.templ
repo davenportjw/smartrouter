@@ -146,7 +146,7 @@ templ CostsTab(vm CostsViewModel) {
 								<td class="px-6 py-4 whitespace-nowrap text-xs font-mono font-semibold text-blue-600">{ sess.SessionID }</td>
 								<td class="px-6 py-4 whitespace-nowrap text-xs font-medium text-gray-800">{ sess.ClientID }</td>
 								<td class="px-6 py-4 whitespace-nowrap text-xs">
-									if sess.ModelRouted == "gemini-2.5-pro" || sess.ModelRouted == "gemini-1.5-pro" {
+									if sess.ModelRouted == "gemini-2.5-pro" {
 										<span class="inline-flex items-center rounded-md bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10">
 											{ sess.ModelRouted }
 										</span>

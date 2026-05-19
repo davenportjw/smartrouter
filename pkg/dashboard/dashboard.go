@@ -479,12 +479,7 @@ func (dc *DashboardController) ServeModels(w http.ResponseWriter, r *http.Reques
 	foundationModels := []string{
 		"gemini-2.5-pro",
 		"gemini-2.5-flash",
-		"gemini-2.0-pro-exp",
-		"gemini-2.0-flash-thinking-exp",
-		"gemini-2.0-flash",
-		"gemini-1.5-pro",
-		"gemini-1.5-flash",
-		"gemini-1.0-pro",
+		"gemini-2.5-flash-lite",
 		"text-embedding-004",
 		"multimodal-embedding-001",
 	}
@@ -1058,7 +1053,7 @@ func (dc *DashboardController) parseGCPCosts(payload []byte) (templates.CostsVie
 		}
 		model := entry.JSONPayload.ModelRouted
 		if model == "" {
-			model = "gemini-1.5-flash"
+			model = "gemini-2.5-flash"
 		}
 
 		inT, outT, cost := estimateTokensAndCost(model, entry.JSONPayload.BytesSent)
@@ -1140,7 +1135,7 @@ func (dc *DashboardController) parseGCPCosts(payload []byte) (templates.CostsVie
 // generateMockCosts populates a detailed transaction mock bill database for offline dev.
 func (dc *DashboardController) generateMockCosts() templates.CostsViewModel {
 	clients := []string{"enterprise-app", "internal-dev-portal", "analytics-service", "startup-sandbox"}
-	models := []string{"gemini-2.5-pro", "gemini-2.5-flash", "gemini-1.5-pro", "gemini-1.5-flash"}
+	models := []string{"gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite"}
 	
 	var sessions []templates.CostTransaction
 	modelSpend := make(map[string]float64)

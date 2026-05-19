@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	firebase "firebase.google.com/go/v4"
@@ -65,10 +66,40 @@ func (as *AuthStore) CreateSession(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Firebase auth client not initialized", http.StatusInternalServerError)
 			return
 		}
-		var err error
-		cookieString, err = as.Client.SessionCookie(r.Context(), idToken, expiresIn)
+
+		// First, verify the ID token to inspect its claims (specifically email)
+		decodedToken, err := as.Client.VerifyIDToken(r.Context(), idToken)
 		if err != nil {
-			log.Printf("[Auth] Error creating session cookie: %v", err)
+			log.Printf("[Auth] Error verifying ID token: %v", err)
+			http.Error(w, "Invalid ID token", http.StatusUnauthorized)
+			return
+		}
+
+		// Retrieve email claim
+		emailClaim, ok := decodedToken.Claims["email"]
+		if !ok {
+			log.Printf("[Auth] Missing email claim in ID token")
+			http.Error(w, "Missing email claim in ID token", http.StatusForbidden)
+			return
+		}
+		email, ok := emailClaim.(string)
+		if !ok {
+			log.Printf("[Auth] Invalid email claim format")
+			http.Error(w, "Invalid email claim format", http.StatusForbidden)
+			return
+		}
+
+		// Restrict authentication access to google.com and cloudadvocacyorg.joonix.net users
+		if !strings.HasSuffix(email, "@google.com") && !strings.HasSuffix(email, "@cloudadvocacyorg.joonix.net") {
+			log.Printf("[Auth] Access denied for unauthorized domain email: %s", email)
+			http.Error(w, "Access restricted to authorized domains", http.StatusForbidden)
+			return
+		}
+
+		var errCookie error
+		cookieString, errCookie = as.Client.SessionCookie(r.Context(), idToken, expiresIn)
+		if errCookie != nil {
+			log.Printf("[Auth] Error creating session cookie: %v", errCookie)
 			http.Error(w, "Failed to create session", http.StatusUnauthorized)
 			return
 		}

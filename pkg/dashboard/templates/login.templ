@@ -168,7 +168,9 @@ templ Login(config FirebaseConfig) {
 						})
 						.then((response) => {
 							if (!response.ok) {
-								throw new Error("Authentication session generation failed on server.");
+								return response.text().then((text) => {
+									throw new Error(text || "Authentication session generation failed on server.");
+								});
 							}
 							return response.json();
 						})

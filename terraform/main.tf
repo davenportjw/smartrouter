@@ -174,6 +174,7 @@ resource "google_identity_platform_config" "auth_config" {
     "google.com",
     "cloudadvocacyorg.joonix.net",
     "gemini-smart-router-txgsracloq-uc.a.run.app",
+    "gemini-smart-router-834476222725.us-central1.run.app",
     "${var.project_id}.firebaseapp.com",
     "${var.project_id}.web.app"
   ]

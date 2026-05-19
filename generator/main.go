@@ -148,9 +148,9 @@ func executeSimulationRound() (string, error) {
 
 	// 2. Choose Model
 	// Weighted choice: Flash (85%), Pro (15%)
-	model := "gemini-1.5-flash"
+	model := "gemini-2.5-flash"
 	if rand.Float64() < 0.15 {
-		model = "gemini-1.5-pro"
+		model = "gemini-2.5-pro"
 	}
 
 	prompt := prompts[rand.Intn(len(prompts))]

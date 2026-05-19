@@ -354,9 +354,9 @@ func (cs *ConfigStore) initLocalDB() error {
 			ID:             "rule-1",
 			ModelPattern:   "*",
 			ClientTier:     "all",
-			TargetModel:    "gemini-1.5-flash",
+			TargetModel:    "gemini-2.5-flash",
 			TargetLocation: "us-central1",
-			FallbackModel:  "gemini-1.5-pro",
+			FallbackModel:  "gemini-2.5-pro",
 			PriorityWeight: 1,
 		}
 
@@ -388,7 +388,7 @@ func (cs *ConfigStore) initLocalDB() error {
 
 		log.Println("[Local Dev] Seeded successfully.")
 		log.Println("[Local Dev] ------------------------------------------------------------")
-		log.Println("[Local Dev] Pre-seeded Router Rule: All requests (*) -> gemini-1.5-flash")
+		log.Println("[Local Dev] Pre-seeded Router Rule: All requests (*) -> gemini-2.5-flash")
 		log.Println("[Local Dev] Pre-seeded Custom Header: X-Client-App-ID (regex validation)")
 		log.Println("[Local Dev] Please generate API Credentials via dashboard: http://localhost:8080/admin/keys")
 		log.Println("[Local Dev] ------------------------------------------------------------")
