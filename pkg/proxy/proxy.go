@@ -481,6 +481,12 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		rp.Proxy.Transport = &retryTransport{base: http.DefaultTransport}
 	}
 
+	// Set custom audit headers in ResponseWriter for client programmatic visibility
+	w.Header().Set("X-Routed-Model", r.Header.Get("X-Routed-Model"))
+	w.Header().Set("X-Requested-Model", r.Header.Get("X-Requested-Model"))
+	w.Header().Set("X-Client-Tier", client.Tier)
+	w.Header().Set("X-App-ID", app.ID)
+
 	// Execute standard reverse proxy
 	rp.Proxy.ServeHTTP(wrapped, r)
 

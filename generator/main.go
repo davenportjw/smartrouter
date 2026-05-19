@@ -146,18 +146,46 @@ func executeSimulationRound() (string, error) {
 		clientTier = "standard"
 	}
 
-	// 2. Choose Model
-	// Weighted choice: Flash (85%), Pro (15%)
-	model := "gemini-2.5-flash"
-	if rand.Float64() < 0.15 {
-		model = "gemini-2.5-pro"
-	}
+	// 2. Choose Model and Prompt
+	// Weighted choice for model:
+	// - 30%: Virtual model "gemini-dynamic" (triggers dynamic complexity routing)
+	// - 15%: "gemini-1.5-pro" (triggers rules-based dynamic routing with headers)
+	// - 40%: "gemini-2.5-flash"
+	// - 15%: "gemini-2.5-pro"
+	var model string
+	var prompt string
+	var customHeaders map[string]string
 
-	prompt := prompts[rand.Intn(len(prompts))]
+	modelRoll := rand.Float64()
+	if modelRoll < 0.30 {
+		model = "gemini-dynamic"
+		// Vary prompt length to exercise simple/medium/complex complexity routing bands
+		promptRoll := rand.Float64()
+		if promptRoll < 0.33 {
+			prompt = "Hi" // simple
+		} else if promptRoll < 0.66 {
+			prompt = "Explain the core difference between sync and async coding." // medium
+		} else {
+			prompt = "Write a highly complex concurrent thread-safe scheduler pipeline in Go, providing robust comments and analysis." // complex
+		}
+	} else if modelRoll < 0.45 {
+		model = "gemini-1.5-pro"
+		prompt = prompts[rand.Intn(len(prompts))]
+		// Set rule header with 50% probability to trigger the custom VIP rule
+		if rand.Float64() < 0.50 {
+			customHeaders = map[string]string{"X-Route-Priority": "gold"}
+		}
+	} else if modelRoll < 0.85 {
+		model = "gemini-2.5-flash"
+		prompt = prompts[rand.Intn(len(prompts))]
+	} else {
+		model = "gemini-2.5-pro"
+		prompt = prompts[rand.Intn(len(prompts))]
+	}
 
 	if clientTier == "invalid" {
 		// Unauthorized call (Invalid API Key)
-		return sendRequest("gr_key_bad_invalid_key", model, prompt, "script-runner-1", false)
+		return sendRequest("gr_key_bad_invalid_key", model, prompt, "script-runner-1", false, customHeaders)
 	} else if clientTier == "free" {
 		// Test Free Tier client
 		// Occasionally (30% of the time) trigger a rate limit (429) by sending 6 requests in a quick burst!
@@ -165,7 +193,7 @@ func executeSimulationRound() (string, error) {
 			log.Println("[Simulate] Simulating burst on Free Tier to trigger rate limits...")
 			var burstSummary string
 			for i := 0; i < 6; i++ {
-				s, e := sendRequest(clientKeys["free"], model, prompt, "mobile-android", false)
+				s, e := sendRequest(clientKeys["free"], model, prompt, "mobile-android", false, customHeaders)
 				if e != nil {
 					burstSummary += fmt.Sprintf("Request %d Error: %v; ", i+1, e)
 				} else {
@@ -175,7 +203,7 @@ func executeSimulationRound() (string, error) {
 			}
 			return "Burst results: " + burstSummary, nil
 		}
-		return sendRequest(clientKeys["free"], model, prompt, "mobile-android", false)
+		return sendRequest(clientKeys["free"], model, prompt, "mobile-android", false, customHeaders)
 	}
 
 	// Premium or Standard
@@ -191,18 +219,18 @@ func executeSimulationRound() (string, error) {
 	}
 
 	if headerRoll < 0.80 {
-		return sendRequest(key, model, prompt, appID, false)
+		return sendRequest(key, model, prompt, appID, false, customHeaders)
 	} else if headerRoll < 0.90 {
 		// Regex is ^[a-zA-Z0-9-]+$
 		invalidAppID := "app_with_underscores!"
-		return sendRequest(key, model, prompt, invalidAppID, false)
+		return sendRequest(key, model, prompt, invalidAppID, false, customHeaders)
 	}
 
 	// Miss header entirely
-	return sendRequest(key, model, prompt, "", true)
+	return sendRequest(key, model, prompt, "", true, customHeaders)
 }
 
-func sendRequest(apiKey, model, prompt, appIDHeader string, missHeader bool) (string, error) {
+func sendRequest(apiKey, model, prompt, appIDHeader string, missHeader bool, customHeaders map[string]string) (string, error) {
 	url := fmt.Sprintf("%s/v1beta/models/%s:generateContent", routerURL, model)
 
 	payload := GeminiPayload{
@@ -234,6 +262,10 @@ func sendRequest(apiKey, model, prompt, appIDHeader string, missHeader bool) (st
 		req.Header.Set("X-Client-App-ID", appIDHeader)
 	}
 
+	for k, v := range customHeaders {
+		req.Header.Set(k, v)
+	}
+
 	client := &http.Client{Timeout: 15 * time.Second}
 	startTime := time.Now()
 	resp, err := client.Do(req)
@@ -246,11 +278,15 @@ func sendRequest(apiKey, model, prompt, appIDHeader string, missHeader bool) (st
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	bodyStr := string(bodyBytes)
 
+	// Audit headers returned by the router
+	routedModel := resp.Header.Get("X-Routed-Model")
+	clientTier := resp.Header.Get("X-Client-Tier")
+
 	if len(bodyStr) > 100 {
 		bodyStr = bodyStr[:100] + "..."
 	}
 
-	summary := fmt.Sprintf("Model=%s, Status=%d, Latency=%dms, Response=%s", model, resp.StatusCode, latency, bodyStr)
+	summary := fmt.Sprintf("Model=%s (Routed=%s), Tier=%s, Status=%d, Latency=%dms, Response=%s", model, routedModel, clientTier, resp.StatusCode, latency, bodyStr)
 	log.Printf("[Simulate] %s", summary)
 
 	return summary, nil

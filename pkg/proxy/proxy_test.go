@@ -1354,6 +1354,166 @@ func TestProxyComplexityRoutingLLMClassifier(t *testing.T) {
 	os.RemoveAll("data/local_db.json")
 }
 
+func TestProxyDynamicRoutingSuite(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+
+	ctx := context.Background()
+	store, _ := config.NewConfigStore(ctx, "test-project")
+
+	// 1. Seed Client and App with complexity heuristics enabled
+	app := config.App{
+		ID:       "app-dynamic-suite",
+		ClientID: "client-dynamic",
+		RPM:      100,
+		TPM:      500000,
+		Priority: "high",
+		Complexity: config.ComplexityRouting{
+			Enabled:                true,
+			AlwaysOverride:         false,
+			SimpleModel:            "gemini-2.5-flash-lite",
+			MediumModel:            "gemini-2.5-flash",
+			ComplexModel:           "gemini-2.5-pro",
+			SimpleCharLimit:        10,
+			MediumCharLimit:        100,
+			ForceComplexMultimodal: true,
+			ForceComplexTools:      true,
+			UseLLMClassifier:       false,
+		},
+	}
+	client := config.Client{ID: "client-dynamic", Tier: "premium"}
+	key := config.APIKey{
+		KeyHash:  config.HashKey("key-dynamic-suite"),
+		AppID:    "app-dynamic-suite",
+		Status:   "active",
+	}
+
+	_ = store.SaveClient(ctx, client)
+	_ = store.SaveApp(ctx, app)
+	_ = store.SaveKey(ctx, key)
+	_ = store.DeleteHeader(ctx, "header-1")
+	_ = store.DeleteRule(ctx, "rule-1")
+
+	// 2. Seed a custom VIP dynamic routing rule
+	_ = store.SaveRule(ctx, config.RoutingRule{
+		ID:             "rule-vip-suite",
+		AppID:          "app-dynamic-suite",
+		ModelPattern:   "gemini-1.5-pro",
+		ClientTier:     "premium",
+		HeaderName:     "X-Route-Priority",
+		HeaderValue:    "gold",
+		TargetModel:    "gemini-2.5-pro",
+		TargetLocation: "us-central1",
+		PriorityWeight: 2,
+	})
+
+	var lastRoutedModel string
+	var mu sync.Mutex
+
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		parts := strings.Split(r.URL.Path, "/models/")
+		if len(parts) >= 2 {
+			lastRoutedModel = strings.Split(parts[1], ":")[0]
+		}
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"This is a mock response."}]}}]}`))
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+	rp, _ := NewRouterProxy(store, "test-project", "us-central1")
+	rp.TokenSource = &mockTokenSource{}
+	rp.Target = backendURL
+	rp.Proxy.Transport = &mockRoundTripper{Target: backendURL}
+
+	// Test Cases
+	tests := []struct {
+		name             string
+		requestedModel   string
+		requestBody      string
+		customHeaders    map[string]string
+		expectedRouted   string
+		expectedResponse string
+	}{
+		{
+			name:           "Complexity: simple prompt",
+			requestedModel: "gemini-dynamic",
+			requestBody:    `{"contents":[{"parts":[{"text":"Hi"}]}]}`,
+			expectedRouted: "gemini-2.5-flash-lite",
+		},
+		{
+			name:           "Complexity: medium prompt",
+			requestedModel: "gemini-dynamic",
+			requestBody:    `{"contents":[{"parts":[{"text":"This is a medium prompt designed to trigger medium tier model."}]}]}`,
+			expectedRouted: "gemini-2.5-flash",
+		},
+		{
+			name:           "Complexity: complex prompt",
+			requestedModel: "gemini-dynamic",
+			requestBody:    `{"contents":[{"parts":[{"text":"This is an exceptionally long prompt designed to trigger the complex tier model by crossing the character threshold configured."}]}]}`,
+			expectedRouted: "gemini-2.5-pro",
+		},
+		{
+			name:           "Rules-based: upgrade gemini-1.5-pro to gemini-2.5-pro via header",
+			requestedModel: "gemini-1.5-pro",
+			requestBody:    `{"contents":[{"parts":[{"text":"Hello VIP"}]}]}`,
+			customHeaders:  map[string]string{"X-Route-Priority": "gold"},
+			expectedRouted: "gemini-2.5-pro",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mu.Lock()
+			lastRoutedModel = ""
+			mu.Unlock()
+
+			req := httptest.NewRequest("POST", "/v1/models/"+tt.requestedModel+":generateContent?key=key-dynamic-suite", strings.NewReader(tt.requestBody))
+			req.Header.Set("x-goog-api-key", "key-dynamic-suite")
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("X-Client-App-ID", "prod-app-main")
+
+			for k, v := range tt.customHeaders {
+				req.Header.Set(k, v)
+			}
+
+			rr := httptest.NewRecorder()
+			rp.ServeHTTP(rr, req)
+
+			if rr.Code != http.StatusOK {
+				t.Fatalf("expected status 200, got %d. Response: %s", rr.Code, rr.Body.String())
+			}
+
+			// Assert response audit headers
+			routedHeader := rr.Header().Get("X-Routed-Model")
+			if routedHeader != tt.expectedRouted {
+				t.Errorf("expected response header X-Routed-Model to be %q, got %q", tt.expectedRouted, routedHeader)
+			}
+
+			tierHeader := rr.Header().Get("X-Client-Tier")
+			if tierHeader != "premium" {
+				t.Errorf("expected response header X-Client-Tier to be 'premium', got %q", tierHeader)
+			}
+
+			appHeader := rr.Header().Get("X-App-ID")
+			if appHeader != "app-dynamic-suite" {
+				t.Errorf("expected response header X-App-ID to be 'app-dynamic-suite', got %q", appHeader)
+			}
+
+			mu.Lock()
+			actualRouted := lastRoutedModel
+			mu.Unlock()
+
+			if actualRouted != tt.expectedRouted {
+				t.Errorf("expected request to be routed to model %q, but mock backend received %q", tt.expectedRouted, actualRouted)
+			}
+		})
+	}
+
+	os.RemoveAll("data/local_db.json")
+}
+
 
 
 
