@@ -13,6 +13,10 @@ import (
 	"firebase.google.com/go/v4/auth"
 )
 
+type contextKey string
+
+const uidContextKey contextKey = "uid"
+
 // AuthStore handles connection to Firebase Auth service.
 type AuthStore struct {
 	Client *auth.Client
@@ -187,7 +191,7 @@ func (as *AuthStore) Middleware(next http.Handler) http.Handler {
 		}
 
 		// Set UID in context so templates/handlers can retrieve user details
-		ctx := context.WithValue(r.Context(), "uid", uid)
+		ctx := context.WithValue(r.Context(), uidContextKey, uid)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

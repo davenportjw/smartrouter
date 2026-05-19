@@ -5,6 +5,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"geminirouter/pkg/auth"
 	"geminirouter/pkg/config"
@@ -97,8 +100,33 @@ func main() {
 	// Static Assets
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
-	log.Printf("Gemini Router starting on port %s...", port)
-	if err := http.ListenAndServe(":"+port, mux); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+	srv := &http.Server{
+		Addr:    ":" + port,
+		Handler: mux,
 	}
+
+	// Listen for system signals to shut down gracefully
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		log.Printf("Gemini Router starting on port %s...", port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Failed to start server: %v", err)
+		}
+	}()
+
+	<-stop
+
+	log.Println("Shutting down server gracefully...")
+
+	// Allow up to 30 seconds for active in-flight requests to complete
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Fatalf("Server forced to shutdown: %v", err)
+	}
+
+	log.Println("Server exiting cleanly.")
 }

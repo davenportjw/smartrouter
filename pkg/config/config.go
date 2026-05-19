@@ -9,8 +9,10 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"cloud.google.com/go/firestore"
 	"google.golang.org/api/iterator"
@@ -82,6 +84,10 @@ type ConfigStore struct {
 	apps    map[string]App    // AppID -> App
 	rules   []RoutingRule
 	headers []CustomHeader
+
+	// Precompiled regex caches
+	ruleRegexes   map[string]*regexp.Regexp
+	headerRegexes map[string]*regexp.Regexp
 }
 
 // LocalDB represents the JSON schema for the local development database.
@@ -98,10 +104,12 @@ func NewConfigStore(ctx context.Context, projectID string) (*ConfigStore, error)
 	isLocalDev := os.Getenv("LOCAL_DEV") == "true"
 
 	store := &ConfigStore{
-		isLocalDev: isLocalDev,
-		keys:       make(map[string]APIKey),
-		clients:    make(map[string]Client),
-		apps:       make(map[string]App),
+		isLocalDev:    isLocalDev,
+		keys:          make(map[string]APIKey),
+		clients:       make(map[string]Client),
+		apps:          make(map[string]App),
+		ruleRegexes:   make(map[string]*regexp.Regexp),
+		headerRegexes: make(map[string]*regexp.Regexp),
 	}
 
 	if isLocalDev {
@@ -168,6 +176,80 @@ func (cs *ConfigStore) LookupApp(appID string) (App, bool) {
 	return app, ok
 }
 
+// sortRulesLocked sorts the cached routing rules slice descending by PriorityWeight.
+// The caller MUST hold the write lock cs.mu.
+func (cs *ConfigStore) sortRulesLocked() {
+	sort.Slice(cs.rules, func(i, j int) bool {
+		if cs.rules[i].PriorityWeight == cs.rules[j].PriorityWeight {
+			return cs.rules[i].ID < cs.rules[j].ID
+		}
+		return cs.rules[i].PriorityWeight > cs.rules[j].PriorityWeight
+	})
+}
+
+// compileRegexesLocked compiles routing rule regexes and custom header regexes in the cached memory store.
+// The caller MUST hold the write lock cs.mu.
+func (cs *ConfigStore) compileRegexesLocked() {
+	cs.ruleRegexes = make(map[string]*regexp.Regexp)
+	for _, rule := range cs.rules {
+		if rule.HeaderName != "" && rule.HeaderValue != "" {
+			if strings.HasPrefix(rule.HeaderValue, "/") && strings.HasSuffix(rule.HeaderValue, "/") {
+				pattern := rule.HeaderValue[1 : len(rule.HeaderValue)-1]
+				re, err := regexp.Compile(pattern)
+				if err != nil {
+					log.Printf("[ConfigStore] Invalid regex pattern in rule %s: %v", rule.ID, err)
+					continue
+				}
+				cs.ruleRegexes[rule.ID] = re
+			}
+		}
+	}
+
+	cs.headerRegexes = make(map[string]*regexp.Regexp)
+	for _, h := range cs.headers {
+		if h.Validation == "regex" && h.ValuePattern != "" {
+			re, err := regexp.Compile(h.ValuePattern)
+			if err != nil {
+				log.Printf("[ConfigStore] Invalid regex pattern in custom header %s: %v", h.ID, err)
+				continue
+			}
+			cs.headerRegexes[h.ID] = re
+		}
+	}
+}
+
+// MatchHeaderRegex verifies a custom header's value using the precompiled regex cache.
+func (cs *ConfigStore) MatchHeaderRegex(headerID, val string) bool {
+	cs.mu.RLock()
+	re, exists := cs.headerRegexes[headerID]
+	cs.mu.RUnlock()
+
+	if exists {
+		return re.MatchString(val)
+	}
+
+	// Fallback if not precompiled
+	cs.mu.RLock()
+	var pattern string
+	for _, h := range cs.headers {
+		if h.ID == headerID {
+			pattern = h.ValuePattern
+			break
+		}
+	}
+	cs.mu.RUnlock()
+
+	if pattern == "" {
+		return false
+	}
+
+	reCompiled, err := regexp.Compile(pattern)
+	if err != nil {
+		return false
+	}
+	return reCompiled.MatchString(val)
+}
+
 // MatchRule evaluates rules to find the best matching target for model, tier, and specific app ID.
 func (cs *ConfigStore) MatchRule(modelName, clientTier, appID string, headers map[string]string) (RoutingRule, bool) {
 	cs.mu.RLock()
@@ -185,11 +267,13 @@ func (cs *ConfigStore) MatchRule(modelName, clientTier, appID string, headers ma
 				headerMatch = false
 			} else if rule.HeaderValue != "" {
 				if strings.HasPrefix(rule.HeaderValue, "/") && strings.HasSuffix(rule.HeaderValue, "/") {
-					// Regex matching, e.g. /^[a-zA-Z0-9]+$/
-					pattern := rule.HeaderValue[1 : len(rule.HeaderValue)-1]
-					matched, err := regexp.MatchString(pattern, val)
-					if err != nil || !matched {
-						headerMatch = false
+					// Try from precompiled regex cache
+					if re, cached := cs.ruleRegexes[rule.ID]; cached {
+						headerMatch = re.MatchString(val)
+					} else {
+						pattern := rule.HeaderValue[1 : len(rule.HeaderValue)-1]
+						matched, err := regexp.MatchString(pattern, val)
+						headerMatch = (err == nil && matched)
 					}
 				} else {
 					// Exact matching
@@ -208,131 +292,232 @@ func (cs *ConfigStore) MatchRule(modelName, clientTier, appID string, headers ma
 // Real-time listeners using Firestore Snapshots
 
 func (cs *ConfigStore) listenKeys(ctx context.Context) {
-	it := cs.Client.Collection("api_keys").Snapshots(ctx)
+	backoff := 1 * time.Second
 	for {
-		snap, err := it.Next()
-		if err != nil {
-			log.Printf("[Firestore] Keys listener error: %v", err)
+		select {
+		case <-ctx.Done():
 			return
+		default:
 		}
 
-		cs.mu.Lock()
-		// Clear old keys cache and reload all snapshots
-		cs.keys = make(map[string]APIKey)
-		for {
-			doc, err := snap.Documents.Next()
-			if err == iterator.Done {
-				break
+		it := cs.Client.Collection("api_keys").Snapshots(ctx)
+		err := func() error {
+			for {
+				snap, err := it.Next()
+				if err != nil {
+					return err
+				}
+				backoff = 1 * time.Second // Reset backoff on success
+
+				cs.mu.Lock()
+				cs.keys = make(map[string]APIKey)
+				for {
+					doc, err := snap.Documents.Next()
+					if err == iterator.Done {
+						break
+					}
+					if err != nil {
+						log.Printf("[Firestore] Error reading key document snapshot: %v", err)
+						continue
+					}
+					var key APIKey
+					if err := doc.DataTo(&key); err != nil {
+						log.Printf("[Firestore] DataTo error mapping APIKey: %v", err)
+						continue
+					}
+					cs.keys[key.KeyHash] = key
+				}
+				cs.mu.Unlock()
+				log.Printf("[Firestore Cache] Synchronized %d API keys", len(cs.keys))
 			}
-			if err != nil {
-				log.Printf("[Firestore] Error reading key document snapshot: %v", err)
-				continue
+		}()
+
+		if err != nil {
+			select {
+			case <-ctx.Done():
+				return
+			default:
 			}
-			var key APIKey
-			if err := doc.DataTo(&key); err != nil {
-				log.Printf("[Firestore] DataTo error mapping APIKey: %v", err)
-				continue
+			log.Printf("[Firestore] Keys listener error: %v. Reconnecting in %v...", err, backoff)
+			time.Sleep(backoff)
+			backoff *= 2
+			if backoff > 1*time.Minute {
+				backoff = 1 * time.Minute
 			}
-			cs.keys[key.KeyHash] = key
 		}
-		cs.mu.Unlock()
-		log.Printf("[Firestore Cache] Synchronized %d API keys", len(cs.keys))
 	}
 }
 
 func (cs *ConfigStore) listenClients(ctx context.Context) {
-	it := cs.Client.Collection("clients").Snapshots(ctx)
+	backoff := 1 * time.Second
 	for {
-		snap, err := it.Next()
-		if err != nil {
-			log.Printf("[Firestore] Clients listener error: %v", err)
+		select {
+		case <-ctx.Done():
 			return
+		default:
 		}
 
-		cs.mu.Lock()
-		cs.clients = make(map[string]Client)
-		for {
-			doc, err := snap.Documents.Next()
-			if err == iterator.Done {
-				break
+		it := cs.Client.Collection("clients").Snapshots(ctx)
+		err := func() error {
+			for {
+				snap, err := it.Next()
+				if err != nil {
+					return err
+				}
+				backoff = 1 * time.Second // Reset backoff on success
+
+				cs.mu.Lock()
+				cs.clients = make(map[string]Client)
+				for {
+					doc, err := snap.Documents.Next()
+					if err == iterator.Done {
+						break
+					}
+					if err != nil {
+						log.Printf("[Firestore] Error reading client document snapshot: %v", err)
+						continue
+					}
+					var client Client
+					if err := doc.DataTo(&client); err != nil {
+						log.Printf("[Firestore] DataTo error mapping Client: %v", err)
+						continue
+					}
+					cs.clients[client.ID] = client
+				}
+				cs.mu.Unlock()
+				log.Printf("[Firestore Cache] Synchronized %d clients", len(cs.clients))
 			}
-			if err != nil {
-				log.Printf("[Firestore] Error reading client document snapshot: %v", err)
-				continue
+		}()
+
+		if err != nil {
+			select {
+			case <-ctx.Done():
+				return
+			default:
 			}
-			var client Client
-			if err := doc.DataTo(&client); err != nil {
-				log.Printf("[Firestore] DataTo error mapping Client: %v", err)
-				continue
+			log.Printf("[Firestore] Clients listener error: %v. Reconnecting in %v...", err, backoff)
+			time.Sleep(backoff)
+			backoff *= 2
+			if backoff > 1*time.Minute {
+				backoff = 1 * time.Minute
 			}
-			cs.clients[client.ID] = client
 		}
-		cs.mu.Unlock()
-		log.Printf("[Firestore Cache] Synchronized %d clients", len(cs.clients))
 	}
 }
 
 func (cs *ConfigStore) listenRules(ctx context.Context) {
-	it := cs.Client.Collection("routing_rules").Snapshots(ctx)
+	backoff := 1 * time.Second
 	for {
-		snap, err := it.Next()
-		if err != nil {
-			log.Printf("[Firestore] Rules listener error: %v", err)
+		select {
+		case <-ctx.Done():
 			return
+		default:
 		}
 
-		cs.mu.Lock()
-		cs.rules = nil
-		for {
-			doc, err := snap.Documents.Next()
-			if err == iterator.Done {
-				break
+		it := cs.Client.Collection("routing_rules").Snapshots(ctx)
+		err := func() error {
+			for {
+				snap, err := it.Next()
+				if err != nil {
+					return err
+				}
+				backoff = 1 * time.Second // Reset backoff on success
+
+				cs.mu.Lock()
+				cs.rules = nil
+				for {
+					doc, err := snap.Documents.Next()
+					if err == iterator.Done {
+						break
+					}
+					if err != nil {
+						log.Printf("[Firestore] Error reading rule document snapshot: %v", err)
+						continue
+					}
+					var rule RoutingRule
+					if err := doc.DataTo(&rule); err != nil {
+						log.Printf("[Firestore] DataTo error mapping RoutingRule: %v", err)
+						continue
+					}
+					cs.rules = append(cs.rules, rule)
+				}
+				cs.sortRulesLocked()
+				cs.compileRegexesLocked()
+				cs.mu.Unlock()
+				log.Printf("[Firestore Cache] Synchronized %d routing rules", len(cs.rules))
 			}
-			if err != nil {
-				log.Printf("[Firestore] Error reading rule document snapshot: %v", err)
-				continue
+		}()
+
+		if err != nil {
+			select {
+			case <-ctx.Done():
+				return
+			default:
 			}
-			var rule RoutingRule
-			if err := doc.DataTo(&rule); err != nil {
-				log.Printf("[Firestore] DataTo error mapping RoutingRule: %v", err)
-				continue
+			log.Printf("[Firestore] Rules listener error: %v. Reconnecting in %v...", err, backoff)
+			time.Sleep(backoff)
+			backoff *= 2
+			if backoff > 1*time.Minute {
+				backoff = 1 * time.Minute
 			}
-			cs.rules = append(cs.rules, rule)
 		}
-		cs.mu.Unlock()
-		log.Printf("[Firestore Cache] Synchronized %d routing rules", len(cs.rules))
 	}
 }
 
 func (cs *ConfigStore) listenApps(ctx context.Context) {
-	it := cs.Client.Collection("apps").Snapshots(ctx)
+	backoff := 1 * time.Second
 	for {
-		snap, err := it.Next()
-		if err != nil {
-			log.Printf("[Firestore] Apps listener error: %v", err)
+		select {
+		case <-ctx.Done():
 			return
+		default:
 		}
 
-		cs.mu.Lock()
-		cs.apps = make(map[string]App)
-		for {
-			doc, err := snap.Documents.Next()
-			if err == iterator.Done {
-				break
+		it := cs.Client.Collection("apps").Snapshots(ctx)
+		err := func() error {
+			for {
+				snap, err := it.Next()
+				if err != nil {
+					return err
+				}
+				backoff = 1 * time.Second // Reset backoff on success
+
+				cs.mu.Lock()
+				cs.apps = make(map[string]App)
+				for {
+					doc, err := snap.Documents.Next()
+					if err == iterator.Done {
+						break
+					}
+					if err != nil {
+						log.Printf("[Firestore] Error reading app document snapshot: %v", err)
+						continue
+					}
+					var app App
+					if err := doc.DataTo(&app); err != nil {
+						log.Printf("[Firestore] DataTo error mapping App: %v", err)
+						continue
+					}
+					cs.apps[app.ID] = app
+				}
+				cs.mu.Unlock()
+				log.Printf("[Firestore Cache] Synchronized %d apps", len(cs.apps))
 			}
-			if err != nil {
-				log.Printf("[Firestore] Error reading app document snapshot: %v", err)
-				continue
+		}()
+
+		if err != nil {
+			select {
+			case <-ctx.Done():
+				return
+			default:
 			}
-			var app App
-			if err := doc.DataTo(&app); err != nil {
-				log.Printf("[Firestore] DataTo error mapping App: %v", err)
-				continue
+			log.Printf("[Firestore] Apps listener error: %v. Reconnecting in %v...", err, backoff)
+			time.Sleep(backoff)
+			backoff *= 2
+			if backoff > 1*time.Minute {
+				backoff = 1 * time.Minute
 			}
-			cs.apps[app.ID] = app
 		}
-		cs.mu.Unlock()
-		log.Printf("[Firestore Cache] Synchronized %d apps", len(cs.apps))
 	}
 }
 
@@ -453,6 +638,8 @@ func (cs *ConfigStore) initLocalDB() error {
 	cs.keys = db.APIKeys
 	cs.rules = db.RoutingRules
 	cs.headers = db.CustomHeaders
+	cs.sortRulesLocked()
+	cs.compileRegexesLocked()
 	cs.mu.Unlock()
 
 	log.Printf("[Local Dev Cache] Loaded %d clients, %d apps, %d API keys, %d rules, %d headers.", len(cs.clients), len(cs.apps), len(cs.keys), len(cs.rules), len(cs.headers))
@@ -700,6 +887,7 @@ func (cs *ConfigStore) SaveHeader(ctx context.Context, h CustomHeader) error {
 		if !found {
 			cs.headers = append(cs.headers, h)
 		}
+		cs.compileRegexesLocked()
 		cs.mu.Unlock()
 		return cs.saveLocalDB()
 	}
@@ -723,6 +911,7 @@ func (cs *ConfigStore) DeleteHeader(ctx context.Context, id string) error {
 			}
 		}
 		cs.headers = updated
+		cs.compileRegexesLocked()
 		cs.mu.Unlock()
 		return cs.saveLocalDB()
 	}
@@ -750,6 +939,8 @@ func (cs *ConfigStore) SaveRule(ctx context.Context, rule RoutingRule) error {
 		if !found {
 			cs.rules = append(cs.rules, rule)
 		}
+		cs.sortRulesLocked()
+		cs.compileRegexesLocked()
 		cs.mu.Unlock()
 		return cs.saveLocalDB()
 	}
@@ -783,34 +974,60 @@ func (cs *ConfigStore) DeleteRule(ctx context.Context, id string) error {
 
 // listenHeaders streams live updates for custom headers from Firestore.
 func (cs *ConfigStore) listenHeaders(ctx context.Context) {
-	it := cs.Client.Collection("custom_headers").Snapshots(ctx)
+	backoff := 1 * time.Second
 	for {
-		snap, err := it.Next()
-		if err != nil {
-			log.Printf("[Firestore] Headers listener error: %v", err)
+		select {
+		case <-ctx.Done():
 			return
+		default:
 		}
 
-		cs.mu.Lock()
-		cs.headers = nil
-		for {
-			doc, err := snap.Documents.Next()
-			if err == iterator.Done {
-				break
+		it := cs.Client.Collection("custom_headers").Snapshots(ctx)
+		err := func() error {
+			for {
+				snap, err := it.Next()
+				if err != nil {
+					return err
+				}
+				backoff = 1 * time.Second // Reset backoff on success
+
+				cs.mu.Lock()
+				cs.headers = nil
+				for {
+					doc, err := snap.Documents.Next()
+					if err == iterator.Done {
+						break
+					}
+					if err != nil {
+						log.Printf("[Firestore] Error reading header document snapshot: %v", err)
+						continue
+					}
+					var h CustomHeader
+					if err := doc.DataTo(&h); err != nil {
+						log.Printf("[Firestore] DataTo error mapping CustomHeader: %v", err)
+						continue
+					}
+					cs.headers = append(cs.headers, h)
+				}
+				cs.compileRegexesLocked()
+				cs.mu.Unlock()
+				log.Printf("[Firestore Cache] Synchronized %d custom headers", len(cs.headers))
 			}
-			if err != nil {
-				log.Printf("[Firestore] Error reading header document snapshot: %v", err)
-				continue
+		}()
+
+		if err != nil {
+			select {
+			case <-ctx.Done():
+				return
+			default:
 			}
-			var h CustomHeader
-			if err := doc.DataTo(&h); err != nil {
-				log.Printf("[Firestore] DataTo error mapping CustomHeader: %v", err)
-				continue
+			log.Printf("[Firestore] Headers listener error: %v. Reconnecting in %v...", err, backoff)
+			time.Sleep(backoff)
+			backoff *= 2
+			if backoff > 1*time.Minute {
+				backoff = 1 * time.Minute
 			}
-			cs.headers = append(cs.headers, h)
 		}
-		cs.mu.Unlock()
-		log.Printf("[Firestore Cache] Synchronized %d custom headers", len(cs.headers))
 	}
 }
 

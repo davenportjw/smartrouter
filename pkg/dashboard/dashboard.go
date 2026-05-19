@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -276,21 +277,49 @@ func (dc *DashboardController) CreateRule(w http.ResponseWriter, r *http.Request
 
 	ctx := r.Context()
 
-	modelPattern := r.FormValue("model_pattern")
-	appID := r.FormValue("app_id")
-	clientTier := r.FormValue("client_tier")
-	headerName := r.FormValue("header_name")
-	headerValue := r.FormValue("header_value")
-	targetModel := r.FormValue("target_model")
-	targetLocation := r.FormValue("target_location")
-	fallbackModel := r.FormValue("fallback_model")
-	priorityWeightStr := r.FormValue("priority_weight")
+	modelPattern := strings.TrimSpace(r.FormValue("model_pattern"))
+	appID := strings.TrimSpace(r.FormValue("app_id"))
+	clientTier := strings.TrimSpace(r.FormValue("client_tier"))
+	headerName := strings.TrimSpace(r.FormValue("header_name"))
+	headerValue := strings.TrimSpace(r.FormValue("header_value"))
+	targetModel := strings.TrimSpace(r.FormValue("target_model"))
+	targetLocation := strings.TrimSpace(r.FormValue("target_location"))
+	fallbackModel := strings.TrimSpace(r.FormValue("fallback_model"))
+	priorityWeightStr := strings.TrimSpace(r.FormValue("priority_weight"))
+
+	if modelPattern == "" {
+		http.Error(w, "Requested Model Pattern cannot be empty.", http.StatusBadRequest)
+		return
+	}
+	if targetModel == "" {
+		http.Error(w, "Target Routed Model cannot be empty.", http.StatusBadRequest)
+		return
+	}
+	if targetLocation == "" {
+		http.Error(w, "Target Location cannot be empty.", http.StatusBadRequest)
+		return
+	}
+
+	// Validate regex pattern in HeaderValue if applicable
+	if headerName != "" && headerValue != "" {
+		if strings.HasPrefix(headerValue, "/") && strings.HasSuffix(headerValue, "/") {
+			pattern := headerValue[1 : len(headerValue)-1]
+			_, err := regexp.Compile(pattern)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("Invalid Header Value regex pattern: %v", err), http.StatusBadRequest)
+				return
+			}
+		}
+	}
 
 	priorityWeight := 1
 	if priorityWeightStr != "" {
-		if pw, err := strconv.Atoi(priorityWeightStr); err == nil {
-			priorityWeight = pw
+		pw, err := strconv.Atoi(priorityWeightStr)
+		if err != nil || pw <= 0 {
+			http.Error(w, "Priority Weight must be a positive integer.", http.StatusBadRequest)
+			return
 		}
+		priorityWeight = pw
 	}
 
 	// Generate unique random ID for this rule
@@ -386,12 +415,32 @@ func (dc *DashboardController) CreateHeader(w http.ResponseWriter, r *http.Reque
 
 	ctx := r.Context()
 
-	name := r.FormValue("name")
-	appID := r.FormValue("app_id")
-	description := r.FormValue("description")
-	requiredStr := r.FormValue("required")
-	validation := r.FormValue("validation")
-	valuePattern := r.FormValue("value_pattern")
+	name := strings.TrimSpace(r.FormValue("name"))
+	appID := strings.TrimSpace(r.FormValue("app_id"))
+	description := strings.TrimSpace(r.FormValue("description"))
+	requiredStr := strings.TrimSpace(r.FormValue("required"))
+	validation := strings.TrimSpace(r.FormValue("validation"))
+	valuePattern := strings.TrimSpace(r.FormValue("value_pattern"))
+
+	if name == "" {
+		http.Error(w, "Header Name cannot be empty.", http.StatusBadRequest)
+		return
+	}
+	if appID == "" {
+		http.Error(w, "Application boundary (App ID) must be specified (or 'global').", http.StatusBadRequest)
+		return
+	}
+	if validation == "regex" {
+		if valuePattern == "" {
+			http.Error(w, "Regex validation requires a non-empty pattern value.", http.StatusBadRequest)
+			return
+		}
+		_, err := regexp.Compile(valuePattern)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Invalid regular expression pattern: %v", err), http.StatusBadRequest)
+			return
+		}
+	}
 
 	required := requiredStr == "true"
 
@@ -736,14 +785,39 @@ func estimateTokensAndCost(model string, bytesSent int64) (int, int, float64) {
 		inTokens = 100
 	}
 
+	// Model specific pricing map (Prices per token)
+	type pricing struct {
+		inPrice  float64
+		outPrice float64
+	}
+
+	// Pricing per 1,000,000 tokens
+	pricingMap := map[string]pricing{
+		"gemini-2.5-pro":          {inPrice: 1.25 / 1e6, outPrice: 5.00 / 1e6},
+		"gemini-2.5-flash":        {inPrice: 0.075 / 1e6, outPrice: 0.30 / 1e6},
+		"gemini-2.5-flash-lite":   {inPrice: 0.0375 / 1e6, outPrice: 0.15 / 1e6},
+		"text-embedding-004":      {inPrice: 0.025 / 1e6, outPrice: 0.0},
+		"multimodal-embedding-001":{inPrice: 0.025 / 1e6, outPrice: 0.0},
+	}
+
 	var inPrice, outPrice float64
+	matched := false
+
+	// Check for prefix matches (e.g., model versions/aliases)
 	modelLower := strings.ToLower(model)
-	if strings.Contains(modelLower, "pro") {
-		inPrice = 1.25 / 1000000.0
-		outPrice = 5.00 / 1000000.0
-	} else {
-		inPrice = 0.075 / 1000000.0
-		outPrice = 0.30 / 1000000.0
+	for key, val := range pricingMap {
+		if strings.Contains(modelLower, key) {
+			inPrice = val.inPrice
+			outPrice = val.outPrice
+			matched = true
+			break
+		}
+	}
+
+	// Fallback to gemini-2.5-flash if no specific pricing model matched
+	if !matched {
+		inPrice = 0.075 / 1e6
+		outPrice = 0.30 / 1e6
 	}
 
 	cost := (float64(inTokens) * inPrice) + (float64(outTokens) * outPrice)
@@ -1549,17 +1623,55 @@ func (dc *DashboardController) CreateApp(w http.ResponseWriter, r *http.Request)
 
 	ctx := r.Context()
 
-	appID := r.FormValue("app_id")
-	appName := r.FormValue("app_name")
-	clientID := r.FormValue("client_id")
-	priority := r.FormValue("priority")
-	rpmStr := r.FormValue("rpm")
-	tpmStr := r.FormValue("tpm")
+	appID := strings.TrimSpace(r.FormValue("app_id"))
+	appName := strings.TrimSpace(r.FormValue("app_name"))
+	clientID := strings.TrimSpace(r.FormValue("client_id"))
+	priority := strings.TrimSpace(r.FormValue("priority"))
+	rpmStr := strings.TrimSpace(r.FormValue("rpm"))
+	tpmStr := strings.TrimSpace(r.FormValue("tpm"))
 
-	rpm, _ := strconv.Atoi(rpmStr)
-	tpm, _ := strconv.Atoi(tpmStr)
+	if appID == "" {
+		http.Error(w, "Application ID (Slug) cannot be empty.", http.StatusBadRequest)
+		return
+	}
+	// Support email slugs (for Google service accounts) or standard alphanumeric slugs
+	if strings.Contains(appID, "@") {
+		if !strings.Contains(appID, ".") {
+			http.Error(w, "Application ID email structure is invalid.", http.StatusBadRequest)
+			return
+		}
+	} else {
+		for _, char := range appID {
+			if !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9') || char == '-' || char == '.') {
+				http.Error(w, "Application ID must be a valid slug (alphanumeric, hyphens, and dots only).", http.StatusBadRequest)
+				return
+			}
+		}
+	}
 
-	err := dc.Store.SaveApp(ctx, config.App{
+	if appName == "" {
+		http.Error(w, "Application Name cannot be empty.", http.StatusBadRequest)
+		return
+	}
+
+	if clientID == "" {
+		http.Error(w, "Parent Client Organization selection is required.", http.StatusBadRequest)
+		return
+	}
+
+	rpm, err := strconv.Atoi(rpmStr)
+	if err != nil || rpm <= 0 {
+		http.Error(w, "Requests Per Minute (RPM) limit must be a positive integer.", http.StatusBadRequest)
+		return
+	}
+
+	tpm, err := strconv.Atoi(tpmStr)
+	if err != nil || tpm <= 0 {
+		http.Error(w, "Tokens Per Minute (TPM) limit must be a positive integer.", http.StatusBadRequest)
+		return
+	}
+
+	err = dc.Store.SaveApp(ctx, config.App{
 		ID:       appID,
 		ClientID: clientID,
 		Name:     appName,

@@ -41,8 +41,7 @@ func (m *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 
 func TestRouterProxyCompatibility(t *testing.T) {
 	// Setup temporary local dev database environment
-	os.Setenv("LOCAL_DEV", "true")
-	defer os.Unsetenv("LOCAL_DEV")
+	t.Setenv("LOCAL_DEV", "true")
 
 	ctx := context.Background()
 	store, err := config.NewConfigStore(ctx, "test-project")
@@ -50,11 +49,16 @@ func TestRouterProxyCompatibility(t *testing.T) {
 		t.Fatalf("failed to initialize config store: %v", err)
 	}
 
-	// Pre-seed the cache with test client and API key
+	// Pre-seed the cache with test client, app, and API key
 	testClient := config.Client{
 		ID:       "test-client",
 		Name:     "Test Client",
 		Tier:     "premium",
+	}
+	testApp := config.App{
+		ID:       "app-test-client",
+		ClientID: "test-client",
+		Name:     "Test App",
 		RPM:      100,
 		TPM:      500000,
 		Priority: "high",
@@ -62,6 +66,7 @@ func TestRouterProxyCompatibility(t *testing.T) {
 	testKeyStr := "gr_test_key_987654"
 	testKey := config.APIKey{
 		KeyHash:  config.HashKey(testKeyStr),
+		AppID:    "app-test-client",
 		ClientID: "test-client",
 		Status:   "active",
 	}
@@ -69,20 +74,51 @@ func TestRouterProxyCompatibility(t *testing.T) {
 	if err := store.SaveClient(ctx, testClient); err != nil {
 		t.Fatalf("failed to save test client: %v", err)
 	}
+	if err := store.SaveApp(ctx, testApp); err != nil {
+		t.Fatalf("failed to save test app: %v", err)
+	}
 	if err := store.SaveKey(ctx, testKey); err != nil {
 		t.Fatalf("failed to save test key: %v", err)
 	}
 
-	// Initialize our RouterProxy
-	targetURL, _ := url.Parse("https://us-central1-aiplatform.googleapis.com")
+	// Clear default pre-seeded headers
+	_ = store.DeleteHeader(ctx, "header-1")
+
+	var lastInterceptedPath string
+	var lastInterceptedAuth string
+	var lastInterceptedHost string
+	var lastInterceptedKeyParam string
+	var lastInterceptedKeyHeader string
+
+	// Local mock backend target server
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		lastInterceptedPath = r.URL.Path
+		lastInterceptedAuth = r.Header.Get("Authorization")
+		lastInterceptedHost = r.Host
+		lastInterceptedKeyParam = r.URL.Query().Get("key")
+		lastInterceptedKeyHeader = r.Header.Get("x-goog-api-key")
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status": "ok"}`))
+	}))
+	defer backend.Close()
+
+	targetURL, _ := url.Parse(backend.URL)
 	rp, err := NewRouterProxy(store, "test-project", "us-central1")
 	if err != nil {
 		t.Fatalf("failed to create RouterProxy: %v", err)
 	}
 
-	// Overwrite TokenSource and Target with mock values
 	rp.TokenSource = &mockTokenSource{}
 	rp.Target = targetURL
+	
+	originalDirector := rp.Proxy.Director
+	rp.Proxy.Director = func(req *http.Request) {
+		originalDirector(req)
+		req.URL.Scheme = targetURL.Scheme
+		req.URL.Host = targetURL.Host
+		req.Host = targetURL.Host
+	}
 
 	tests := []struct {
 		name         string
@@ -133,7 +169,12 @@ func TestRouterProxyCompatibility(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Reconstruct a mock HTTP request hitting the proxy
+			lastInterceptedPath = ""
+			lastInterceptedAuth = ""
+			lastInterceptedHost = ""
+			lastInterceptedKeyParam = ""
+			lastInterceptedKeyHeader = ""
+
 			reqURL := tt.inputPath
 			if tt.apiKey != "" {
 				reqURL += "?key=" + tt.apiKey
@@ -143,52 +184,42 @@ func TestRouterProxyCompatibility(t *testing.T) {
 				req.Header.Set("x-goog-api-key", tt.apiKey)
 			}
 
-			// Populate the headers that ServeHTTP would normally set
-			pathParts := strings.Split(req.URL.Path, "/")
-			if len(pathParts) >= 3 && pathParts[2] == "models" {
-				parts := strings.Split(req.URL.Path, "/models/")
-				if len(parts) >= 2 {
-					modelAndAction := parts[1]
-					actionParts := strings.Split(modelAndAction, ":")
-					requestedModel := actionParts[0]
-					req.Header.Set("X-Requested-Model", requestedModel)
-					req.Header.Set("X-Routed-Model", requestedModel)
-				}
+			rr := httptest.NewRecorder()
+			rp.ServeHTTP(rr, req)
+
+			if rr.Code != http.StatusOK {
+				t.Fatalf("expected status 200, got %d. Body: %s", rr.Code, rr.Body.String())
 			}
 
-			// Use custom director
-			rp.Proxy.Director(req)
-
 			// Validate output path translation
-			if req.URL.Path != tt.expectedPath {
-				t.Errorf("expected path %q, got %q", tt.expectedPath, req.URL.Path)
+			if lastInterceptedPath != tt.expectedPath {
+				t.Errorf("expected path %q, got %q", tt.expectedPath, lastInterceptedPath)
 			}
 
 			// Validate OAuth2 Bearer Token injection
-			authHeader := req.Header.Get("Authorization")
 			if tt.expectAuth {
-				if authHeader != "Bearer mock-gcp-token" {
-					t.Errorf("expected bearer token header, got %q", authHeader)
+				if lastInterceptedAuth != "Bearer mock-gcp-token" {
+					t.Errorf("expected bearer token header, got %q", lastInterceptedAuth)
 				}
 			} else {
-				if authHeader != "" {
-					t.Errorf("did not expect authorization header, got %q", authHeader)
+				if lastInterceptedAuth != "" {
+					t.Errorf("did not expect authorization header, got %q", lastInterceptedAuth)
 				}
 			}
 
 			// Validate API Key scrubbing
 			if tt.expectKeyDel {
-				if req.URL.Query().Get("key") != "" {
+				if lastInterceptedKeyParam != "" {
 					t.Errorf("expected API key to be removed from query parameters")
 				}
-				if req.Header.Get("x-goog-api-key") != "" {
+				if lastInterceptedKeyHeader != "" {
 					t.Errorf("expected API key to be removed from headers")
 				}
 			}
 
 			// Validate host redirection
-			if req.Host != targetURL.Host {
-				t.Errorf("expected Host header %q, got %q", targetURL.Host, req.Host)
+			if lastInterceptedHost != targetURL.Host {
+				t.Errorf("expected Host header %q, got %q", targetURL.Host, lastInterceptedHost)
 			}
 		})
 	}
@@ -198,8 +229,7 @@ func TestRouterProxyCompatibility(t *testing.T) {
 }
 
 func TestRouterProxyCustomHeaders(t *testing.T) {
-	os.Setenv("LOCAL_DEV", "true")
-	defer os.Unsetenv("LOCAL_DEV")
+	t.Setenv("LOCAL_DEV", "true")
 
 	ctx := context.Background()
 	store, err := config.NewConfigStore(ctx, "test-project")
@@ -344,8 +374,7 @@ func TestRouterProxyCustomHeaders(t *testing.T) {
 }
 
 func TestRouterProxyHeaderRouting(t *testing.T) {
-	os.Setenv("LOCAL_DEV", "true")
-	defer os.Unsetenv("LOCAL_DEV")
+	t.Setenv("LOCAL_DEV", "true")
 
 	ctx := context.Background()
 	store, err := config.NewConfigStore(ctx, "test-project")
@@ -500,8 +529,7 @@ func TestRouterProxyHeaderRouting(t *testing.T) {
 }
 
 func TestRouterProxyAppCentricFlows(t *testing.T) {
-	os.Setenv("LOCAL_DEV", "true")
-	defer os.Unsetenv("LOCAL_DEV")
+	t.Setenv("LOCAL_DEV", "true")
 
 	ctx := context.Background()
 	store, err := config.NewConfigStore(ctx, "test-project")
@@ -608,8 +636,7 @@ func TestRouterProxyAppCentricFlows(t *testing.T) {
 }
 
 func TestRouterProxyGoogleIdentityAuth(t *testing.T) {
-	os.Setenv("LOCAL_DEV", "true")
-	defer os.Unsetenv("LOCAL_DEV")
+	t.Setenv("LOCAL_DEV", "true")
 
 	ctx := context.Background()
 	store, err := config.NewConfigStore(ctx, "test-project")
@@ -728,14 +755,9 @@ func TestRouterProxyGoogleIdentityAuth(t *testing.T) {
 }
 
 func TestRequestSchedulerOrdering(t *testing.T) {
-	os.Setenv("LOCAL_DEV", "true")
-	os.Setenv("ROUTER_CONCURRENCY_LIMIT", "1")
-	os.Setenv("ROUTER_MAX_QUEUE_SIZE", "5")
-	defer func() {
-		os.Unsetenv("LOCAL_DEV")
-		os.Unsetenv("ROUTER_CONCURRENCY_LIMIT")
-		os.Unsetenv("ROUTER_MAX_QUEUE_SIZE")
-	}()
+	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("ROUTER_CONCURRENCY_LIMIT", "1")
+	t.Setenv("ROUTER_MAX_QUEUE_SIZE", "5")
 
 	ctx := context.Background()
 	store, err := config.NewConfigStore(ctx, "test-project")
@@ -843,14 +865,9 @@ func TestRequestSchedulerOrdering(t *testing.T) {
 }
 
 func TestRequestSchedulerQueueFull(t *testing.T) {
-	os.Setenv("LOCAL_DEV", "true")
-	os.Setenv("ROUTER_CONCURRENCY_LIMIT", "1")
-	os.Setenv("ROUTER_MAX_QUEUE_SIZE", "1")
-	defer func() {
-		os.Unsetenv("LOCAL_DEV")
-		os.Unsetenv("ROUTER_CONCURRENCY_LIMIT")
-		os.Unsetenv("ROUTER_MAX_QUEUE_SIZE")
-	}()
+	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("ROUTER_CONCURRENCY_LIMIT", "1")
+	t.Setenv("ROUTER_MAX_QUEUE_SIZE", "1")
 
 	ctx := context.Background()
 	store, _ := config.NewConfigStore(ctx, "test-project")
@@ -911,14 +928,9 @@ func TestRequestSchedulerQueueFull(t *testing.T) {
 }
 
 func TestRequestSchedulerClientDisconnect(t *testing.T) {
-	os.Setenv("LOCAL_DEV", "true")
-	os.Setenv("ROUTER_CONCURRENCY_LIMIT", "1")
-	os.Setenv("ROUTER_MAX_QUEUE_SIZE", "5")
-	defer func() {
-		os.Unsetenv("LOCAL_DEV")
-		os.Unsetenv("ROUTER_CONCURRENCY_LIMIT")
-		os.Unsetenv("ROUTER_MAX_QUEUE_SIZE")
-	}()
+	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("ROUTER_CONCURRENCY_LIMIT", "1")
+	t.Setenv("ROUTER_MAX_QUEUE_SIZE", "5")
 
 	ctx := context.Background()
 	store, _ := config.NewConfigStore(ctx, "test-project")
@@ -985,8 +997,7 @@ func TestRequestSchedulerClientDisconnect(t *testing.T) {
 }
 
 func TestProxyUpstream429Retry(t *testing.T) {
-	os.Setenv("LOCAL_DEV", "true")
-	defer os.Unsetenv("LOCAL_DEV")
+	t.Setenv("LOCAL_DEV", "true")
 
 	ctx := context.Background()
 	store, _ := config.NewConfigStore(ctx, "test-project")

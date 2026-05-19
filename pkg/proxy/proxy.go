@@ -11,7 +11,6 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -139,27 +138,13 @@ func NewRouterProxy(store *config.ConfigStore, projectID, location string) (*Rou
 		originalDirector(req)
 		req.Host = target.Host
 
-		// 1. Check for context errors passed from ServeHTTP
-		if val := req.Header.Get("X-Router-Error"); val != "" {
-			return
-		}
-
-		// 2. Remove client-side credentials
+		// 1. Remove client-side credentials
 		query := req.URL.Query()
 		query.Del("key")
 		req.URL.RawQuery = query.Encode()
 		req.Header.Del("x-goog-api-key")
 
-		// 3. Fetch OAuth2 token for upstream Vertex AI API
-		token, err := rp.TokenSource.Token()
-		if err != nil {
-			log.Printf("[Proxy] Error retrieving Google Cloud token: %v", err)
-			req.Header.Set("X-Router-Error", "TokenError")
-			return
-		}
-		req.Header.Set("Authorization", "Bearer "+token.AccessToken)
-
-		// 4. Rewrite URL paths to project-level GCP endpoints
+		// 2. Rewrite URL paths to project-level GCP endpoints
 		pathParts := strings.Split(req.URL.Path, "/")
 		if len(pathParts) < 3 {
 			return
@@ -343,8 +328,7 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 			case "regex":
-				matched, err := regexp.MatchString(h.ValuePattern, val)
-				if err != nil || !matched {
+				if !rp.Store.MatchHeaderRegex(h.ID, val) {
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusBadRequest)
 					w.Write([]byte(fmt.Sprintf(`{"error": {"code": 400, "message": "Header %s does not match required pattern: %s"}}`, h.Name, h.ValuePattern)))
@@ -421,6 +405,17 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Fetch OAuth2 token for upstream Vertex AI API
+	token, err := rp.TokenSource.Token()
+	if err != nil {
+		log.Printf("[Proxy] Error retrieving Google Cloud token: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"error": {"message": "Failed to retrieve Google Cloud credentials."}}`))
+		return
+	}
+	r.Header.Set("Authorization", "Bearer "+token.AccessToken)
+
 	// Wrap the transport dynamically with the retry transport wrapper
 	if rp.Proxy.Transport != nil {
 		if _, ok := rp.Proxy.Transport.(*retryTransport); !ok {
@@ -432,17 +427,6 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Execute standard reverse proxy
 	rp.Proxy.ServeHTTP(wrapped, r)
-
-	// Access internal headers we populated during Director
-	routerError := r.Header.Get("X-Router-Error")
-	if routerError == "ClientNotFound" {
-		http.Error(w, `{"error": {"message": "Client configuration missing."}}`, http.StatusInternalServerError)
-		return
-	}
-	if routerError == "TokenError" {
-		http.Error(w, `{"error": {"message": "Failed to retrieve Google Cloud credentials."}}`, http.StatusInternalServerError)
-		return
-	}
 
 	latency := time.Since(startTime).Milliseconds()
 
