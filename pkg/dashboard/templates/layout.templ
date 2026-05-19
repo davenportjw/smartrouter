@@ -56,6 +56,9 @@ templ Layout(title string, currentTab string, content templ.Component) {
 							<a href="/admin/rules" class={ "inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium h-full", templ.KV("border-blue-600 text-blue-600", currentTab == "rules"), templ.KV("border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700", currentTab != "rules") }>
 								Routing Rules
 							</a>
+							<a href="/admin/complexity" class={ "inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium h-full", templ.KV("border-blue-600 text-blue-600", currentTab == "complexity"), templ.KV("border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700", currentTab != "complexity") }>
+								Complexity Routing
+							</a>
 							<a href="/admin/models" class={ "inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium h-full", templ.KV("border-blue-600 text-blue-600", currentTab == "models"), templ.KV("border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700", currentTab != "models") }>
 								Models
 							</a>

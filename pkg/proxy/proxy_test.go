@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
@@ -1051,6 +1052,304 @@ func TestProxyUpstream429Retry(t *testing.T) {
 		t.Errorf("expected 3 total attempts upstream, got %d", attempts)
 	}
 	mu.Unlock()
+
+	os.RemoveAll("data/local_db.json")
+}
+
+func TestProxyComplexityRoutingHeuristics(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+
+	ctx := context.Background()
+	store, _ := config.NewConfigStore(ctx, "test-project")
+
+	// Seed Client and App with complexity heuristics enabled
+	app := config.App{
+		ID:       "app-complexity-heuristics",
+		ClientID: "client-1",
+		RPM:      100,
+		TPM:      500000,
+		Priority: "high",
+		Complexity: config.ComplexityRouting{
+			Enabled:                true,
+			AlwaysOverride:         true,
+			SimpleModel:            "gemini-2.5-flash-lite",
+			MediumModel:            "gemini-2.5-flash",
+			ComplexModel:           "gemini-2.5-pro",
+			SimpleCharLimit:        10,
+			MediumCharLimit:        25,
+			ForceComplexMultimodal: true,
+			ForceComplexTools:      true,
+			UseLLMClassifier:       false,
+		},
+	}
+	client1 := config.Client{ID: "client-1", Tier: "premium"}
+	key := config.APIKey{
+		KeyHash:  config.HashKey("key-heuristics"),
+		AppID:    "app-complexity-heuristics",
+		Status:   "active",
+	}
+
+	_ = store.SaveClient(ctx, client1)
+	_ = store.SaveApp(ctx, app)
+	_ = store.SaveKey(ctx, key)
+	_ = store.DeleteHeader(ctx, "header-1")
+	_ = store.DeleteRule(ctx, "rule-1")
+
+	var lastRoutedModel string
+	var mu sync.Mutex
+
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		parts := strings.Split(r.URL.Path, "/models/")
+		if len(parts) >= 2 {
+			lastRoutedModel = strings.Split(parts[1], ":")[0]
+		}
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status": "success"}`))
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+	rp, _ := NewRouterProxy(store, "test-project", "us-central1")
+	rp.TokenSource = &mockTokenSource{}
+	rp.Target = backendURL
+	rp.Proxy.Transport = &mockRoundTripper{Target: backendURL}
+
+	tests := []struct {
+		name          string
+		requestBody   string
+		expectedModel string
+	}{
+		{
+			name:          "Classifies as Simple: length <= 10 chars",
+			requestBody:   `{"contents":[{"parts":[{"text":"hi"}]}]}`,
+			expectedModel: "gemini-2.5-flash-lite",
+		},
+		{
+			name:          "Classifies as Medium: length > 10 and <= 25 chars",
+			requestBody:   `{"contents":[{"parts":[{"text":"hello world, this is md"}]}]}`,
+			expectedModel: "gemini-2.5-flash",
+		},
+		{
+			name:          "Classifies as Complex: length > 25 chars",
+			requestBody:   `{"contents":[{"parts":[{"text":"explain quantum mechanics algorithms in high reasoning detail"}]}]}`,
+			expectedModel: "gemini-2.5-pro",
+		},
+		{
+			name:          "Bypasses to Complex: short prompt with multimodal image input",
+			requestBody:   `{"contents":[{"parts":[{"inlineData":{"mimeType":"image/png","data":"iVBORw..."}},{"text":"what is this"}]}]}`,
+			expectedModel: "gemini-2.5-pro",
+		},
+		{
+			name:          "Bypasses to Complex: short prompt with tool calling declarations",
+			requestBody:   `{"contents":[{"parts":[{"text":"fetch MAU stats"}]}],"tools":[{"functionDeclarations":[]}]}`,
+			expectedModel: "gemini-2.5-pro",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mu.Lock()
+			lastRoutedModel = ""
+			mu.Unlock()
+
+			req := httptest.NewRequest("POST", "/v1/models/gemini-2.5-flash:generateContent?key=key-heuristics", strings.NewReader(tt.requestBody))
+			req.Header.Set("x-goog-api-key", "key-heuristics")
+			req.Header.Set("Content-Type", "application/json")
+			rr := httptest.NewRecorder()
+
+			rp.ServeHTTP(rr, req)
+
+			if rr.Code != http.StatusOK {
+				t.Fatalf("expected status 200, got %d. Response: %s", rr.Code, rr.Body.String())
+			}
+
+			mu.Lock()
+			actualModel := lastRoutedModel
+			mu.Unlock()
+
+			if actualModel != tt.expectedModel {
+				t.Errorf("expected routed model to be %q, got %q", tt.expectedModel, actualModel)
+			}
+		})
+	}
+
+	os.RemoveAll("data/local_db.json")
+}
+
+func TestProxyComplexityRoutingValidation(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+
+	ctx := context.Background()
+	store, _ := config.NewConfigStore(ctx, "test-project")
+
+	// Seed Client, App with complexity DISABLED, and active key
+	app := config.App{
+		ID:       "app-complexity-disabled",
+		ClientID: "client-1",
+		RPM:      100,
+		TPM:      500000,
+		Priority: "medium",
+		Complexity: config.ComplexityRouting{
+			Enabled: false, // explicitly disabled!
+		},
+	}
+	client1 := config.Client{ID: "client-1", Tier: "standard"}
+	key := config.APIKey{
+		KeyHash:  config.HashKey("key-disabled"),
+		AppID:    "app-complexity-disabled",
+		Status:   "active",
+	}
+
+	_ = store.SaveClient(ctx, client1)
+	_ = store.SaveApp(ctx, app)
+	_ = store.SaveKey(ctx, key)
+	_ = store.DeleteHeader(ctx, "header-1")
+	_ = store.DeleteRule(ctx, "rule-1")
+
+	rp, _ := NewRouterProxy(store, "test-project", "us-central1")
+	rp.TokenSource = &mockTokenSource{}
+
+	// Request the virtual dynamic model 'gemini-dynamic'
+	req := httptest.NewRequest("POST", "/v1/models/gemini-dynamic:generateContent?key=key-disabled", strings.NewReader(`{"contents":[{"parts":[{"text":"hi"}]}]}`))
+	req.Header.Set("x-goog-api-key", "key-disabled")
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	rp.ServeHTTP(rr, req)
+
+	// Should fail with HTTP 400 Bad Request
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400 for disabled complexity routing, got %d. Response: %s", rr.Code, rr.Body.String())
+	}
+
+	var out struct {
+		Error struct {
+			Message string `json:"message"`
+			Status  string `json:"status"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
+		t.Fatalf("failed to parse error JSON response: %v", err)
+	}
+
+	if !strings.Contains(out.Error.Message, "dynamic complexity routing is not enabled") {
+		t.Errorf("expected descriptive error message, got: %q", out.Error.Message)
+	}
+	if out.Error.Status != "INVALID_ARGUMENT" {
+		t.Errorf("expected status code INVALID_ARGUMENT, got: %q", out.Error.Status)
+	}
+
+	os.RemoveAll("data/local_db.json")
+}
+
+func TestProxyComplexityRoutingLLMClassifier(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+
+	ctx := context.Background()
+	store, _ := config.NewConfigStore(ctx, "test-project")
+
+	// Seed Client, App with LLM Semantic Classification enabled
+	app := config.App{
+		ID:       "app-complexity-llm",
+		ClientID: "client-1",
+		RPM:      100,
+		TPM:      500000,
+		Priority: "high",
+		Complexity: config.ComplexityRouting{
+			Enabled:                true,
+			AlwaysOverride:         true,
+			SimpleModel:            "gemini-2.5-flash-lite",
+			MediumModel:            "gemini-2.5-flash",
+			ComplexModel:           "gemini-2.5-pro",
+			UseLLMClassifier:       true,
+			ClassifierModel:        "gemini-3.1-flash-lite",
+			ForceComplexMultimodal: false,
+			ForceComplexTools:      false,
+		},
+	}
+	client1 := config.Client{ID: "client-1", Tier: "premium"}
+	key := config.APIKey{
+		KeyHash:  config.HashKey("key-llm"),
+		AppID:    "app-complexity-llm",
+		Status:   "active",
+	}
+
+	_ = store.SaveClient(ctx, client1)
+	_ = store.SaveApp(ctx, app)
+	_ = store.SaveKey(ctx, key)
+	_ = store.DeleteHeader(ctx, "header-1")
+	_ = store.DeleteRule(ctx, "rule-1")
+
+	var lastRoutedModel string
+	var mu sync.Mutex
+
+	// Mock backend handles:
+	// 1. Classifier OIDC requests at models/gemini-2.5-flash-lite:generateContent
+	// 2. Target routed queries at standard model endpoints
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+
+		// Detect if it is the classifier call
+		if strings.Contains(r.URL.Path, "/models/gemini-3.1-flash-lite:generateContent") {
+			w.WriteHeader(http.StatusOK)
+			// Return structured OIDC response text: {"complexity": "complex"}
+			w.Write([]byte(`{
+				"candidates": [
+					{
+						"content": {
+							"parts": [
+								{
+									"text": "{\"complexity\": \"complex\"}"
+								}
+							]
+						}
+					}
+				]
+			}`))
+			return
+		}
+
+		// Standard routed request
+		parts := strings.Split(r.URL.Path, "/models/")
+		if len(parts) >= 2 {
+			lastRoutedModel = strings.Split(parts[1], ":")[0]
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status": "success"}`))
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+	rp, _ := NewRouterProxy(store, "test-project", "us-central1")
+	rp.TokenSource = &mockTokenSource{}
+	rp.Target = backendURL
+	// Redirect ALL proxy round-trips through the mock backend
+	rp.Proxy.Transport = &mockRoundTripper{Target: backendURL}
+
+	// Make a query using dynamic routing. Prompt is short ("hi") which heuristically would be "simple",
+	// but our LLM Semantic Classifier returns {"complexity": "complex"}!
+	req := httptest.NewRequest("POST", "/v1/models/gemini-dynamic:generateContent?key=key-llm", strings.NewReader(`{"contents":[{"parts":[{"text":"hi"}]}]}`))
+	req.Header.Set("x-goog-api-key", "key-llm")
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	rp.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d. Response: %s", rr.Code, rr.Body.String())
+	}
+
+	mu.Lock()
+	routed := lastRoutedModel
+	mu.Unlock()
+
+	// Should be routed to gemini-2.5-pro (since classifier classified it as complex!)
+	if routed != "gemini-2.5-pro" {
+		t.Errorf("expected LLM routed target model to be 'gemini-2.5-pro', got %q", routed)
+	}
 
 	os.RemoveAll("data/local_db.json")
 }

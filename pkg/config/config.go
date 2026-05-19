@@ -28,14 +28,30 @@ type Client struct {
 	Priority string `firestore:"priority" json:"priority"` // "high", "medium", "low"
 }
 
+// ComplexityRouting defines configurations and thresholds for dynamic routing.
+type ComplexityRouting struct {
+	Enabled                bool   `firestore:"enabled" json:"enabled"`
+	AlwaysOverride         bool   `firestore:"always_override" json:"always_override"`
+	SimpleModel            string `firestore:"simple_model" json:"simple_model"`
+	MediumModel            string `firestore:"medium_model" json:"medium_model"`
+	ComplexModel           string `firestore:"complex_model" json:"complex_model"`
+	SimpleCharLimit        int    `firestore:"simple_char_limit" json:"simple_char_limit"`
+	MediumCharLimit        int    `firestore:"medium_char_limit" json:"medium_char_limit"`
+	ForceComplexMultimodal bool   `firestore:"force_complex_multimodal" json:"force_complex_multimodal"`
+	ForceComplexTools      bool   `firestore:"force_complex_tools" json:"force_complex_tools"`
+	UseLLMClassifier       bool   `firestore:"use_llm_classifier" json:"use_llm_classifier"`
+	ClassifierModel        string `firestore:"classifier_model" json:"classifier_model"`
+}
+
 // App represents an explicit application belonging to a client.
 type App struct {
-	ID       string `firestore:"id" json:"id"`
-	ClientID string `firestore:"client_id" json:"client_id"`
-	Name     string `firestore:"name" json:"name"`
-	RPM      int    `firestore:"rpm" json:"rpm"`
-	TPM      int    `firestore:"tpm" json:"tpm"`
-	Priority string `firestore:"priority" json:"priority"` // "high", "medium", "low"
+	ID         string            `firestore:"id" json:"id"`
+	ClientID   string            `firestore:"client_id" json:"client_id"`
+	Name       string            `firestore:"name" json:"name"`
+	RPM        int               `firestore:"rpm" json:"rpm"`
+	TPM        int               `firestore:"tpm" json:"tpm"`
+	Priority   string            `firestore:"priority" json:"priority"` // "high", "medium", "low"
+	Complexity ComplexityRouting `firestore:"complexity" json:"complexity"`
 }
 
 // APIKey represents an authorized router API key mapping to a client and app.
@@ -619,8 +635,42 @@ func (cs *ConfigStore) initLocalDB() error {
 					RPM:      cRPM,
 					TPM:      cTPM,
 					Priority: cPriority,
+					Complexity: ComplexityRouting{
+						Enabled:                false,
+						AlwaysOverride:         false,
+						SimpleModel:            "gemini-2.5-flash-lite",
+						MediumModel:            "gemini-2.5-flash",
+						ComplexModel:           "gemini-2.5-pro",
+						SimpleCharLimit:        200,
+						MediumCharLimit:        1000,
+						ForceComplexMultimodal: true,
+						ForceComplexTools:      true,
+						UseLLMClassifier:       false,
+						ClassifierModel:        "gemini-3.1-flash-lite",
+					},
 				}
 			}
+		}
+	}
+
+	// Migrate existing apps that don't have Complexity structure populated
+	for id, app := range db.Apps {
+		if app.Complexity.SimpleModel == "" {
+			app.Complexity = ComplexityRouting{
+				Enabled:                false,
+				AlwaysOverride:         false,
+				SimpleModel:            "gemini-2.5-flash-lite",
+				MediumModel:            "gemini-2.5-flash",
+				ComplexModel:           "gemini-2.5-pro",
+				SimpleCharLimit:        200,
+				MediumCharLimit:        1000,
+				ForceComplexMultimodal: true,
+				ForceComplexTools:      true,
+				UseLLMClassifier:       false,
+				ClassifierModel:        "gemini-3.1-flash-lite",
+			}
+			db.Apps[id] = app
+			dirty = true
 		}
 	}
 
@@ -802,6 +852,19 @@ func (cs *ConfigStore) SaveKey(ctx context.Context, key APIKey) error {
 				RPM:      cRPM,
 				TPM:      cTPM,
 				Priority: cPriority,
+				Complexity: ComplexityRouting{
+					Enabled:                false,
+					AlwaysOverride:         false,
+					SimpleModel:            "gemini-2.5-flash-lite",
+					MediumModel:            "gemini-2.5-flash",
+					ComplexModel:           "gemini-2.5-pro",
+					SimpleCharLimit:        200,
+					MediumCharLimit:        1000,
+					ForceComplexMultimodal: true,
+					ForceComplexTools:      true,
+					UseLLMClassifier:       false,
+					ClassifierModel:        "gemini-3.1-flash-lite",
+				},
 			}
 		}
 		cs.mu.Unlock()

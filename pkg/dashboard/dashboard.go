@@ -1678,6 +1678,19 @@ func (dc *DashboardController) CreateApp(w http.ResponseWriter, r *http.Request)
 		RPM:      rpm,
 		TPM:      tpm,
 		Priority: priority,
+		Complexity: config.ComplexityRouting{
+			Enabled:                false,
+			AlwaysOverride:         false,
+			SimpleModel:            "gemini-2.5-flash-lite",
+			MediumModel:            "gemini-2.5-flash",
+			ComplexModel:           "gemini-2.5-pro",
+			SimpleCharLimit:        200,
+			MediumCharLimit:        1000,
+			ForceComplexMultimodal: true,
+			ForceComplexTools:      true,
+			UseLLMClassifier:       false,
+			ClassifierModel:        "gemini-3.1-flash-lite",
+		},
 	})
 	if err != nil {
 		log.Printf("[Dashboard] Error saving application profile: %v", err)
@@ -1711,4 +1724,142 @@ func (dc *DashboardController) DeleteApp(w http.ResponseWriter, r *http.Request)
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(""))
+}
+
+// ServeComplexity renders the Dynamic Complexity Routing administration view.
+func (dc *DashboardController) ServeComplexity(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	apps, err := dc.Store.GetAllApps(ctx)
+	if err != nil {
+		log.Printf("[Dashboard] Error loading apps for complexity routing: %v", err)
+		http.Error(w, "Failed to load applications", http.StatusInternalServerError)
+		return
+	}
+
+	clients, err := dc.Store.GetAllClients(ctx)
+	if err != nil {
+		log.Printf("[Dashboard] Error loading clients for complexity routing: %v", err)
+		http.Error(w, "Failed to load client organizations", http.StatusInternalServerError)
+		return
+	}
+
+	clientsMap := make(map[string]config.Client)
+	for _, c := range clients {
+		clientsMap[c.ID] = c
+	}
+
+	var viewModels []templates.ComplexityViewModel
+	for _, a := range apps {
+		clientProfile, ok := clientsMap[a.ClientID]
+		if !ok {
+			clientProfile = config.Client{
+				ID:   a.ClientID,
+				Name: "Unknown Client",
+				Tier: "free",
+			}
+		}
+		viewModels = append(viewModels, templates.ComplexityViewModel{
+			App:    a,
+			Client: clientProfile,
+		})
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	content := templates.ComplexityTab(viewModels)
+	_ = templates.Layout("Complexity Routing", "complexity", content).Render(ctx, w)
+}
+
+// ServeComplexityEditModal renders the dynamic settings modal form via HTMX.
+func (dc *DashboardController) ServeComplexityEditModal(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	appID := r.URL.Query().Get("app_id")
+	if appID == "" {
+		http.Error(w, "Missing application ID", http.StatusBadRequest)
+		return
+	}
+
+	app, ok := dc.Store.LookupApp(appID)
+	if !ok {
+		http.Error(w, "Application not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	_ = templates.ComplexityModal(app).Render(ctx, w)
+}
+
+// SaveComplexitySettings updates dynamic parameters for query complexity routing.
+func (dc *DashboardController) SaveComplexitySettings(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx := r.Context()
+
+	appID := strings.TrimSpace(r.FormValue("app_id"))
+	if appID == "" {
+		http.Error(w, "Missing application ID", http.StatusBadRequest)
+		return
+	}
+
+	app, ok := dc.Store.LookupApp(appID)
+	if !ok {
+		http.Error(w, "Application not found", http.StatusNotFound)
+		return
+	}
+
+	enabled := r.FormValue("enabled") == "true"
+	alwaysOverride := r.FormValue("always_override") == "true"
+	simpleModel := strings.TrimSpace(r.FormValue("simple_model"))
+	mediumModel := strings.TrimSpace(r.FormValue("medium_model"))
+	complexModel := strings.TrimSpace(r.FormValue("complex_model"))
+	simpleCharLimitStr := strings.TrimSpace(r.FormValue("simple_char_limit"))
+	mediumCharLimitStr := strings.TrimSpace(r.FormValue("medium_char_limit"))
+	forceComplexMultimodal := r.FormValue("force_complex_multimodal") == "true"
+	forceComplexTools := r.FormValue("force_complex_tools") == "true"
+	useLLMClassifier := r.FormValue("use_llm_classifier") == "true"
+	classifierModel := strings.TrimSpace(r.FormValue("classifier_model"))
+
+	simpleCharLimit, err := strconv.Atoi(simpleCharLimitStr)
+	if err != nil || simpleCharLimit < 0 {
+		http.Error(w, "Simple text limit must be a non-negative integer.", http.StatusBadRequest)
+		return
+	}
+
+	mediumCharLimit, err := strconv.Atoi(mediumCharLimitStr)
+	if err != nil || mediumCharLimit < 0 {
+		http.Error(w, "Medium text limit must be a non-negative integer.", http.StatusBadRequest)
+		return
+	}
+
+	if simpleCharLimit > mediumCharLimit {
+		http.Error(w, "Simple text character limit cannot be larger than Medium limit.", http.StatusBadRequest)
+		return
+	}
+
+	// Update Complexity fields
+	app.Complexity = config.ComplexityRouting{
+		Enabled:                enabled,
+		AlwaysOverride:         alwaysOverride,
+		SimpleModel:            simpleModel,
+		MediumModel:            mediumModel,
+		ComplexModel:           complexModel,
+		SimpleCharLimit:        simpleCharLimit,
+		MediumCharLimit:        mediumCharLimit,
+		ForceComplexMultimodal: forceComplexMultimodal,
+		ForceComplexTools:      forceComplexTools,
+		UseLLMClassifier:       useLLMClassifier,
+		ClassifierModel:        classifierModel,
+	}
+
+	err = dc.Store.SaveApp(ctx, app)
+	if err != nil {
+		log.Printf("[Dashboard] Error saving complexity settings: %v", err)
+		http.Error(w, "Failed to save complexity settings", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/complexity", http.StatusSeeOther)
 }

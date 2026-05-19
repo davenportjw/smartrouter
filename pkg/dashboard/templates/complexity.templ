@@ -1,0 +1,333 @@
+package templates
+
+import (
+	"geminirouter/pkg/config"
+)
+
+type ComplexityViewModel struct {
+	App    config.App
+	Client config.Client
+}
+
+templ ComplexityTab(items []ComplexityViewModel) {
+	<div class="space-y-8">
+		<!-- Header & Description -->
+		<div class="sm:flex sm:items-center sm:justify-between">
+			<div>
+				<h1 class="text-2xl font-bold tracking-tight text-gray-900">Dynamic Complexity Routing</h1>
+				<p class="mt-2 text-sm text-gray-700">
+					Configure semantic or heuristic routing to dynamically select models (Pro, Flash, or Flash-Lite) based on request complexity.
+				</p>
+			</div>
+		</div>
+
+		<!-- Apps Data Table -->
+		<div class="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
+			<div class="inline-block min-w-full align-middle">
+				<table class="min-w-full divide-y divide-gray-300">
+					<thead class="bg-gray-50">
+						<tr>
+							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Application Name</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Status</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Method</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Simple Model & Max Chars</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Medium Model & Max Chars</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Complex Model</th>
+							<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
+								<span class="sr-only">Actions</span>
+							</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-gray-200 bg-white">
+						if len(items) == 0 {
+							<tr>
+								<td colspan="7" class="text-center py-8 text-sm text-gray-500 italic">
+									No logical applications configured. Register an application first under the Applications tab.
+								</td>
+							</tr>
+						} else {
+							for _, item := range items {
+								<tr class="hover:bg-gray-50 transition-colors">
+									<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
+										<div class="font-semibold text-gray-900">{ item.App.Name }</div>
+										<div class="text-xs font-mono text-gray-400">{ item.App.ID }</div>
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-sm">
+										if item.App.Complexity.Enabled {
+											if item.App.Complexity.AlwaysOverride {
+												<span class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
+													Always Override
+												</span>
+											} else {
+												<span class="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
+													SDK Virtual Model
+												</span>
+											}
+										} else {
+											<span class="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10">
+												Disabled
+											</span>
+										}
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-medium">
+										if item.App.Complexity.Enabled {
+											if item.App.Complexity.UseLLMClassifier {
+												<div class="text-xs">LLM Classifier</div>
+												<div class="text-[10px] font-mono text-gray-400">{ item.App.Complexity.ClassifierModel }</div>
+											} else {
+												<div class="text-xs">Static Heuristics</div>
+											}
+										} else {
+											<span class="text-gray-400">-</span>
+										}
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-mono text-xs">
+										<div>{ item.App.Complexity.SimpleModel }</div>
+										if item.App.Complexity.Enabled && !item.App.Complexity.UseLLMClassifier {
+											<div class="text-[10px] text-gray-400">&lt;= { intToString(item.App.Complexity.SimpleCharLimit) } chars</div>
+										}
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-mono text-xs">
+										<div>{ item.App.Complexity.MediumModel }</div>
+										if item.App.Complexity.Enabled && !item.App.Complexity.UseLLMClassifier {
+											<div class="text-[10px] text-gray-400">&lt;= { intToString(item.App.Complexity.MediumCharLimit) } chars</div>
+										}
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-mono text-xs">
+										{ item.App.Complexity.ComplexModel }
+									</td>
+									<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+										<button
+											hx-get={ "/admin/complexity/edit?app_id=" + item.App.ID }
+											hx-target="#modal-container"
+											class="text-blue-600 hover:text-blue-900 transition font-semibold"
+										>
+											Configure Settings
+										</button>
+									</td>
+								</tr>
+							}
+						}
+					</tbody>
+				</table>
+			</div>
+		</div>
+
+		<!-- Modal Target Anchor -->
+		<div id="modal-container"></div>
+	</div>
+}
+
+templ ComplexityModal(app config.App) {
+	<!-- Modal backdrop -->
+	<div id="edit-complexity-modal" class="relative z-50" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+		<div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
+		
+		<div class="fixed inset-0 z-50 w-screen overflow-y-auto">
+			<div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+				
+				<!-- Modal Panel -->
+				<div class="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl sm:p-6 border border-gray-200">
+					<div class="absolute right-0 top-0 hidden pr-4 pt-4 sm:block">
+						<button
+							type="button"
+							onclick="document.getElementById('edit-complexity-modal').remove()"
+							class="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none"
+						>
+							<span class="sr-only">Close</span>
+							<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+							</svg>
+						</button>
+					</div>
+
+					<div class="sm:flex sm:items-start">
+						<div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
+							<h3 class="text-lg font-bold leading-6 text-gray-900" id="modal-title">
+								Complexity Routing Settings: <span class="text-blue-600">{ app.Name }</span>
+							</h3>
+							<div class="mt-1">
+								<p class="text-xs text-gray-500 font-mono">{ app.ID }</p>
+							</div>
+
+							<!-- Settings Form -->
+							<form
+								hx-post="/admin/complexity/save"
+								class="mt-6 space-y-5"
+								onsubmit="document.getElementById('edit-complexity-modal').remove()"
+							>
+								<input type="hidden" name="app_id" value={ app.ID } />
+
+								<!-- General Routing Enablers -->
+								<div class="bg-gray-50 p-4 rounded-md border border-gray-200 space-y-3">
+									<div class="flex items-center justify-between">
+										<div class="flex flex-col">
+											<label for="enabled" class="text-sm font-semibold text-gray-950">Enable Dynamic Complexity Routing</label>
+											<span class="text-[11px] text-gray-500">Allow the router to dynamically choose target models.</span>
+										</div>
+										<input
+											type="checkbox"
+											name="enabled"
+											id="enabled"
+											value="true"
+											class="h-4.5 w-4.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+											if app.Complexity.Enabled { checked }
+										/>
+									</div>
+
+									<div class="flex items-center justify-between border-t border-gray-200 pt-3">
+										<div class="flex flex-col">
+											<label for="always_override" class="text-sm font-semibold text-gray-950">Always Override Requested Model</label>
+											<span class="text-[11px] text-gray-500">Override standard models. When unchecked, only routes if requested model is 'gemini-dynamic'.</span>
+										</div>
+										<input
+											type="checkbox"
+											name="always_override"
+											id="always_override"
+											value="true"
+											class="h-4.5 w-4.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+											if app.Complexity.AlwaysOverride { checked }
+										/>
+									</div>
+								</div>
+
+								<!-- Model Allocations -->
+								<div>
+									<h4 class="text-xs font-bold text-gray-950 tracking-wider uppercase mb-3">Model Allocations</h4>
+									<div class="grid grid-cols-3 gap-4">
+										<div>
+											<label for="simple_model" class="block text-xs font-medium text-gray-700">Simple Model</label>
+											<select name="simple_model" id="simple_model" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono">
+												<option value="gemini-2.5-flash-lite" if app.Complexity.SimpleModel == "gemini-2.5-flash-lite" { selected }>gemini-2.5-flash-lite</option>
+												<option value="gemini-2.5-flash" if app.Complexity.SimpleModel == "gemini-2.5-flash" { selected }>gemini-2.5-flash</option>
+												<option value="gemini-2.5-pro" if app.Complexity.SimpleModel == "gemini-2.5-pro" { selected }>gemini-2.5-pro</option>
+											</select>
+										</div>
+										<div>
+											<label for="medium_model" class="block text-xs font-medium text-gray-700">Medium Model</label>
+											<select name="medium_model" id="medium_model" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono">
+												<option value="gemini-2.5-flash" if app.Complexity.MediumModel == "gemini-2.5-flash" { selected }>gemini-2.5-flash</option>
+												<option value="gemini-2.5-flash-lite" if app.Complexity.MediumModel == "gemini-2.5-flash-lite" { selected }>gemini-2.5-flash-lite</option>
+												<option value="gemini-2.5-pro" if app.Complexity.MediumModel == "gemini-2.5-pro" { selected }>gemini-2.5-pro</option>
+											</select>
+										</div>
+										<div>
+											<label for="complex_model" class="block text-xs font-medium text-gray-700">Complex Model</label>
+											<select name="complex_model" id="complex_model" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono">
+												<option value="gemini-2.5-pro" if app.Complexity.ComplexModel == "gemini-2.5-pro" { selected }>gemini-2.5-pro</option>
+												<option value="gemini-2.5-flash" if app.Complexity.ComplexModel == "gemini-2.5-flash" { selected }>gemini-2.5-flash</option>
+												<option value="gemini-2.5-flash-lite" if app.Complexity.ComplexModel == "gemini-2.5-flash-lite" { selected }>gemini-2.5-flash-lite</option>
+											</select>
+										</div>
+									</div>
+								</div>
+
+								<!-- Method Options: LLM Classifier vs Static Heuristics -->
+								<div class="border-t border-gray-200 pt-4">
+									<h4 class="text-xs font-bold text-gray-950 tracking-wider uppercase mb-3">Classification Method</h4>
+									
+									<div class="space-y-4">
+										<!-- LLM Toggle -->
+										<div class="flex items-center justify-between bg-blue-50/50 p-3 rounded-md border border-blue-100">
+											<div class="flex flex-col">
+												<label for="use_llm_classifier" class="text-xs font-bold text-blue-950">Use LLM Semantic Classifier</label>
+												<span class="text-[10px] text-blue-800">Send prompt to a low-cost model to classify complexity rather than character limits.</span>
+											</div>
+											<input
+												type="checkbox"
+												name="use_llm_classifier"
+												id="use_llm_classifier"
+												value="true"
+												class="h-4.5 w-4.5 rounded border-blue-300 text-blue-600 focus:ring-blue-500"
+												if app.Complexity.UseLLMClassifier { checked }
+											/>
+										</div>
+
+										<div class="grid grid-cols-2 gap-4">
+											<div>
+												<label for="classifier_model" class="block text-xs font-medium text-gray-700">LLM Classifier Model</label>
+												<select name="classifier_model" id="classifier_model" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono">
+													<option value="gemini-3.1-flash-lite" if app.Complexity.ClassifierModel == "gemini-3.1-flash-lite" || app.Complexity.ClassifierModel == "" { selected }>gemini-3.1-flash-lite (Recommended)</option>
+													<option value="gemini-2.5-flash-lite" if app.Complexity.ClassifierModel == "gemini-2.5-flash-lite" { selected }>gemini-2.5-flash-lite</option>
+													<option value="gemini-2.5-flash" if app.Complexity.ClassifierModel == "gemini-2.5-flash" { selected }>gemini-2.5-flash</option>
+												</select>
+											</div>
+											
+											<!-- Heuristic Fast-Bypasses -->
+											<div class="bg-gray-50 p-3 rounded-md border border-gray-200 space-y-2 text-xs">
+												<div class="font-bold text-gray-750 mb-1">Fast-Bypasses (Force Complex)</div>
+												<div class="flex items-center justify-between">
+													<label for="force_complex_multimodal" class="text-gray-700">Multimodal Payloads</label>
+													<input
+														type="checkbox"
+														name="force_complex_multimodal"
+														id="force_complex_multimodal"
+														value="true"
+														class="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+														if app.Complexity.ForceComplexMultimodal { checked }
+													/>
+												</div>
+												<div class="flex items-center justify-between border-t border-gray-150 pt-1">
+													<label for="force_complex_tools" class="text-gray-700">Tools / Function Calls</label>
+													<input
+														type="checkbox"
+														name="force_complex_tools"
+														id="force_complex_tools"
+														value="true"
+														class="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+														if app.Complexity.ForceComplexTools { checked }
+													/>
+												</div>
+											</div>
+										</div>
+
+										<!-- Heuristics: Static Limits -->
+										<div class="grid grid-cols-2 gap-4 border-t border-gray-100 pt-3">
+											<div>
+												<label for="simple_char_limit" class="block text-xs font-medium text-gray-700">Simple Text Max Length (characters)</label>
+												<input
+													type="number"
+													name="simple_char_limit"
+													id="simple_char_limit"
+													required
+													value={ intToString(app.Complexity.SimpleCharLimit) }
+													class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono"
+												/>
+											</div>
+											<div>
+												<label for="medium_char_limit" class="block text-xs font-medium text-gray-700">Medium Text Max Length (characters)</label>
+												<input
+													type="number"
+													name="medium_char_limit"
+													id="medium_char_limit"
+													required
+													value={ intToString(app.Complexity.MediumCharLimit) }
+													class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono"
+												/>
+											</div>
+										</div>
+									</div>
+								</div>
+
+								<!-- Action Buttons -->
+								<div class="mt-6 sm:mt-4 sm:flex sm:flex-row-reverse gap-3 border-t border-gray-200 pt-4">
+									<button type="submit" class="inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:w-auto transition">
+										Save Settings
+									</button>
+									<button
+										type="button"
+										onclick="document.getElementById('edit-complexity-modal').remove()"
+										class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto transition"
+									>
+										Cancel
+									</button>
+								</div>
+							</form>
+						</div>
+					</div>
+				</div>
+				
+			</div>
+		</div>
+	</div>
+}

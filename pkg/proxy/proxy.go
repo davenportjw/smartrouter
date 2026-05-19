@@ -287,6 +287,61 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 				r.Header.Set("X-Requested-Model", requestedModel)
 
+				// 1.2. Evaluate Validation for Virtual Model
+				if requestedModel == "gemini-dynamic" && !app.Complexity.Enabled {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusBadRequest)
+					w.Write([]byte(fmt.Sprintf(`{
+						"error": {
+							"code": 400,
+							"message": "Virtual model 'gemini-dynamic' requested but dynamic complexity routing is not enabled for application '%s'. Please enable it in the smart router dashboard.",
+							"status": "INVALID_ARGUMENT"
+						}
+					}`, app.ID)))
+					return
+				}
+
+				// 1.3. Execute Dynamic Complexity Routing
+				targetModel := requestedModel
+				if app.Complexity.Enabled && (app.Complexity.AlwaysOverride || requestedModel == "gemini-dynamic") {
+					var bodyBytes []byte
+					if r.Body != nil {
+						var err error
+						bodyBytes, err = io.ReadAll(r.Body)
+						if err == nil {
+							// Restore request body for downstream proxy execution
+							r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+							
+							// Run dynamic classifier
+							complexityTier, classifyErr := rp.classifyComplexity(r.Context(), bodyBytes, app.Complexity)
+							if classifyErr == nil {
+								switch complexityTier {
+								case "simple":
+									targetModel = app.Complexity.SimpleModel
+									if targetModel == "" {
+										targetModel = "gemini-2.5-flash-lite"
+									}
+								case "medium":
+									targetModel = app.Complexity.MediumModel
+									if targetModel == "" {
+										targetModel = "gemini-2.5-flash"
+									}
+								case "complex":
+									targetModel = app.Complexity.ComplexModel
+									if targetModel == "" {
+										targetModel = "gemini-2.5-pro"
+									}
+								}
+								log.Printf("[Proxy Routing] Dynamic complexity router classified prompt as '%s' -> routed target model: %s", complexityTier, targetModel)
+							} else {
+								log.Printf("[Proxy Routing] Complexity classification failed: %v. Falling back to requested model %s", classifyErr, requestedModel)
+							}
+						} else {
+							log.Printf("[Proxy Routing] Failed to read request body for complexity classification: %v", err)
+						}
+					}
+				}
+
 				// Collect flat headers map for MatchRule
 				headersMap := make(map[string]string)
 				for k, v := range r.Header {
@@ -295,12 +350,13 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 
-				// Apply dynamic routing rules (bound to App or Global)
-				targetModel := requestedModel
-				routedRule, matched := rp.Store.MatchRule(requestedModel, client.Tier, app.ID, headersMap)
+				// 1.4. Apply standard dynamic rules-based routing matching on top of the complexity-classified model!
+				routedRule, matched := rp.Store.MatchRule(targetModel, client.Tier, app.ID, headersMap)
 				if matched {
+					log.Printf("[Proxy Routing] MatchRule matched rules-based routing on top of complexity routed model %s -> targeting: %s", targetModel, routedRule.TargetModel)
 					targetModel = routedRule.TargetModel
 				}
+				
 				r.Header.Set("X-Routed-Model", targetModel)
 			}
 		}
@@ -585,5 +641,223 @@ func (t *retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, err
 	}
 	return resp, nil
+}
+
+type geminiPart struct {
+	Text       string                 `json:"text,omitempty"`
+	InlineData map[string]interface{} `json:"inlineData,omitempty"`
+	FileData   map[string]interface{} `json:"fileData,omitempty"`
+}
+
+type geminiContent struct {
+	Role  string       `json:"role,omitempty"`
+	Parts []geminiPart `json:"parts,omitempty"`
+}
+
+type geminiRequest struct {
+	Contents []geminiContent `json:"contents,omitempty"`
+	Tools    []interface{}   `json:"tools,omitempty"`
+}
+
+type classifierResponse struct {
+	Candidates []struct {
+		Content struct {
+			Parts []struct {
+				Text string `json:"text"`
+			} `json:"parts"`
+		} `json:"content"`
+	} `json:"candidates"`
+}
+
+// classifyComplexity evaluates the incoming body payload to determine query complexity.
+func (rp *RouterProxy) classifyComplexity(ctx context.Context, body []byte, c config.ComplexityRouting) (string, error) {
+	var req geminiRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		// Graceful fallback if unmarshalling fails
+		return "simple", nil
+	}
+
+	// 1. Evaluate Fast Heuristics Bypasses
+	hasMultimodal := false
+	hasTools := len(req.Tools) > 0
+
+	charCount := 0
+	for _, content := range req.Contents {
+		for _, part := range content.Parts {
+			if part.InlineData != nil || part.FileData != nil {
+				hasMultimodal = true
+			}
+			charCount += len(part.Text)
+		}
+	}
+
+	if hasTools && c.ForceComplexTools {
+		log.Printf("[Complexity Classifier] Request has active tools. Bypassing LLM classifier, routing as complex.")
+		return "complex", nil
+	}
+	if hasMultimodal && c.ForceComplexMultimodal {
+		log.Printf("[Complexity Classifier] Request has multimodal inline/file payload. Bypassing LLM classifier, routing as complex.")
+		return "complex", nil
+	}
+
+	// 2. Run LLM-Based Semantic Classification if configured
+	if c.UseLLMClassifier {
+		classifierModel := c.ClassifierModel
+		if classifierModel == "" {
+			classifierModel = "gemini-3.1-flash-lite"
+		}
+
+		log.Printf("[Complexity Classifier] Invoking dynamic classifier (%s) for prompt (length: %d characters)...", classifierModel, charCount)
+		
+		// Concat user text prompts to feed the semantic classifier
+		var promptSnippet strings.Builder
+		for _, content := range req.Contents {
+			for _, part := range content.Parts {
+				if part.Text != "" {
+					promptSnippet.WriteString(part.Text)
+					promptSnippet.WriteByte('\n')
+				}
+			}
+		}
+		snippetStr := promptSnippet.String()
+		if len(snippetStr) > 4000 {
+			snippetStr = snippetStr[:4000]
+		}
+
+		complexityResult, err := rp.callLLMClassifier(ctx, classifierModel, snippetStr)
+		if err == nil && (complexityResult == "simple" || complexityResult == "medium" || complexityResult == "complex") {
+			log.Printf("[Complexity Classifier] LLM classified complexity: %s", complexityResult)
+			return complexityResult, nil
+		}
+		log.Printf("[Complexity Classifier] LLM classification call failed: %v. Falling back to static thresholds.", err)
+	}
+
+	// 3. Heuristic Rules: Classify strictly by character thresholds
+	if charCount <= c.SimpleCharLimit {
+		return "simple", nil
+	}
+	if charCount <= c.MediumCharLimit {
+		return "medium", nil
+	}
+	return "complex", nil
+}
+
+// callLLMClassifier sends a rapid structured OIDC JSON query to the Vertex AI Gemini API.
+func (rp *RouterProxy) callLLMClassifier(ctx context.Context, modelName string, prompt string) (string, error) {
+	systemInstr := "You are a low-overhead API routing complexity classifier. Classify the user prompt into one of three tiers:\n" +
+		"- simple: Greetings, chit-chat, simple factual lookups, single basic questions.\n" +
+		"- medium: Summarization, standard instructions, translations, content generation.\n" +
+		"- complex: Complex coding, math/logic puzzles, multi-step debugging, deep reasoning.\n" +
+		"Return JSON format: {\"complexity\": \"simple\" | \"medium\" | \"complex\"}"
+
+	type schemaProp struct {
+		Type string   `json:"type"`
+		Enum []string `json:"enum,omitempty"`
+	}
+	type schemaObj struct {
+		Type       string                `json:"type"`
+		Properties map[string]schemaProp `json:"properties"`
+		Required   []string              `json:"required"`
+	}
+	type genConfig struct {
+		ResponseMimeType string    `json:"responseMimeType"`
+		ResponseSchema   schemaObj `json:"responseSchema"`
+		Temperature      float64   `json:"temperature"`
+		MaxOutputTokens  int       `json:"maxOutputTokens"`
+	}
+
+	type internalPart struct {
+		Text string `json:"text"`
+	}
+	type internalContent struct {
+		Parts []internalPart `json:"parts"`
+	}
+	type internalReq struct {
+		Contents          []internalContent `json:"contents"`
+		SystemInstruction internalContent   `json:"systemInstruction"`
+		GenerationConfig  genConfig         `json:"generationConfig"`
+	}
+
+	reqBody := internalReq{
+		Contents: []internalContent{
+			{
+				Parts: []internalPart{{Text: "Prompt to classify:\n" + prompt}},
+			},
+		},
+		SystemInstruction: internalContent{
+			Parts: []internalPart{{Text: systemInstr}},
+		},
+		GenerationConfig: genConfig{
+			ResponseMimeType: "application/json",
+			ResponseSchema: schemaObj{
+				Type: "OBJECT",
+				Properties: map[string]schemaProp{
+					"complexity": {
+						Type: "STRING",
+						Enum: []string{"simple", "medium", "complex"},
+					},
+				},
+				Required: []string{"complexity"},
+			},
+			Temperature:     0.0,
+			MaxOutputTokens: 20,
+		},
+	}
+
+	reqJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", err
+	}
+
+	// Target the smart-router's regional host configuration dynamically
+	targetURL := fmt.Sprintf("%s://%s/v1/projects/%s/locations/%s/publishers/google/models/%s:generateContent",
+		rp.Target.Scheme, rp.Target.Host, rp.ProjectID, rp.Location, modelName)
+
+	// Tight timeout for classification overhead safety (600ms)
+	callCtx, cancel := context.WithTimeout(ctx, 600*time.Millisecond)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(callCtx, "POST", targetURL, bytes.NewReader(reqJSON))
+	if err != nil {
+		return "", err
+	}
+
+	token, err := rp.TokenSource.Token()
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch credentials: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token.AccessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyErr, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("classifier API returned status %s: %s", resp.Status, string(bodyErr))
+	}
+
+	var res classifierResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return "", err
+	}
+
+	if len(res.Candidates) == 0 || len(res.Candidates[0].Content.Parts) == 0 {
+		return "", fmt.Errorf("empty candidates in classifier response")
+	}
+
+	rawJSON := res.Candidates[0].Content.Parts[0].Text
+	var out struct {
+		Complexity string `json:"complexity"`
+	}
+	if err := json.Unmarshal([]byte(rawJSON), &out); err != nil {
+		return "", fmt.Errorf("failed to parse output JSON %q: %w", rawJSON, err)
+	}
+
+	return out.Complexity, nil
 }
 
