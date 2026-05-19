@@ -136,7 +136,22 @@ func NewRouterProxy(store *config.ConfigStore, projectID, location string) (*Rou
 	originalDirector := proxy.Director
 	proxy.Director = func(req *http.Request) {
 		originalDirector(req)
-		req.Host = target.Host
+
+		// Resolve dynamic model location for rewriting host and path
+		modelLoc := req.Header.Get("X-Routed-Model-Location")
+		if modelLoc == "" {
+			modelLoc = rp.Location
+		}
+
+		// If modelLoc differs from router local region, dynamically rewrite the request target host
+		if modelLoc != rp.Location {
+			targetHost := modelLoc + "-aiplatform.googleapis.com"
+			req.URL.Scheme = "https"
+			req.URL.Host = targetHost
+			req.Host = targetHost
+		} else {
+			req.Host = target.Host
+		}
 
 		// 1. Remove client-side credentials
 		query := req.URL.Query()
@@ -171,12 +186,12 @@ func NewRouterProxy(store *config.ConfigStore, projectID, location string) (*Rou
 			}
 
 			newPath := fmt.Sprintf("/v1/projects/%s/locations/%s/publishers/google/models/%s%s",
-				rp.ProjectID, rp.Location, targetModel, action)
+				rp.ProjectID, modelLoc, targetModel, action)
 			req.URL.Path = newPath
 		} else if resource == "reasoningEngines" || resource == "ragCorpora" {
 			remainingPath := strings.Join(pathParts[2:], "/")
 			newPath := fmt.Sprintf("/%s/projects/%s/locations/%s/%s",
-				version, rp.ProjectID, rp.Location, remainingPath)
+				version, rp.ProjectID, modelLoc, remainingPath)
 			req.URL.Path = newPath
 		}
 	}
@@ -358,6 +373,15 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				}
 				
 				r.Header.Set("X-Routed-Model", targetModel)
+
+				// Resolve and set the routed model's location
+				modelLoc := rp.Location // default to router's location
+				if activeModel, exists := rp.Store.LookupActiveModel(targetModel); exists && activeModel.Location != "" {
+					if activeModel.Location != "global" {
+						modelLoc = activeModel.Location
+					}
+				}
+				r.Header.Set("X-Routed-Model-Location", modelLoc)
 			}
 		}
 	}
@@ -484,6 +508,7 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Set custom audit headers in ResponseWriter for client programmatic visibility
 	w.Header().Set("X-Routed-Model", r.Header.Get("X-Routed-Model"))
 	w.Header().Set("X-Requested-Model", r.Header.Get("X-Requested-Model"))
+	w.Header().Set("X-Routed-Model-Location", r.Header.Get("X-Routed-Model-Location"))
 	w.Header().Set("X-Client-Tier", client.Tier)
 	w.Header().Set("X-App-ID", app.ID)
 

@@ -87,6 +87,15 @@ type CustomHeader struct {
 	ValuePattern string `firestore:"value_pattern" json:"value_pattern"`   // Regex format or comma-separated enum values
 }
 
+// ModelConfig defines the registered models and endpoints active in the router.
+type ModelConfig struct {
+	ID          string `firestore:"id" json:"id"`                     // e.g., "gemini-2.5-flash", "my-custom-model"
+	DisplayName string `firestore:"display_name" json:"display_name"`   // e.g., "Gemini 2.5 Flash", "Fine-Tuned Support Model"
+	Location    string `firestore:"location" json:"location"`         // e.g., "us-central1", "us", "global"
+	Type        string `firestore:"type" json:"type"`                 // "foundation", "custom", "endpoint"
+	Active      bool   `firestore:"active" json:"active"`             // true if available for routing
+}
+
 // ConfigStore manages Firestore connections and a fast in-memory configuration cache.
 type ConfigStore struct {
 	Client      *firestore.Client
@@ -95,9 +104,10 @@ type ConfigStore struct {
 
 	// Thread-safe in-memory cache
 	mu      sync.RWMutex
-	keys    map[string]APIKey // Hex-encoded KeyHash -> APIKey
-	clients map[string]Client // ClientID -> Client
-	apps    map[string]App    // AppID -> App
+	keys    map[string]APIKey      // Hex-encoded KeyHash -> APIKey
+	clients map[string]Client      // ClientID -> Client
+	apps    map[string]App         // AppID -> App
+	models  map[string]ModelConfig // Model ID -> ModelConfig
 	rules   []RoutingRule
 	headers []CustomHeader
 
@@ -108,11 +118,12 @@ type ConfigStore struct {
 
 // LocalDB represents the JSON schema for the local development database.
 type LocalDB struct {
-	Clients       map[string]Client `json:"clients"`
-	Apps          map[string]App    `json:"apps"`
-	APIKeys       map[string]APIKey `json:"api_keys"`
-	RoutingRules  []RoutingRule     `json:"routing_rules"`
-	CustomHeaders []CustomHeader    `json:"custom_headers"`
+	Clients       map[string]Client      `json:"clients"`
+	Apps          map[string]App         `json:"apps"`
+	APIKeys       map[string]APIKey      `json:"api_keys"`
+	RoutingRules  []RoutingRule          `json:"routing_rules"`
+	CustomHeaders []CustomHeader         `json:"custom_headers"`
+	Models        []ModelConfig          `json:"models"`
 }
 
 // NewConfigStore initializes a Firestore connection and caches configuration, or uses local file for dev.
@@ -124,6 +135,7 @@ func NewConfigStore(ctx context.Context, projectID string) (*ConfigStore, error)
 		keys:          make(map[string]APIKey),
 		clients:       make(map[string]Client),
 		apps:          make(map[string]App),
+		models:        make(map[string]ModelConfig),
 		ruleRegexes:   make(map[string]*regexp.Regexp),
 		headerRegexes: make(map[string]*regexp.Regexp),
 	}
@@ -162,6 +174,7 @@ func (cs *ConfigStore) StartListeners(ctx context.Context) {
 	go cs.listenApps(ctx)
 	go cs.listenRules(ctx)
 	go cs.listenHeaders(ctx)
+	go cs.listenModels(ctx)
 }
 
 // LookupKey finds a matching active API key in the local cache.
@@ -576,6 +589,20 @@ func (cs *ConfigStore) initLocalDB() error {
 					ValuePattern: "^[a-zA-Z0-9-]+$",
 				},
 			},
+			Models: []ModelConfig{
+				{ID: "gemini-2.5-flash", DisplayName: "Gemini 2.5 Flash", Location: "global", Type: "foundation", Active: true},
+				{ID: "gemini-2.5-pro", DisplayName: "Gemini 2.5 Pro", Location: "global", Type: "foundation", Active: true},
+				{ID: "gemini-2.5-flash-lite", DisplayName: "Gemini 2.5 Flash Lite", Location: "global", Type: "foundation", Active: true},
+				{ID: "gemini-3.0-flash", DisplayName: "Gemini 3.0 Flash", Location: "global", Type: "foundation", Active: true},
+				{ID: "gemini-3.0-pro", DisplayName: "Gemini 3.0 Pro", Location: "global", Type: "foundation", Active: true},
+				{ID: "gemini-3.1-flash", DisplayName: "Gemini 3.1 Flash", Location: "global", Type: "foundation", Active: true},
+				{ID: "gemini-3.1-pro", DisplayName: "Gemini 3.1 Pro", Location: "global", Type: "foundation", Active: true},
+				{ID: "gemini-3.5-flash", DisplayName: "Gemini 3.5 Flash", Location: "global", Type: "foundation", Active: true},
+				{ID: "gemini-3.5-pro", DisplayName: "Gemini 3.5 Pro", Location: "global", Type: "foundation", Active: true},
+				{ID: "gemini-3.5-flash-lite", DisplayName: "Gemini 3.5 Flash Lite", Location: "global", Type: "foundation", Active: true},
+				{ID: "text-embedding-004", DisplayName: "Text Embedding 004", Location: "global", Type: "foundation", Active: true},
+				{ID: "multimodal-embedding-001", DisplayName: "Multimodal Embedding 001", Location: "global", Type: "foundation", Active: true},
+			},
 		}
 
 		data, err := json.MarshalIndent(db, "", "  ")
@@ -674,8 +701,27 @@ func (cs *ConfigStore) initLocalDB() error {
 		}
 	}
 
+	// Auto-migrate existing database with empty models
+	if len(db.Models) == 0 {
+		db.Models = []ModelConfig{
+			{ID: "gemini-2.5-flash", DisplayName: "Gemini 2.5 Flash", Location: "global", Type: "foundation", Active: true},
+			{ID: "gemini-2.5-pro", DisplayName: "Gemini 2.5 Pro", Location: "global", Type: "foundation", Active: true},
+			{ID: "gemini-2.5-flash-lite", DisplayName: "Gemini 2.5 Flash Lite", Location: "global", Type: "foundation", Active: true},
+			{ID: "gemini-3.0-flash", DisplayName: "Gemini 3.0 Flash", Location: "global", Type: "foundation", Active: true},
+			{ID: "gemini-3.0-pro", DisplayName: "Gemini 3.0 Pro", Location: "global", Type: "foundation", Active: true},
+			{ID: "gemini-3.1-flash", DisplayName: "Gemini 3.1 Flash", Location: "global", Type: "foundation", Active: true},
+			{ID: "gemini-3.1-pro", DisplayName: "Gemini 3.1 Pro", Location: "global", Type: "foundation", Active: true},
+			{ID: "gemini-3.5-flash", DisplayName: "Gemini 3.5 Flash", Location: "global", Type: "foundation", Active: true},
+			{ID: "gemini-3.5-pro", DisplayName: "Gemini 3.5 Pro", Location: "global", Type: "foundation", Active: true},
+			{ID: "gemini-3.5-flash-lite", DisplayName: "Gemini 3.5 Flash Lite", Location: "global", Type: "foundation", Active: true},
+			{ID: "text-embedding-004", DisplayName: "Text Embedding 004", Location: "global", Type: "foundation", Active: true},
+			{ID: "multimodal-embedding-001", DisplayName: "Multimodal Embedding 001", Location: "global", Type: "foundation", Active: true},
+		}
+		dirty = true
+	}
+
 	if dirty {
-		log.Println("[Local Dev] Migrating existing database schemas to explicit App-Centric model...")
+		log.Println("[Local Dev] Migrating existing database schemas to include Models and App-Centric structures...")
 		mdata, err := json.MarshalIndent(db, "", "  ")
 		if err == nil {
 			_ = os.WriteFile(cs.localDBPath, mdata, 0644)
@@ -688,23 +734,32 @@ func (cs *ConfigStore) initLocalDB() error {
 	cs.keys = db.APIKeys
 	cs.rules = db.RoutingRules
 	cs.headers = db.CustomHeaders
+	cs.models = make(map[string]ModelConfig)
+	for _, m := range db.Models {
+		cs.models[m.ID] = m
+	}
 	cs.sortRulesLocked()
 	cs.compileRegexesLocked()
 	cs.mu.Unlock()
 
-	log.Printf("[Local Dev Cache] Loaded %d clients, %d apps, %d API keys, %d rules, %d headers.", len(cs.clients), len(cs.apps), len(cs.keys), len(cs.rules), len(cs.headers))
+	log.Printf("[Local Dev Cache] Loaded %d clients, %d apps, %d API keys, %d rules, %d headers, %d models.", len(cs.clients), len(cs.apps), len(cs.keys), len(cs.rules), len(cs.headers), len(cs.models))
 	return nil
 }
 
 // saveLocalDB flushes memory cache changes to local_db.json.
 func (cs *ConfigStore) saveLocalDB() error {
 	cs.mu.RLock()
+	var modelsList []ModelConfig
+	for _, m := range cs.models {
+		modelsList = append(modelsList, m)
+	}
 	db := LocalDB{
 		Clients:       cs.clients,
 		Apps:          cs.apps,
 		APIKeys:       cs.keys,
 		RoutingRules:  cs.rules,
 		CustomHeaders: cs.headers,
+		Models:        modelsList,
 	}
 	cs.mu.RUnlock()
 
@@ -1156,4 +1211,174 @@ func (cs *ConfigStore) DeleteApp(ctx context.Context, id string) error {
 
 	_, err := cs.Client.Collection("apps").Doc(id).Delete(ctx)
 	return err
+}
+
+// IsValidModelName validates standard and custom Vertex AI model names.
+func IsValidModelName(name string) bool {
+	// Matches standard Gemini model formats
+	reGemini := regexp.MustCompile(`^gemini-([2-9])\.([0-9])-(flash|pro|flash-lite)$`)
+	matches := reGemini.FindStringSubmatch(name)
+	if matches != nil {
+		majorStr := matches[1]
+		minorStr := matches[2]
+		if majorStr == "2" {
+			// For Gemini 2.x, it must be 2.5 or higher
+			if minorStr < "5" {
+				return false
+			}
+		}
+		return true
+	}
+
+	// Matches standard Embeddings
+	if name == "text-embedding-004" || name == "multimodal-embedding-001" {
+		return true
+	}
+
+	// Matches Custom tuned model resource path
+	if strings.HasPrefix(name, "projects/") && strings.Contains(name, "/models/") {
+		parts := strings.Split(name, "/models/")
+		return len(parts) == 2 && len(strings.TrimSpace(parts[1])) > 0
+	}
+
+	// Matches Serving Endpoint resource path
+	if strings.HasPrefix(name, "projects/") && strings.Contains(name, "/endpoints/") {
+		parts := strings.Split(name, "/endpoints/")
+		return len(parts) == 2 && len(strings.TrimSpace(parts[1])) > 0
+	}
+
+	return false
+}
+
+// LookupActiveModel resolves a model and verifies if it is active for routing.
+func (cs *ConfigStore) LookupActiveModel(id string) (ModelConfig, bool) {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+	m, exists := cs.models[id]
+	if exists && m.Active {
+		return m, true
+	}
+	return ModelConfig{}, false
+}
+
+// GetAllModels retrieves all active and inactive models from the local database or Firestore.
+func (cs *ConfigStore) GetAllModels(ctx context.Context) ([]ModelConfig, error) {
+	cs.mu.RLock()
+	isDev := cs.isLocalDev
+	cs.mu.RUnlock()
+
+	if isDev {
+		cs.mu.RLock()
+		defer cs.mu.RUnlock()
+		var list []ModelConfig
+		for _, m := range cs.models {
+			list = append(list, m)
+		}
+		return list, nil
+	}
+
+	modelDocs, err := cs.Client.Collection("models").Documents(ctx).GetAll()
+	if err != nil {
+		return nil, err
+	}
+	var list []ModelConfig
+	for _, doc := range modelDocs {
+		var model ModelConfig
+		if err := doc.DataTo(&model); err == nil {
+			list = append(list, model)
+		}
+	}
+	return list, nil
+}
+
+// SaveModel persists a model's details locally or in active Firestore.
+func (cs *ConfigStore) SaveModel(ctx context.Context, model ModelConfig) error {
+	cs.mu.RLock()
+	isDev := cs.isLocalDev
+	cs.mu.RUnlock()
+
+	if isDev {
+		cs.mu.Lock()
+		cs.models[model.ID] = model
+		cs.mu.Unlock()
+		return cs.saveLocalDB()
+	}
+
+	_, err := cs.Client.Collection("models").Doc(model.ID).Set(ctx, model)
+	return err
+}
+
+// DeleteModel deletes a model by ID.
+func (cs *ConfigStore) DeleteModel(ctx context.Context, id string) error {
+	cs.mu.RLock()
+	isDev := cs.isLocalDev
+	cs.mu.RUnlock()
+
+	if isDev {
+		cs.mu.Lock()
+		delete(cs.models, id)
+		cs.mu.Unlock()
+		return cs.saveLocalDB()
+	}
+
+	_, err := cs.Client.Collection("models").Doc(id).Delete(ctx)
+	return err
+}
+
+// listenModels streams live updates for the models collection from Firestore.
+func (cs *ConfigStore) listenModels(ctx context.Context) {
+	backoff := 1 * time.Second
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		it := cs.Client.Collection("models").Snapshots(ctx)
+		err := func() error {
+			for {
+				snap, err := it.Next()
+				if err != nil {
+					return err
+				}
+				backoff = 1 * time.Second // Reset backoff on success
+
+				cs.mu.Lock()
+				cs.models = make(map[string]ModelConfig)
+				for {
+					doc, err := snap.Documents.Next()
+					if err == iterator.Done {
+						break
+					}
+					if err != nil {
+						log.Printf("[Firestore] Error reading model document snapshot: %v", err)
+						continue
+					}
+					var model ModelConfig
+					if err := doc.DataTo(&model); err != nil {
+						log.Printf("[Firestore] DataTo error mapping ModelConfig: %v", err)
+						continue
+					}
+					cs.models[model.ID] = model
+				}
+				cs.mu.Unlock()
+				log.Printf("[Firestore Cache] Synchronized %d models", len(cs.models))
+			}
+		}()
+
+		if err != nil {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+			log.Printf("[Firestore] Models listener error: %v. Reconnecting in %v...", err, backoff)
+			time.Sleep(backoff)
+			backoff *= 2
+			if backoff > 1*time.Minute {
+				backoff = 1 * time.Minute
+			}
+		}
+	}
 }

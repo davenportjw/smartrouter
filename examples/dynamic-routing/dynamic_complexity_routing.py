@@ -60,6 +60,7 @@ def send_dynamic_request(prompt: str, description: str):
             # Extract response metadata injected by the router
             requested_model = response.headers.get("X-Requested-Model", "gemini-dynamic")
             routed_model = response.headers.get("X-Routed-Model", "Unknown")
+            routed_loc = response.headers.get("X-Routed-Model-Location", "global")
             client_tier = response.headers.get("X-Client-Tier", "Unknown")
             app_id = response.headers.get("X-App-ID", "Unknown")
 
@@ -72,6 +73,7 @@ def send_dynamic_request(prompt: str, description: str):
             print(f"✅ Success!")
             print(f"👉 Requested Model : {requested_model}")
             print(f"👉 Routed Model    : \033[1;32m{routed_model}\033[0m")
+            print(f"👉 Routed Location : \033[1;34m{routed_loc}\033[0m")
             print(f"👉 Client Tier      : {client_tier}")
             print(f"👉 App ID          : {app_id}")
             print(f"👉 Response Snippet: \"{text.strip()[:100].replace(chr(10), ' ')}...\"")

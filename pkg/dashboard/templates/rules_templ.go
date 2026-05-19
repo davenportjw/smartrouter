@@ -265,7 +265,7 @@ func RulesTab(rules []config.RoutingRule) templ.Component {
 	})
 }
 
-func RuleModal(apps []config.App) templ.Component {
+func RuleModal(apps []config.App, activeModels []config.ModelConfig) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -335,7 +335,79 @@ func RuleModal(apps []config.App) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "</select></div></div><div class=\"grid grid-cols-2 gap-4\"><div><label for=\"client_tier\" class=\"block text-xs font-medium text-gray-700\">Client Tier Eligibility</label> <select name=\"client_tier\" id=\"client_tier\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm\"><option value=\"all\">All Tiers</option> <option value=\"free\">Free Tier Only</option> <option value=\"standard\">Standard Tier Only</option> <option value=\"premium\">Premium Tier Only</option></select></div><div><label for=\"priority_weight\" class=\"block text-xs font-medium text-gray-700\">Priority Weight (1-10)</label> <input type=\"number\" name=\"priority_weight\" id=\"priority_weight\" min=\"1\" max=\"10\" value=\"1\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm\"></div></div><div class=\"bg-gray-50 rounded-md p-3 border border-gray-150 space-y-3\"><h4 class=\"text-xs font-bold uppercase tracking-wider text-gray-500\">Header-Based Route Segmentation (Optional)</h4><div class=\"grid grid-cols-2 gap-3\"><div><label for=\"header_name\" class=\"block text-[10px] font-medium text-gray-600\">HTTP Header Name</label> <input type=\"text\" name=\"header_name\" id=\"header_name\" placeholder=\"e.g. X-Client-App-ID\" class=\"mt-1 block w-full rounded-md bg-white border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-xs\"></div><div><label for=\"header_value\" class=\"block text-[10px] font-medium text-gray-600\">Value Match / Pattern</label> <input type=\"text\" name=\"header_value\" id=\"header_value\" placeholder=\"e.g. prod-chat or /canary/\" class=\"mt-1 block w-full rounded-md bg-white border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-xs\"></div></div><p class=\"text-[10px] text-gray-400 leading-relaxed\">If header name is set, this rule only triggers when request contains it. Wrap value with slashes (e.g. <code class=\"bg-gray-100 text-gray-600 px-0.5 font-mono\">/canary/</code>) to perform regex evaluation.</p></div><div class=\"grid grid-cols-2 gap-4\"><div><label for=\"target_model\" class=\"block text-xs font-medium text-gray-700\">Routed Target Model</label> <select name=\"target_model\" id=\"target_model\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm\"><option value=\"gemini-2.5-flash\">gemini-2.5-flash</option> <option value=\"gemini-2.5-pro\">gemini-2.5-pro</option> <option value=\"gemini-2.5-flash-lite\">gemini-2.5-flash-lite</option> <option value=\"text-embedding-004\">text-embedding-004</option></select></div><div><label for=\"target_location\" class=\"block text-xs font-medium text-gray-700\">Target Location (GCP)</label> <input type=\"text\" name=\"target_location\" id=\"target_location\" required value=\"us-central1\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm\"></div></div><div class=\"grid grid-cols-1 gap-4\"><div><label for=\"fallback_model\" class=\"block text-xs font-medium text-gray-700\">Fallback Model (Optional)</label> <input type=\"text\" name=\"fallback_model\" id=\"fallback_model\" placeholder=\"e.g. gemini-2.5-flash\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm\"></div></div><div class=\"mt-6 sm:mt-4 sm:flex sm:flex-row-reverse gap-3\"><button type=\"submit\" class=\"inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:w-auto transition\">Save Routing Rule</button> <button type=\"button\" onclick=\"document.getElementById('create-rule-modal').remove()\" class=\"mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto transition\">Cancel</button></div></form></div></div></div></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "</select></div></div><div class=\"grid grid-cols-2 gap-4\"><div><label for=\"client_tier\" class=\"block text-xs font-medium text-gray-700\">Client Tier Eligibility</label> <select name=\"client_tier\" id=\"client_tier\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm\"><option value=\"all\">All Tiers</option> <option value=\"free\">Free Tier Only</option> <option value=\"standard\">Standard Tier Only</option> <option value=\"premium\">Premium Tier Only</option></select></div><div><label for=\"priority_weight\" class=\"block text-xs font-medium text-gray-700\">Priority Weight (1-10)</label> <input type=\"number\" name=\"priority_weight\" id=\"priority_weight\" min=\"1\" max=\"10\" value=\"1\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm\"></div></div><div class=\"bg-gray-50 rounded-md p-3 border border-gray-150 space-y-3\"><h4 class=\"text-xs font-bold uppercase tracking-wider text-gray-500\">Header-Based Route Segmentation (Optional)</h4><div class=\"grid grid-cols-2 gap-3\"><div><label for=\"header_name\" class=\"block text-[10px] font-medium text-gray-600\">HTTP Header Name</label> <input type=\"text\" name=\"header_name\" id=\"header_name\" placeholder=\"e.g. X-Client-App-ID\" class=\"mt-1 block w-full rounded-md bg-white border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-xs\"></div><div><label for=\"header_value\" class=\"block text-[10px] font-medium text-gray-600\">Value Match / Pattern</label> <input type=\"text\" name=\"header_value\" id=\"header_value\" placeholder=\"e.g. prod-chat or /canary/\" class=\"mt-1 block w-full rounded-md bg-white border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-xs\"></div></div><p class=\"text-[10px] text-gray-400 leading-relaxed\">If header name is set, this rule only triggers when request contains it. Wrap value with slashes (e.g. <code class=\"bg-gray-100 text-gray-600 px-0.5 font-mono\">/canary/</code>) to perform regex evaluation.</p></div><div class=\"grid grid-cols-2 gap-4\"><div><label for=\"target_model\" class=\"block text-xs font-medium text-gray-700\">Routed Target Model</label> <select name=\"target_model\" id=\"target_model\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm font-mono\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		for _, m := range activeModels {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<option value=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var16 string
+			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.ResolveAttributeValue(m.ID)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/rules.templ`, Line: 238, Col: 32}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var16)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var17 string
+			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(m.DisplayName)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/rules.templ`, Line: 238, Col: 50}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</option>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "</select></div><div><label for=\"target_location\" class=\"block text-xs font-medium text-gray-700\">Target Location (GCP)</label> <input type=\"text\" name=\"target_location\" id=\"target_location\" required value=\"us-central1\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm font-mono\"></div></div><div class=\"grid grid-cols-1 gap-4\"><div><label for=\"fallback_model\" class=\"block text-xs font-medium text-gray-700\">Fallback Model (Optional)</label> <select name=\"fallback_model\" id=\"fallback_model\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm font-mono\"><option value=\"\">None</option> ")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		for _, m := range activeModels {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "<option value=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var18 string
+			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.ResolveAttributeValue(m.ID)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/rules.templ`, Line: 254, Col: 32}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var18)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var19 string
+			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(m.DisplayName)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/rules.templ`, Line: 254, Col: 50}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "</option>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "</select></div></div><div class=\"mt-6 sm:mt-4 sm:flex sm:flex-row-reverse gap-3\"><button type=\"submit\" class=\"inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:w-auto transition\">Save Routing Rule</button> <button type=\"button\" onclick=\"document.getElementById('create-rule-modal').remove()\" class=\"mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto transition\">Cancel</button></div></form></div></div></div></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

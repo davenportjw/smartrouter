@@ -242,3 +242,16 @@ If dynamic matching based on headers and model pattern needs adjustment, we refi
 appMatch := rule.AppID == "" || rule.AppID == "all" || rule.AppID == appID
 ```
 Since `appID` matches exactly, this resolves seamlessly to the targeted routing logic, ensuring modular, reliable, and easily maintainable feature delivery.
+
+---
+
+## 6. Documentation Synchronicity & Maintenance
+
+To ensure that developer and operator runbooks never drift from actual system capabilities:
+
+* **Mandatory Documentation Updates**: Whenever you add a new feature, refactor routing structures, introduce custom validation rules, or modify admin dashboard handlers, you **MUST** update the corresponding guide under `/docs` in the same commit.
+* **Formatting & Writing Rules**:
+  - **Humanized Tone**: Write in a highly terse, active, and direct voice. Avoid verbose AI/robot templates (e.g., no unnecessary introductory preambles like "In this section, we will explore..."). Go straight to the instructions.
+  - **Tactical Examples**: Focus on practical copy-pasteable config examples, `curl` requests, and visual sequence/entity diagrams.
+  - **Document Index**: Ensure any newly created files are properly mapped and linked in the main `/docs/README.md` index file.
+

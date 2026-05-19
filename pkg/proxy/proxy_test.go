@@ -1514,6 +1514,113 @@ func TestProxyDynamicRoutingSuite(t *testing.T) {
 	os.RemoveAll("data/local_db.json")
 }
 
+func TestProxyRegionalModelRouting(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+
+	ctx := context.Background()
+	store, err := config.NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to initialize config store: %v", err)
+	}
+
+	// Seed App, Client, Key
+	app := config.App{ID: "app-1", ClientID: "client-1", RPM: 100, TPM: 10000}
+	client := config.Client{ID: "client-1", Tier: "premium"}
+	key := config.APIKey{KeyHash: config.HashKey("key-1"), AppID: "app-1", Status: "active"}
+	_ = store.SaveClient(ctx, client)
+	_ = store.SaveApp(ctx, app)
+	_ = store.SaveKey(ctx, key)
+	_ = store.DeleteHeader(ctx, "header-1")
+	_ = store.DeleteRule(ctx, "rule-1")
+
+	// Seed a regional custom model residing in "us" multiregion (proxy is in "us-central1")
+	customModel := config.ModelConfig{
+		ID:          "gemini-custom-us",
+		DisplayName: "Tuned Model in US Multi-Region",
+		Location:    "us",
+		Type:        "custom",
+		Active:      true,
+	}
+	_ = store.SaveModel(ctx, customModel)
+
+	var receivedPath string
+	var mu sync.Mutex
+
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		receivedPath = r.URL.Path
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status": "success"}`))
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+	
+	// Instantiate proxy in us-central1
+	rp, _ := NewRouterProxy(store, "test-project", "us-central1")
+	rp.TokenSource = &mockTokenSource{}
+	rp.Target = backendURL
+	
+	// Create and use hostCapturingRoundTripper
+	capturer := &hostCapturingRoundTripper{Target: backendURL}
+	rp.Proxy.Transport = capturer
+
+	// Perform proxy request requesting gemini-custom-us
+	req := httptest.NewRequest("POST", "/v1/models/gemini-custom-us:generateContent?key=key-1", strings.NewReader(`{}`))
+	req.Header.Set("x-goog-api-key", "key-1")
+	rr := httptest.NewRecorder()
+
+	rp.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected proxy response code 200, got %d. Body: %s", rr.Code, rr.Body.String())
+	}
+
+	// Verify response audit headers
+	routedHeader := rr.Header().Get("X-Routed-Model")
+	if routedHeader != "gemini-custom-us" {
+		t.Errorf("expected X-Routed-Model to be 'gemini-custom-us', got %q", routedHeader)
+	}
+
+	locationHeader := rr.Header().Get("X-Routed-Model-Location")
+	if locationHeader != "us" {
+		t.Errorf("expected X-Routed-Model-Location to be 'us', got %q", locationHeader)
+	}
+
+	mu.Lock()
+	path := receivedPath
+	mu.Unlock()
+
+	// The request host should be rewritten to "us-aiplatform.googleapis.com"
+	expectedHost := "us-aiplatform.googleapis.com"
+	if capturer.CapturedHost != expectedHost {
+		t.Errorf("expected rewritten host to be %q, got %q", expectedHost, capturer.CapturedHost)
+	}
+
+	// The path location should be rewritten from "us-central1" to "us"
+	expectedPath := "/v1/projects/test-project/locations/us/publishers/google/models/gemini-custom-us:generateContent"
+	if path != expectedPath {
+		t.Errorf("expected rewritten path to be %q, got %q", expectedPath, path)
+	}
+
+	os.RemoveAll("data/local_db.json")
+}
+
+type hostCapturingRoundTripper struct {
+	Target       *url.URL
+	CapturedHost string
+}
+
+func (h *hostCapturingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	h.CapturedHost = req.Host
+	req.URL.Scheme = h.Target.Scheme
+	req.URL.Host = h.Target.Host
+	req.Host = h.Target.Host
+	return http.DefaultTransport.RoundTrip(req)
+}
+
+
 
 
 

@@ -31,4 +31,8 @@ Before you write any code or create configuration schemas, keep these rules in m
 - **Local Mocking (`LOCAL_DEV`)**: Use `LOCAL_DEV=true` with local data `data/local_db.json` when writing local tests or spinning up the proxy locally.
 - **Declarative Custom Headers**: Use `CustomHeader` configuration definitions instead of manually parsing and validating specific headers in Go code.
 
+### 4. Documentation Synchronicity
+- **Mandatory Update Rule**: You **MUST** update or append to the corresponding files under the **`/docs`** directory in the same pull request/commit whenever adding a new feature, refactoring routing schemas, or altering dashboard workflows.
+- **Maintain Tone**: Ensure all updates adhere to the crisp, terse, active, and "humanized" technical writing style of the docset.
+
 For detailed code examples and tutorials on how to implement these patterns via TDD, please open and execute the instructions in **[skills/agent_guidelines.md](skills/agent_guidelines.md)**.

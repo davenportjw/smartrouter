@@ -57,6 +57,7 @@ def send_rules_request(requested_model: str, custom_headers: dict, description: 
             # Retrieve headers returned by the smart router
             req_model = response.headers.get("X-Requested-Model", "Unknown")
             routed_model = response.headers.get("X-Routed-Model", "Unknown")
+            routed_loc = response.headers.get("X-Routed-Model-Location", "global")
             client_tier = response.headers.get("X-Client-Tier", "Unknown")
 
             # Get output text
@@ -68,6 +69,7 @@ def send_rules_request(requested_model: str, custom_headers: dict, description: 
             print(f"✅ Success!")
             print(f"👉 Requested Model : {req_model}")
             print(f"👉 Routed Model    : \033[1;32m{routed_model}\033[0m")
+            print(f"👉 Routed Location : \033[1;34m{routed_loc}\033[0m")
             print(f"👉 Client Tier      : {client_tier}")
             print(f"👉 Response Snippet: \"{text.strip()[:100].replace(chr(10), ' ')}...\"")
 

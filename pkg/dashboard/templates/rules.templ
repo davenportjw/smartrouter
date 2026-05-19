@@ -141,7 +141,7 @@ templ RulesTab(rules []config.RoutingRule) {
 	</div>
 }
 
-templ RuleModal(apps []config.App) {
+templ RuleModal(apps []config.App, activeModels []config.ModelConfig) {
 	<!-- Modal backdrop -->
 	<div id="create-rule-modal" class="relative z-50" aria-labelledby="modal-title" role="dialog" aria-modal="true">
 		<div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
@@ -233,23 +233,27 @@ templ RuleModal(apps []config.App) {
 								<div class="grid grid-cols-2 gap-4">
 									<div>
 										<label for="target_model" class="block text-xs font-medium text-gray-700">Routed Target Model</label>
-										<select name="target_model" id="target_model" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm">
-											<option value="gemini-2.5-flash">gemini-2.5-flash</option>
-											<option value="gemini-2.5-pro">gemini-2.5-pro</option>
-											<option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite</option>
-											<option value="text-embedding-004">text-embedding-004</option>
+										<select name="target_model" id="target_model" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm font-mono">
+											for _, m := range activeModels {
+												<option value={ m.ID }>{ m.DisplayName }</option>
+											}
 										</select>
 									</div>
 									<div>
 										<label for="target_location" class="block text-xs font-medium text-gray-700">Target Location (GCP)</label>
-										<input type="text" name="target_location" id="target_location" required value="us-central1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
+										<input type="text" name="target_location" id="target_location" required value="us-central1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm font-mono" />
 									</div>
 								</div>
 
 								<div class="grid grid-cols-1 gap-4">
 									<div>
 										<label for="fallback_model" class="block text-xs font-medium text-gray-700">Fallback Model (Optional)</label>
-										<input type="text" name="fallback_model" id="fallback_model" placeholder="e.g. gemini-2.5-flash" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
+										<select name="fallback_model" id="fallback_model" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm font-mono">
+											<option value="">None</option>
+											for _, m := range activeModels {
+												<option value={ m.ID }>{ m.DisplayName }</option>
+											}
+										</select>
 									</div>
 								</div>
 
