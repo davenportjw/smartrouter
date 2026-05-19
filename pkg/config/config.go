@@ -153,61 +153,7 @@ func NewConfigStore(ctx context.Context, projectID string) (*ConfigStore, error)
 	}
 	store.Client = client
 
-	// Seed production Firestore with default models if empty
-	if err := store.seedFirestoreModelsIfEmpty(ctx); err != nil {
-		log.Printf("[ConfigStore] Warning: failed to seed default Firestore models: %v", err)
-	}
-
 	return store, nil
-}
-
-func (cs *ConfigStore) seedFirestoreModelsIfEmpty(ctx context.Context) error {
-	log.Println("[ConfigStore] Verifying default foundation models in production Firestore...")
-	defaultModels := []ModelConfig{
-		{ID: "gemini-2.5-flash", DisplayName: "Gemini 2.5 Flash", Location: "global", Type: "foundation", Active: true},
-		{ID: "gemini-2.5-pro", DisplayName: "Gemini 2.5 Pro", Location: "global", Type: "foundation", Active: true},
-		{ID: "gemini-2.5-flash-lite", DisplayName: "Gemini 2.5 Flash Lite", Location: "global", Type: "foundation", Active: true},
-		{ID: "gemini-3.0-flash", DisplayName: "Gemini 3.0 Flash", Location: "global", Type: "foundation", Active: true},
-		{ID: "gemini-3.0-pro", DisplayName: "Gemini 3.0 Pro", Location: "global", Type: "foundation", Active: true},
-		{ID: "gemini-3.1-flash", DisplayName: "Gemini 3.1 Flash", Location: "global", Type: "foundation", Active: true},
-		{ID: "gemini-3.1-pro", DisplayName: "Gemini 3.1 Pro", Location: "global", Type: "foundation", Active: true},
-		{ID: "gemini-3.5-flash", DisplayName: "Gemini 3.5 Flash", Location: "us", Type: "foundation", Active: true},
-		{ID: "gemini-3.5-pro", DisplayName: "Gemini 3.5 Pro", Location: "us", Type: "foundation", Active: true},
-		{ID: "gemini-3.5-flash-lite", DisplayName: "Gemini 3.5 Flash Lite", Location: "us", Type: "foundation", Active: true},
-		{ID: "text-embedding-004", DisplayName: "Text Embedding 004", Location: "global", Type: "foundation", Active: true},
-		{ID: "multimodal-embedding-001", DisplayName: "Multimodal Embedding 001", Location: "global", Type: "foundation", Active: true},
-		{ID: "gemini-dynamic", DisplayName: "Gemini Dynamic Complexity Router", Location: "global", Type: "foundation", Active: true},
-	}
-
-	for _, m := range defaultModels {
-		docRef := cs.Client.Collection("models").Doc(m.ID)
-		snap, err := docRef.Get(ctx)
-		if err != nil {
-			// Model does not exist in Firestore, seed it!
-			_, err = docRef.Set(ctx, m)
-			if err != nil {
-				log.Printf("[ConfigStore] Failed to seed model %s: %v", m.ID, err)
-			} else {
-				log.Printf("[ConfigStore] Seeded missing model %s to Firestore", m.ID)
-			}
-		} else {
-			// Verify location and update if mismatched
-			var existing ModelConfig
-			if err := snap.DataTo(&existing); err == nil {
-				if existing.Location != m.Location {
-					existing.Location = m.Location
-					_, err = docRef.Set(ctx, existing)
-					if err != nil {
-						log.Printf("[ConfigStore] Failed to migrate model location for %s: %v", m.ID, err)
-					} else {
-						log.Printf("[ConfigStore] Migrated model location for %s to %q in Firestore", m.ID, m.Location)
-					}
-				}
-			}
-		}
-	}
-
-	return nil
 }
 
 // HashKey returns the hex-encoded SHA-256 hash of an API key.
@@ -643,21 +589,7 @@ func (cs *ConfigStore) initLocalDB() error {
 					ValuePattern: "^[a-zA-Z0-9-]+$",
 				},
 			},
-			Models: []ModelConfig{
-				{ID: "gemini-2.5-flash", DisplayName: "Gemini 2.5 Flash", Location: "global", Type: "foundation", Active: true},
-				{ID: "gemini-2.5-pro", DisplayName: "Gemini 2.5 Pro", Location: "global", Type: "foundation", Active: true},
-				{ID: "gemini-2.5-flash-lite", DisplayName: "Gemini 2.5 Flash Lite", Location: "global", Type: "foundation", Active: true},
-				{ID: "gemini-3.0-flash", DisplayName: "Gemini 3.0 Flash", Location: "global", Type: "foundation", Active: true},
-				{ID: "gemini-3.0-pro", DisplayName: "Gemini 3.0 Pro", Location: "global", Type: "foundation", Active: true},
-				{ID: "gemini-3.1-flash", DisplayName: "Gemini 3.1 Flash", Location: "global", Type: "foundation", Active: true},
-				{ID: "gemini-3.1-pro", DisplayName: "Gemini 3.1 Pro", Location: "global", Type: "foundation", Active: true},
-				{ID: "gemini-3.5-flash", DisplayName: "Gemini 3.5 Flash", Location: "us", Type: "foundation", Active: true},
-				{ID: "gemini-3.5-pro", DisplayName: "Gemini 3.5 Pro", Location: "us", Type: "foundation", Active: true},
-				{ID: "gemini-3.5-flash-lite", DisplayName: "Gemini 3.5 Flash Lite", Location: "us", Type: "foundation", Active: true},
-				{ID: "text-embedding-004", DisplayName: "Text Embedding 004", Location: "global", Type: "foundation", Active: true},
-				{ID: "multimodal-embedding-001", DisplayName: "Multimodal Embedding 001", Location: "global", Type: "foundation", Active: true},
-				{ID: "gemini-dynamic", DisplayName: "Gemini Dynamic Complexity Router", Location: "global", Type: "foundation", Active: true},
-			},
+			Models: []ModelConfig{},
 		}
 
 		data, err := json.MarshalIndent(db, "", "  ")
@@ -757,30 +689,8 @@ func (cs *ConfigStore) initLocalDB() error {
 	}
 	// Auto-migrate existing database with empty models
 	if len(db.Models) == 0 {
-		db.Models = []ModelConfig{
-			{ID: "gemini-2.5-flash", DisplayName: "Gemini 2.5 Flash", Location: "global", Type: "foundation", Active: true},
-			{ID: "gemini-2.5-pro", DisplayName: "Gemini 2.5 Pro", Location: "global", Type: "foundation", Active: true},
-			{ID: "gemini-2.5-flash-lite", DisplayName: "Gemini 2.5 Flash Lite", Location: "global", Type: "foundation", Active: true},
-			{ID: "gemini-3.0-flash", DisplayName: "Gemini 3.0 Flash", Location: "global", Type: "foundation", Active: true},
-			{ID: "gemini-3.0-pro", DisplayName: "Gemini 3.0 Pro", Location: "global", Type: "foundation", Active: true},
-			{ID: "gemini-3.1-flash", DisplayName: "Gemini 3.1 Flash", Location: "global", Type: "foundation", Active: true},
-			{ID: "gemini-3.1-pro", DisplayName: "Gemini 3.1 Pro", Location: "global", Type: "foundation", Active: true},
-			{ID: "gemini-3.5-flash", DisplayName: "Gemini 3.5 Flash", Location: "us", Type: "foundation", Active: true},
-			{ID: "gemini-3.5-pro", DisplayName: "Gemini 3.5 Pro", Location: "us", Type: "foundation", Active: true},
-			{ID: "gemini-3.5-flash-lite", DisplayName: "Gemini 3.5 Flash Lite", Location: "us", Type: "foundation", Active: true},
-			{ID: "text-embedding-004", DisplayName: "Text Embedding 004", Location: "global", Type: "foundation", Active: true},
-			{ID: "multimodal-embedding-001", DisplayName: "Multimodal Embedding 001", Location: "global", Type: "foundation", Active: true},
-			{ID: "gemini-dynamic", DisplayName: "Gemini Dynamic Complexity Router", Location: "global", Type: "foundation", Active: true},
-		}
+		db.Models = []ModelConfig{}
 		dirty = true
-	}
-
-	// Ensure existing models locations are correct (e.g. gemini-3.5 models updated to "us")
-	for i, m := range db.Models {
-		if strings.HasPrefix(m.ID, "gemini-3.5-") && m.Location == "global" {
-			db.Models[i].Location = "us"
-			dirty = true
-		}
 	}
 
 	if dirty {

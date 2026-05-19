@@ -58,6 +58,17 @@ func main() {
 	// Initialize Dashboard Controller
 	dashController := dashboard.NewDashboardController(configStore, projectID, location)
 
+	// Verify and bootstrap models registry on first start if empty
+	modelsList, err := configStore.GetAllModels(ctx)
+	if err == nil && len(modelsList) == 0 {
+		log.Println("[Discovery] Models registry is empty. Invoking first-start dynamic bootstrap discovery...")
+		if err := dashController.DiscoverAndCacheModels(ctx); err != nil {
+			log.Printf("[Discovery] Warning: first-start dynamic bootstrap discovery failed: %v", err)
+		} else {
+			log.Println("[Discovery] First-start dynamic bootstrap discovery completed successfully.")
+		}
+	}
+
 	mux := http.NewServeMux()
 
 	// Gemini API Endpoints (routed through the proxy)

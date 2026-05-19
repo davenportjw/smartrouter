@@ -2067,6 +2067,356 @@ func TestProxyIncompatibleLocationRouting(t *testing.T) {
 	os.RemoveAll("data/local_db.json")
 }
 
+func TestPublisherModelsDiscovery(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+
+	ctx := context.Background()
+	store, err := config.NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to initialize config store: %v", err)
+	}
+
+	// Seed initial App, Client, Key
+	app := config.App{ID: "app-1", ClientID: "client-1", RPM: 100, TPM: 10000}
+	client := config.Client{ID: "client-1", Tier: "premium"}
+	key := config.APIKey{KeyHash: config.HashKey("key-1"), AppID: "app-1", Status: "active"}
+	_ = store.SaveClient(ctx, client)
+	_ = store.SaveApp(ctx, app)
+	_ = store.SaveKey(ctx, key)
+	_ = store.DeleteHeader(ctx, "header-1")
+	_ = store.DeleteRule(ctx, "rule-1")
+
+	// Remove default models in local dev so we start clean
+	models, _ := store.GetAllModels(ctx)
+	for _, m := range models {
+		_ = store.DeleteModel(ctx, m.ID)
+	}
+
+	// Instantiate dashboard controller
+	dash := dashboard.NewDashboardController(store, "test-project", "us-central1")
+
+	// Mock Vertex AI REST endpoints:
+	// 1. return custom models (empty list)
+	// 2. return endpoints (empty list)
+	// 3. return publisher models containing publishers/google/models/gemini-3.5-flash
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if strings.Contains(r.URL.Path, "/publishers/google/models") {
+			w.Write([]byte(`{
+				"publisherModels": [
+					{
+						"name": "publishers/google/models/gemini-3.5-flash",
+						"displayName": "Gemini 3.5 Flash (Mocked)"
+					}
+				]
+			}`))
+		} else {
+			w.Write([]byte(`{}`))
+		}
+	}))
+	defer mockServer.Close()
+
+	mockServerURL, _ := url.Parse(mockServer.URL)
+	dash.HTTPClient = &http.Client{
+		Transport: &mockGCPRoundTripper{Target: mockServerURL},
+	}
+
+	// Trigger refresh models
+	wRec := httptest.NewRecorder()
+	reqRefresh := httptest.NewRequest("POST", "/admin/models/refresh", nil)
+	dash.RefreshModels(wRec, reqRefresh)
+
+	if wRec.Code != http.StatusSeeOther {
+		t.Fatalf("expected 303 redirect from RefreshModels, got %d", wRec.Code)
+	}
+
+	// Fetch newly discovered/cached models in the store
+	refreshedModels, err := store.GetAllModels(ctx)
+	if err != nil {
+		t.Fatalf("failed to load refreshed models: %v", err)
+	}
+
+	var found *config.ModelConfig
+	for _, m := range refreshedModels {
+		if m.ID == "gemini-3.5-flash" {
+			mCopy := m
+			found = &mCopy
+			break
+		}
+	}
+
+	if found == nil {
+		t.Fatalf("expected gemini-3.5-flash to be dynamically discovered and cached in store")
+	}
+
+	if found.DisplayName != "Gemini 3.5 Flash (Mocked)" {
+		t.Errorf("expected display name 'Gemini 3.5 Flash (Mocked)', got %q", found.DisplayName)
+	}
+
+	// The location should be resolved as compatible/coerced (in this case, matched)
+	if found.Location != "us-central1" {
+		t.Errorf("expected model location 'us-central1', got %q", found.Location)
+	}
+
+	if found.Type != "foundation" {
+		t.Errorf("expected model type 'foundation', got %q", found.Type)
+	}
+
+	if !found.Active {
+		t.Errorf("newly discovered foundation model should be active by default")
+	}
+
+	os.RemoveAll("data/local_db.json")
+}
+
+func TestFirstStartDiscoveryBootstrap(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+
+	ctx := context.Background()
+	store, err := config.NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to initialize config store: %v", err)
+	}
+
+	// Verify that the pre-seeded models list starts as empty under our new logic
+	models, err := store.GetAllModels(ctx)
+	if err != nil {
+		t.Fatalf("failed to fetch models: %v", err)
+	}
+	if len(models) != 0 {
+		t.Fatalf("expected models registry to start as empty, got %d models", len(models))
+	}
+
+	// Instantiate dashboard controller
+	dash := dashboard.NewDashboardController(store, "test-project", "us-central1")
+
+	// Mock Vertex AI REST endpoints
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if strings.Contains(r.URL.Path, "/publishers/google/models") {
+			w.Write([]byte(`{
+				"publisherModels": [
+					{
+						"name": "publishers/google/models/gemini-2.5-pro",
+						"displayName": "Gemini 2.5 Pro"
+					}
+				]
+			}`))
+		} else {
+			w.Write([]byte(`{}`))
+		}
+	}))
+	defer mockServer.Close()
+
+	mockServerURL, _ := url.Parse(mockServer.URL)
+	dash.HTTPClient = &http.Client{
+		Transport: &mockGCPRoundTripper{Target: mockServerURL},
+	}
+
+	// Simulate main.go first start bootstrap logic
+	if len(models) == 0 {
+		if err := dash.DiscoverAndCacheModels(ctx); err != nil {
+			t.Fatalf("failed to run DiscoverAndCacheModels bootstrap: %v", err)
+		}
+	}
+
+	// Verify that models were dynamically discovered and cached
+	bootstrappedModels, err := store.GetAllModels(ctx)
+	if err != nil {
+		t.Fatalf("failed to fetch bootstrapped models: %v", err)
+	}
+
+	if len(bootstrappedModels) == 0 {
+		t.Fatalf("expected models registry to be bootstrapped, got 0 models")
+	}
+
+	var found *config.ModelConfig
+	for _, m := range bootstrappedModels {
+		if m.ID == "gemini-2.5-pro" {
+			mCopy := m
+			found = &mCopy
+			break
+		}
+	}
+
+	if found == nil {
+		t.Fatalf("expected gemini-2.5-pro to be bootstrapped in registry")
+	}
+
+	if found.Location != "us-central1" {
+		t.Errorf("expected bootstrapped model location 'us-central1', got %q", found.Location)
+	}
+
+	if found.Type != "foundation" {
+		t.Errorf("expected bootstrapped model type 'foundation', got %q", found.Type)
+	}
+
+	if !found.Active {
+		t.Errorf("bootstrapped foundation model should be active by default")
+	}
+
+	os.RemoveAll("data/local_db.json")
+}
+
+func TestDiscoveryRegistryObsoleteDisabling(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+
+	ctx := context.Background()
+	store, err := config.NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to initialize config store: %v", err)
+	}
+
+	// 1. Seed obsolete/placeholder foundation models to be soft-disabled
+	fake1 := config.ModelConfig{ID: "gemini-3.0-flash", DisplayName: "Gemini 3.0 Flash", Location: "global", Type: "foundation", Active: true}
+	fake2 := config.ModelConfig{ID: "gemini-3.1-pro", DisplayName: "Gemini 3.1 Pro", Location: "global", Type: "foundation", Active: true}
+	
+	// 2. Seed standard custom model that should NOT be altered
+	custom := config.ModelConfig{ID: "my-custom-endpoint", DisplayName: "My Custom Tuned Endpoint", Location: "us-central1", Type: "custom", Active: true}
+
+	_ = store.SaveModel(ctx, fake1)
+	_ = store.SaveModel(ctx, fake2)
+	_ = store.SaveModel(ctx, custom)
+
+	// Instantiate dashboard controller
+	dash := dashboard.NewDashboardController(store, "test-project", "us-central1")
+
+	// Mock Vertex AI REST publishers API to return ONLY gemini-2.5-flash as the active model
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if strings.Contains(r.URL.Path, "/publishers/google/models") {
+			w.Write([]byte(`{
+				"publisherModels": [
+					{
+						"name": "publishers/google/models/gemini-2.5-flash",
+						"displayName": "Gemini 2.5 Flash"
+					}
+				]
+			}`))
+		} else {
+			w.Write([]byte(`{}`))
+		}
+	}))
+	defer mockServer.Close()
+
+	mockServerURL, _ := url.Parse(mockServer.URL)
+	dash.HTTPClient = &http.Client{
+		Transport: &mockGCPRoundTripper{Target: mockServerURL},
+	}
+
+	// Trigger dynamic discovery
+	err = dash.DiscoverAndCacheModels(ctx)
+	if err != nil {
+		t.Fatalf("failed to run DiscoverAndCacheModels: %v", err)
+	}
+
+	// Load all models present in the store after discovery completes
+	models, err := store.GetAllModels(ctx)
+	if err != nil {
+		t.Fatalf("failed to fetch models: %v", err)
+	}
+
+	var m25Flash, m30Flash, m31Pro, mCustom *config.ModelConfig
+	for _, m := range models {
+		mCopy := m
+		switch m.ID {
+		case "gemini-2.5-flash":
+			m25Flash = &mCopy
+		case "gemini-3.0-flash":
+			m30Flash = &mCopy
+		case "gemini-3.1-pro":
+			m31Pro = &mCopy
+		case "my-custom-endpoint":
+			mCustom = &mCopy
+		}
+	}
+
+	// Assertions:
+	if m25Flash == nil {
+		t.Errorf("expected gemini-2.5-flash to be dynamically discovered and added")
+	}
+	if mCustom == nil {
+		t.Errorf("expected custom model my-custom-endpoint to be preserved")
+	}
+
+	// Obsolete models must STILL EXIST in the database (soft-disabled, not deleted)
+	if m30Flash == nil {
+		t.Fatalf("expected obsolete model gemini-3.0-flash to remain in store, but it was deleted")
+	}
+	if m31Pro == nil {
+		t.Fatalf("expected obsolete model gemini-3.1-pro to remain in store, but it was deleted")
+	}
+
+	// They must be soft-disabled (Active = false)
+	if m30Flash.Active {
+		t.Errorf("expected obsolete gemini-3.0-flash to be disabled (Active=false), but it was active")
+	}
+	if m31Pro.Active {
+		t.Errorf("expected obsolete gemini-3.1-pro to be disabled (Active=false), but it was active")
+	}
+
+	// Their DisplayNames must be marked Obsolete
+	if m30Flash.DisplayName != "Gemini 3.0 Flash (Obsolete)" {
+		t.Errorf("expected display name 'Gemini 3.0 Flash (Obsolete)', got %q", m30Flash.DisplayName)
+	}
+	if m31Pro.DisplayName != "Gemini 3.1 Pro (Obsolete)" {
+		t.Errorf("expected display name 'Gemini 3.1 Pro (Obsolete)', got %q", m31Pro.DisplayName)
+	}
+
+	os.RemoveAll("data/local_db.json")
+}
+
+func TestStaticLocationsResolution(t *testing.T) {
+	ctx := context.Background()
+
+	// Scenario A: Deployed in specific region "europe-west9"
+	dash1 := dashboard.NewDashboardController(nil, "test-project", "europe-west9")
+	locs1, err := dash1.ServeLocationsTestHelper(ctx) // we will add a helper or invoke directly if exported
+	if err != nil {
+		t.Fatalf("failed to fetch locations: %v", err)
+	}
+
+	if len(locs1) != 3 {
+		t.Fatalf("expected exactly 3 locations, got %d", len(locs1))
+	}
+
+	expected1 := map[string]bool{
+		"europe-west9": true,  // Active
+		"eu":           false, // Inactive
+		"global":       false, // Inactive
+	}
+
+	for _, l := range locs1 {
+		isActive, ok := expected1[l.ID]
+		if !ok {
+			t.Errorf("unexpected resolved location: %q", l.ID)
+		}
+		if l.Active != isActive {
+			t.Errorf("expected location %s Active status to be %t, got %t", l.ID, isActive, l.Active)
+		}
+	}
+
+	// Scenario B: Location is empty, should default to us-central1, us, global
+	dash2 := dashboard.NewDashboardController(nil, "test-project", "")
+	locs2, _ := dash2.ServeLocationsTestHelper(ctx)
+
+	expected2 := map[string]bool{
+		"us-central1": true,
+		"us":          false,
+		"global":      false,
+	}
+
+	for _, l := range locs2 {
+		isActive, ok := expected2[l.ID]
+		if !ok {
+			t.Errorf("unexpected resolved location: %q", l.ID)
+		}
+		if l.Active != isActive {
+			t.Errorf("expected default location %s Active status to be %t, got %t", l.ID, isActive, l.Active)
+		}
+	}
+}
+
 
 
 

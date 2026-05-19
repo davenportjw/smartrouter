@@ -51,7 +51,7 @@ func TestIsValidModelName(t *testing.T) {
 	}
 }
 
-func TestDefaultModelSeeding(t *testing.T) {
+func TestFirstStartModelSeedingEmpty(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
 	defer os.RemoveAll("data/local_db.json")
 
@@ -66,19 +66,7 @@ func TestDefaultModelSeeding(t *testing.T) {
 		t.Fatalf("failed to retrieve seeded models: %v", err)
 	}
 
-	// We expect at least the seeded default models (5 standard gemini-2.5, 7 standard gemini-3.x, plus 2 embeddings = 12 models)
-	expectedSeededCount := 12
-	if len(models) < expectedSeededCount {
-		t.Errorf("expected at least %d seeded models, got %d", expectedSeededCount, len(models))
-	}
-
-	// Assert that all seeded models are valid and active
-	for _, m := range models {
-		if !m.Active {
-			t.Errorf("expected seeded model %s to be active, but it was inactive", m.ID)
-		}
-		if !IsValidModelName(m.ID) {
-			t.Errorf("seeded model %s has an invalid name code", m.ID)
-		}
+	if len(models) != 0 {
+		t.Errorf("expected 0 seeded models on first start before discovery, got %d", len(models))
 	}
 }

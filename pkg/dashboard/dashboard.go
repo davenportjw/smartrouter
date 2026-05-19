@@ -637,25 +637,20 @@ func (dc *DashboardController) ServeModels(w http.ResponseWriter, r *http.Reques
 	_ = templates.Layout("GCP Models", "models", content).Render(ctx, w)
 }
 
-// RefreshModels queries GCP's Vertex AI API for the local location and parent multiregion, loading new models.
-func (dc *DashboardController) RefreshModels(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	ctx := r.Context()
-
+// DiscoverAndCacheModels queries Vertex AI APIs and caches all discovered models and endpoints.
+func (dc *DashboardController) DiscoverAndCacheModels(ctx context.Context) error {
 	// Fetch currently configured models to avoid resetting their active statuses
 	currentModels, err := dc.Store.GetAllModels(ctx)
 	if err != nil {
-		log.Printf("[Dashboard] GetAllModels failed: %v", err)
-		http.Error(w, "Database connection failure", http.StatusInternalServerError)
-		return
+		return fmt.Errorf("GetAllModels failed: %w", err)
 	}
 	activeStatus := make(map[string]bool)
 	for _, m := range currentModels {
 		activeStatus[m.ID] = m.Active
 	}
+
+	discoveredFoundationIDs := make(map[string]bool)
+	discoveredModelsMap := make(map[string]config.ModelConfig)
 
 	var locationsToFetch []string
 	locations, fetchLocErr := dc.fetchLocations(ctx)
@@ -672,9 +667,12 @@ func (dc *DashboardController) RefreshModels(w http.ResponseWriter, r *http.Requ
 	}
 
 	for _, loc := range locationsToFetch {
-		log.Printf("[Dashboard] Refreshing discovered models from Vertex AI in location: %q...", loc)
+		if loc == "global" {
+			continue
+		}
+		log.Printf("[Discovery] Refreshing discovered models from Vertex AI in location: %q...", loc)
 		
-		// Fetch custom models from API
+		// 1. Fetch custom models from API
 		custom, err := dc.fetchCustomModels(ctx, loc)
 		if err == nil {
 			for _, m := range custom {
@@ -690,19 +688,31 @@ func (dc *DashboardController) RefreshModels(w http.ResponseWriter, r *http.Requ
 					modelLoc = config.GetSmallestCompatibleLocation(loc, extLoc)
 				}
 
-				_ = dc.Store.SaveModel(ctx, config.ModelConfig{
+				// Resolve smallest location against previous iterations or pre-existing database models
+				if prev, alreadyDiscovered := discoveredModelsMap[m.Name]; alreadyDiscovered {
+					modelLoc = config.GetSmallestCompatibleLocation(prev.Location, modelLoc)
+				} else {
+					for _, existingModel := range currentModels {
+						if existingModel.ID == m.Name && existingModel.Location != "" {
+							modelLoc = config.GetSmallestCompatibleLocation(existingModel.Location, modelLoc)
+							break
+						}
+					}
+				}
+
+				discoveredModelsMap[m.Name] = config.ModelConfig{
 					ID:          m.Name,
 					DisplayName: m.DisplayName,
 					Location:    modelLoc,
 					Type:        "custom",
 					Active:      active,
-				})
+				}
 			}
 		} else {
-			log.Printf("[Dashboard] fetchCustomModels failed for loc %q: %v", loc, err)
+			log.Printf("[Discovery] fetchCustomModels failed for loc %q: %v", loc, err)
 		}
 
-		// Fetch endpoints from API
+		// 2. Fetch endpoints from API
 		endpoints, err := dc.fetchEndpoints(ctx, loc)
 		if err == nil {
 			for _, ep := range endpoints {
@@ -721,17 +731,107 @@ func (dc *DashboardController) RefreshModels(w http.ResponseWriter, r *http.Requ
 					modelLoc = config.GetSmallestCompatibleLocation(loc, extLoc)
 				}
 
-				_ = dc.Store.SaveModel(ctx, config.ModelConfig{
+				// Resolve smallest location against previous iterations or pre-existing database models
+				if prev, alreadyDiscovered := discoveredModelsMap[ep.Name]; alreadyDiscovered {
+					modelLoc = config.GetSmallestCompatibleLocation(prev.Location, modelLoc)
+				} else {
+					for _, existingModel := range currentModels {
+						if existingModel.ID == ep.Name && existingModel.Location != "" {
+							modelLoc = config.GetSmallestCompatibleLocation(existingModel.Location, modelLoc)
+							break
+						}
+					}
+				}
+
+				discoveredModelsMap[ep.Name] = config.ModelConfig{
 					ID:          ep.Name,
 					DisplayName: displayName,
 					Location:    modelLoc,
 					Type:        "endpoint",
 					Active:      active,
-				})
+				}
 			}
 		} else {
-			log.Printf("[Dashboard] fetchEndpoints failed for loc %q: %v", loc, err)
+			log.Printf("[Discovery] fetchEndpoints failed for loc %q: %v", loc, err)
 		}
+
+		// 3. Fetch Google foundation/publisher models from API
+		pubModels, err := dc.fetchPublisherModels(ctx, loc)
+		if err == nil {
+			for _, pm := range pubModels {
+				if !config.IsValidModelName(pm.Name) {
+					continue
+				}
+				discoveredFoundationIDs[pm.Name] = true
+
+				active, exists := activeStatus[pm.Name]
+				if !exists {
+					active = true // Default new foundation models to active
+				}
+
+				// Extract specific location and resolve smallest compatible location
+				modelLoc := loc
+				if extLoc := config.ExtractLocationFromResourceName(pm.Name); extLoc != "" {
+					modelLoc = config.GetSmallestCompatibleLocation(loc, extLoc)
+				}
+
+				// Resolve smallest location against previous iterations or pre-existing database models
+				if prev, alreadyDiscovered := discoveredModelsMap[pm.Name]; alreadyDiscovered {
+					modelLoc = config.GetSmallestCompatibleLocation(prev.Location, modelLoc)
+				} else {
+					for _, existingModel := range currentModels {
+						if existingModel.ID == pm.Name && existingModel.Location != "" {
+							modelLoc = config.GetSmallestCompatibleLocation(existingModel.Location, modelLoc)
+							break
+						}
+					}
+				}
+
+				discoveredModelsMap[pm.Name] = config.ModelConfig{
+					ID:          pm.Name,
+					DisplayName: pm.DisplayName,
+					Location:    modelLoc,
+					Type:        "foundation",
+					Active:      active,
+				}
+			}
+		} else {
+			log.Printf("[Discovery] fetchPublisherModels failed for loc %q: %v", loc, err)
+		}
+	}
+
+	// Save all final resolved discovered models to the database
+	for _, modelToSave := range discoveredModelsMap {
+		_ = dc.Store.SaveModel(ctx, modelToSave)
+	}
+
+	// Soft-disable and mark obsolete for foundation models no longer returned by publishers API
+	for _, m := range currentModels {
+		if m.Type == "foundation" && !discoveredFoundationIDs[m.ID] && m.ID != "gemini-dynamic" {
+			log.Printf("[Discovery] Soft-disabling obsolete foundation model %s...", m.ID)
+			m.Active = false
+			if !strings.Contains(m.DisplayName, " (Obsolete)") {
+				m.DisplayName = m.DisplayName + " (Obsolete)"
+			}
+			_ = dc.Store.SaveModel(ctx, m)
+		}
+	}
+
+	return nil
+}
+
+// RefreshModels queries GCP's Vertex AI API for the local location and parent multiregion, loading new models.
+func (dc *DashboardController) RefreshModels(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	ctx := r.Context()
+
+	if err := dc.DiscoverAndCacheModels(ctx); err != nil {
+		log.Printf("[Dashboard] DiscoverAndCacheModels failed: %v", err)
+		http.Error(w, "Failed to discover models from Google Cloud", http.StatusInternalServerError)
+		return
 	}
 
 	// Redirect back to the models administration screen
@@ -884,25 +984,33 @@ type gcpEndpointsResponse struct {
 }
 
 func (dc *DashboardController) fetchLocations(ctx context.Context) ([]templates.LocationInfo, error) {
-	url := fmt.Sprintf("https://%s-aiplatform.googleapis.com/v1/projects/%s/locations", dc.Location, dc.ProjectID)
-	body, err := dc.gcpGet(ctx, url)
-	if err != nil {
-		return nil, err
-	}
-
-	var resp gcpLocationsResponse
-	if err := json.Unmarshal(body, &resp); err != nil {
-		return nil, err
+	locService := dc.Location
+	if locService == "" {
+		locService = "us-central1"
 	}
 
 	var list []templates.LocationInfo
-	for _, l := range resp.Locations {
+	list = append(list, templates.LocationInfo{
+		ID:     locService,
+		Name:   locService,
+		Active: true,
+	})
+
+	multiReg := config.GetMultiRegionParent(locService)
+	if multiReg != "" {
 		list = append(list, templates.LocationInfo{
-			ID:     l.LocationID,
-			Name:   l.LocationID,
-			Active: l.LocationID == dc.Location,
+			ID:     multiReg,
+			Name:   multiReg,
+			Active: false,
 		})
 	}
+
+	list = append(list, templates.LocationInfo{
+		ID:     "global",
+		Name:   "global",
+		Active: false,
+	})
+
 	return list, nil
 }
 
@@ -969,6 +1077,43 @@ func (dc *DashboardController) fetchEndpoints(ctx context.Context, loc string) (
 			DisplayName:    e.DisplayName,
 			CreateTime:     e.CreateTime,
 			DeployedModels: deployedModels,
+		})
+	}
+	return list, nil
+}
+
+type gcpPublisherModel struct {
+	Name        string `json:"name"`
+	DisplayName string `json:"displayName"`
+}
+
+type gcpPublisherModelsResponse struct {
+	PublisherModels []gcpPublisherModel `json:"publisherModels"`
+}
+
+func (dc *DashboardController) fetchPublisherModels(ctx context.Context, loc string) ([]templates.CustomModelInfo, error) {
+	url := fmt.Sprintf("https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models", loc, dc.ProjectID, loc)
+	body, err := dc.gcpGet(ctx, url)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp gcpPublisherModelsResponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, err
+	}
+
+	var list []templates.CustomModelInfo
+	for _, m := range resp.PublisherModels {
+		parts := strings.Split(m.Name, "/")
+		modelName := parts[len(parts)-1]
+
+		list = append(list, templates.CustomModelInfo{
+			Name:            modelName,
+			DisplayName:     m.DisplayName,
+			Version:         "",
+			CreateTime:      "",
+			PublicModelName: modelName,
 		})
 	}
 	return list, nil
@@ -2114,4 +2259,9 @@ func (dc *DashboardController) SaveComplexitySettings(w http.ResponseWriter, r *
 	}
 
 	http.Redirect(w, r, "/admin/complexity", http.StatusSeeOther)
+}
+
+// ServeLocationsTestHelper is an exported test helper wrapper to execute fetchLocations in unit tests.
+func (dc *DashboardController) ServeLocationsTestHelper(ctx context.Context) ([]templates.LocationInfo, error) {
+	return dc.fetchLocations(ctx)
 }
