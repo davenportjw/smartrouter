@@ -32,3 +32,17 @@ data/local_db.json
 # IDE settings
 .idea/
 .vscode/
+
+# Python & CPython compiler artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Python environments
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+

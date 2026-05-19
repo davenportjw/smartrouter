@@ -169,6 +169,19 @@ We provide a repeatable capability audit skill file at [skills/compatibility_aud
 
 ---
 
+## 🔌 Deployed Client Examples & Integrations
+
+We provide production-ready, fully containerized client service templates deployed on **Google Cloud Run** that demonstrate how to connect to and call the Gemini Smart Router using the most cost-effective model (`gemini-2.5-flash-lite`):
+
+| Example | Type | Auth Protocol | Key Security | Best Use Case |
+| :--- | :--- | :--- | :--- | :--- |
+| **[API Key Integration](examples/cloudrun-apikey/)** | Microservice | HTTP Header (`x-goog-api-key`) | Static API Key in Env / Secrets | Traditional client apps, legacy services, external SaaS integrations. |
+| **[Service Account IAM](examples/cloudrun-serviceaccount/)** | Microservice | Google OIDC Token (`Authorization: Bearer`) | Zero-Key IAM (Metadata Server) | Secure internal workloads, cloud native microservices, auditable audit trails. |
+
+For complete guides on app registration, configuration limits, deployment scripts, and payload schemas, please refer directly to the respective template directories.
+
+---
+
 ## 🛠️ Troubleshooting
 
 ### 1. `identitytoolkit` API Errors
