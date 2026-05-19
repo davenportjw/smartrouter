@@ -1,6 +1,6 @@
 # 💻 Local Development Guide
 
-Spin up the Gemini Smart Router locally for rapid testing, component refactoring, and dynamic rule evaluation.
+Spin up the Smart Router locally for rapid testing, component refactoring, and dynamic rule evaluation.
 
 ---
 

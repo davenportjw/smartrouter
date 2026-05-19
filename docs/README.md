@@ -1,6 +1,6 @@
-# 🌌 Gemini Smart Router Documentation
+# 🌌 Smart Router Documentation
 
-Welcome to the Gemini Smart Router docset. Use this high-performance, Firebase-secured drop-in proxy on Google Cloud Run to manage API keys, rate limits, and dynamic routing for upstream Gemini and Vertex AI workloads.
+Welcome to the Smart Router docset. Use this high-performance, Firebase-secured drop-in proxy on Google Cloud Run to manage API keys, rate limits, and dynamic routing for upstream Gemini and Vertex AI workloads.
 
 ---
 

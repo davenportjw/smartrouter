@@ -20,9 +20,10 @@ func TestIsValidModelName(t *testing.T) {
 		{"Gemini 3.1 Pro", "gemini-3.1-pro", true},
 		{"Gemini 3.5 Flash-Lite", "gemini-3.5-flash-lite", true},
 		
-		// Valid Embeddings
+		// Valid Embeddings and Virtual Router
 		{"Text Embedding 004", "text-embedding-004", true},
 		{"Multimodal Embedding 001", "multimodal-embedding-001", true},
+		{"Gemini Dynamic Virtual Router", "gemini-dynamic", true},
 
 		// Valid Custom/Tuned Model and Endpoint paths
 		{"Valid Tuned Path", "projects/my-project/locations/us-central1/models/my-custom-model", true},

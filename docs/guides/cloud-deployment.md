@@ -1,6 +1,6 @@
 # 🚀 Cloud Run Deployment Manual
 
-The Gemini Smart Router is designed for highly durable, containerized execution on **Google Cloud Run**. Deployment is fully automated using a single wrapper script and Terraform.
+The Smart Router is designed for highly durable, containerized execution on **Google Cloud Run**. Deployment is fully automated using a single wrapper script and Terraform.
 
 ---
 
@@ -46,7 +46,7 @@ The automated script performs the following sequential phases:
 Instead of forcing manual Console registration, `deploy.sh` leverages your active Google authentication token to:
 1. Query Google Firebase Management APIs to check if Firebase is linked to the project.
 2. If missing, programmatically enables and links Firebase.
-3. Scans for an existing registered Web App named `Gemini Router Admin`. If missing, it programmatically registers it.
+3. Scans for an existing registered Web App named `Smart Router Admin`. If missing, it programmatically registers it.
 4. Extracts Web Client configuration parameters and automatically writes them to `.env` (e.g. `FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, etc.).
 
 ### Phase 3: Infrastructure Provisioning (Terraform)

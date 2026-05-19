@@ -1,6 +1,6 @@
 # 🗂️ Administrative Dashboard Overview
 
-The Gemini Smart Router includes an elegant, compiled HTMX-powered administrative control panel accessible at `/admin`. Operators use this dashboard to manage applications, provision keys, configure declarative request routing, and audit throughput costs in real time.
+The Smart Router includes an elegant, compiled HTMX-powered administrative control panel accessible at `/admin`. Operators use this dashboard to manage applications, provision keys, configure declarative request routing, and audit throughput costs in real time.
 
 ---
 

@@ -40,14 +40,14 @@ func Login(config FirebaseConfig) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\" class=\"h-full bg-gray-50\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Sign In - Gemini Smart Router</title><script src=\"https://cdn.tailwindcss.com\"></script><link href=\"https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap\" rel=\"stylesheet\"><!-- Firebase JS SDK v9+ (using compat for simple CDN injection) --><script src=\"https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js\"></script><script src=\"https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js\"></script><style>\n\t\t\t\tbody {\n\t\t\t\t\tfont-family: 'Google Sans', sans-serif;\n\t\t\t\t}\n\t\t\t</style></head><body class=\"h-full flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-gray-50\"><div class=\"sm:mx-auto sm:w-full sm:max-w-md\"><!-- Stylized Logo --><div class=\"flex justify-center text-3xl font-extrabold tracking-tight\"><span class=\"text-blue-600\">G</span> <span class=\"text-red-500\">e</span> <span class=\"text-yellow-500\">m</span> <span class=\"text-blue-600\">i</span> <span class=\"text-green-500\">n</span> <span class=\"text-red-500\">i</span> <span class=\"text-gray-700 ml-2\">Smart Router</span></div><h2 class=\"mt-6 text-center text-sm font-medium text-gray-500\">Administrative Console</h2></div><div class=\"mt-8 sm:mx-auto sm:w-full sm:max-w-md\"><div class=\"bg-white py-8 px-4 shadow-md sm:rounded-lg sm:px-10 border border-gray-200\"><div class=\"space-y-6\"><div><h3 class=\"text-lg font-medium text-gray-900 text-center\">Sign In</h3><p class=\"mt-1 text-xs text-gray-500 text-center\">Authorized administration access only.</p></div><!-- Error alert box (hidden by default) --><div id=\"error-box\" class=\"hidden rounded-md bg-red-50 p-4\"><div class=\"flex\"><div class=\"flex-shrink-0\"><svg class=\"h-5 w-5 text-red-400\" viewBox=\"0 0 20 20\" fill=\"currentColor\" aria-hidden=\"true\"><path fill-rule=\"evenodd\" d=\"M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z\" clip-rule=\"evenodd\"></path></svg></div><div class=\"ml-3\"><p id=\"error-message\" class=\"text-sm font-medium text-red-800\"></p></div></div></div><!-- Hidden config element to pass Go config fields to Javascript safely --><div id=\"firebase-config\" class=\"hidden\" data-api-key=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\" class=\"h-full bg-gray-50\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Sign In - Smart Router</title><script src=\"https://cdn.tailwindcss.com\"></script><link href=\"https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap\" rel=\"stylesheet\"><!-- Firebase JS SDK v9+ (using compat for simple CDN injection) --><script src=\"https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js\"></script><script src=\"https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js\"></script><style>\n\t\t\t\tbody {\n\t\t\t\t\tfont-family: 'Google Sans', sans-serif;\n\t\t\t\t}\n\t\t\t</style></head><body class=\"h-full flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-gray-50\"><div class=\"sm:mx-auto sm:w-full sm:max-w-md\"><!-- Stylized Logo --><div class=\"flex justify-center text-3xl font-extrabold tracking-tight\"><span class=\"bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent\">Smart Router</span></div><h2 class=\"mt-6 text-center text-sm font-medium text-gray-500\">Administrative Console</h2></div><div class=\"mt-8 sm:mx-auto sm:w-full sm:max-w-md\"><div class=\"bg-white py-8 px-4 shadow-md sm:rounded-lg sm:px-10 border border-gray-200\"><div class=\"space-y-6\"><div><h3 class=\"text-lg font-medium text-gray-900 text-center\">Sign In</h3><p class=\"mt-1 text-xs text-gray-500 text-center\">Authorized administration access only.</p></div><!-- Error alert box (hidden by default) --><div id=\"error-box\" class=\"hidden rounded-md bg-red-50 p-4\"><div class=\"flex\"><div class=\"flex-shrink-0\"><svg class=\"h-5 w-5 text-red-400\" viewBox=\"0 0 20 20\" fill=\"currentColor\" aria-hidden=\"true\"><path fill-rule=\"evenodd\" d=\"M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z\" clip-rule=\"evenodd\"></path></svg></div><div class=\"ml-3\"><p id=\"error-message\" class=\"text-sm font-medium text-red-800\"></p></div></div></div><!-- Hidden config element to pass Go config fields to Javascript safely --><div id=\"firebase-config\" class=\"hidden\" data-api-key=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.ResolveAttributeValue(config.APIKey)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/login.templ`, Line: 77, Col: 35}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/login.templ`, Line: 71, Col: 35}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 		if templ_7745c5c3_Err != nil {
@@ -60,7 +60,7 @@ func Login(config FirebaseConfig) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(config.AuthDomain)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/login.templ`, Line: 78, Col: 43}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/login.templ`, Line: 72, Col: 43}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 		if templ_7745c5c3_Err != nil {
@@ -73,7 +73,7 @@ func Login(config FirebaseConfig) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(config.ProjectID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/login.templ`, Line: 79, Col: 41}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/login.templ`, Line: 73, Col: 41}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 		if templ_7745c5c3_Err != nil {
@@ -86,7 +86,7 @@ func Login(config FirebaseConfig) templ.Component {
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(config.StorageBucket)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/login.templ`, Line: 80, Col: 49}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/login.templ`, Line: 74, Col: 49}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 		if templ_7745c5c3_Err != nil {
@@ -99,7 +99,7 @@ func Login(config FirebaseConfig) templ.Component {
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.ResolveAttributeValue(config.MessagingSenderID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/login.templ`, Line: 81, Col: 58}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/login.templ`, Line: 75, Col: 58}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 		if templ_7745c5c3_Err != nil {
@@ -112,7 +112,7 @@ func Login(config FirebaseConfig) templ.Component {
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(config.AppID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/login.templ`, Line: 82, Col: 33}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/login.templ`, Line: 76, Col: 33}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 		if templ_7745c5c3_Err != nil {

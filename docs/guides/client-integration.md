@@ -1,6 +1,6 @@
 # 🔌 Client Integration Runbook
 
-This guide details the exact request schemas, curl commands, and header specs required to authenticate and call the Gemini Smart Router.
+This guide details the exact request schemas, curl commands, and header specs required to authenticate and call the Smart Router.
 
 The proxy supports two authentication methods: **Static API Key** and **Zero-Key IAM Service Account OIDC**.
 

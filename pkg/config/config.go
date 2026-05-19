@@ -153,7 +153,47 @@ func NewConfigStore(ctx context.Context, projectID string) (*ConfigStore, error)
 	}
 	store.Client = client
 
+	// Seed production Firestore with default models if empty
+	if err := store.seedFirestoreModelsIfEmpty(ctx); err != nil {
+		log.Printf("[ConfigStore] Warning: failed to seed default Firestore models: %v", err)
+	}
+
 	return store, nil
+}
+
+func (cs *ConfigStore) seedFirestoreModelsIfEmpty(ctx context.Context) error {
+	log.Println("[ConfigStore] Verifying default foundation models in production Firestore...")
+	defaultModels := []ModelConfig{
+		{ID: "gemini-2.5-flash", DisplayName: "Gemini 2.5 Flash", Location: "global", Type: "foundation", Active: true},
+		{ID: "gemini-2.5-pro", DisplayName: "Gemini 2.5 Pro", Location: "global", Type: "foundation", Active: true},
+		{ID: "gemini-2.5-flash-lite", DisplayName: "Gemini 2.5 Flash Lite", Location: "global", Type: "foundation", Active: true},
+		{ID: "gemini-3.0-flash", DisplayName: "Gemini 3.0 Flash", Location: "global", Type: "foundation", Active: true},
+		{ID: "gemini-3.0-pro", DisplayName: "Gemini 3.0 Pro", Location: "global", Type: "foundation", Active: true},
+		{ID: "gemini-3.1-flash", DisplayName: "Gemini 3.1 Flash", Location: "global", Type: "foundation", Active: true},
+		{ID: "gemini-3.1-pro", DisplayName: "Gemini 3.1 Pro", Location: "global", Type: "foundation", Active: true},
+		{ID: "gemini-3.5-flash", DisplayName: "Gemini 3.5 Flash", Location: "global", Type: "foundation", Active: true},
+		{ID: "gemini-3.5-pro", DisplayName: "Gemini 3.5 Pro", Location: "global", Type: "foundation", Active: true},
+		{ID: "gemini-3.5-flash-lite", DisplayName: "Gemini 3.5 Flash Lite", Location: "global", Type: "foundation", Active: true},
+		{ID: "text-embedding-004", DisplayName: "Text Embedding 004", Location: "global", Type: "foundation", Active: true},
+		{ID: "multimodal-embedding-001", DisplayName: "Multimodal Embedding 001", Location: "global", Type: "foundation", Active: true},
+		{ID: "gemini-dynamic", DisplayName: "Gemini Dynamic Complexity Router", Location: "global", Type: "foundation", Active: true},
+	}
+
+	for _, m := range defaultModels {
+		docRef := cs.Client.Collection("models").Doc(m.ID)
+		_, err := docRef.Get(ctx)
+		if err != nil {
+			// Model does not exist in Firestore, seed it!
+			_, err = docRef.Set(ctx, m)
+			if err != nil {
+				log.Printf("[ConfigStore] Failed to seed model %s: %v", m.ID, err)
+			} else {
+				log.Printf("[ConfigStore] Seeded missing model %s to Firestore", m.ID)
+			}
+		}
+	}
+
+	return nil
 }
 
 // HashKey returns the hex-encoded SHA-256 hash of an API key.
@@ -602,6 +642,7 @@ func (cs *ConfigStore) initLocalDB() error {
 				{ID: "gemini-3.5-flash-lite", DisplayName: "Gemini 3.5 Flash Lite", Location: "global", Type: "foundation", Active: true},
 				{ID: "text-embedding-004", DisplayName: "Text Embedding 004", Location: "global", Type: "foundation", Active: true},
 				{ID: "multimodal-embedding-001", DisplayName: "Multimodal Embedding 001", Location: "global", Type: "foundation", Active: true},
+				{ID: "gemini-dynamic", DisplayName: "Gemini Dynamic Complexity Router", Location: "global", Type: "foundation", Active: true},
 			},
 		}
 
@@ -700,7 +741,6 @@ func (cs *ConfigStore) initLocalDB() error {
 			dirty = true
 		}
 	}
-
 	// Auto-migrate existing database with empty models
 	if len(db.Models) == 0 {
 		db.Models = []ModelConfig{
@@ -716,6 +756,7 @@ func (cs *ConfigStore) initLocalDB() error {
 			{ID: "gemini-3.5-flash-lite", DisplayName: "Gemini 3.5 Flash Lite", Location: "global", Type: "foundation", Active: true},
 			{ID: "text-embedding-004", DisplayName: "Text Embedding 004", Location: "global", Type: "foundation", Active: true},
 			{ID: "multimodal-embedding-001", DisplayName: "Multimodal Embedding 001", Location: "global", Type: "foundation", Active: true},
+			{ID: "gemini-dynamic", DisplayName: "Gemini Dynamic Complexity Router", Location: "global", Type: "foundation", Active: true},
 		}
 		dirty = true
 	}
@@ -1230,8 +1271,8 @@ func IsValidModelName(name string) bool {
 		return true
 	}
 
-	// Matches standard Embeddings
-	if name == "text-embedding-004" || name == "multimodal-embedding-001" {
+	// Matches standard Embeddings or Virtual Dynamic Router
+	if name == "text-embedding-004" || name == "multimodal-embedding-001" || name == "gemini-dynamic" {
 		return true
 	}
 

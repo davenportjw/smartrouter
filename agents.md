@@ -1,6 +1,6 @@
 # Agent Guidelines & Features Skill
 
-Welcome! If you are an AI coding assistant or agent developing features or fixing issues in the **Gemini Smart Router**, you are required to follow the standard guidelines and practices of this repository.
+Welcome! If you are an AI coding assistant or agent developing features or fixing issues in the **Smart Router**, you are required to follow the standard guidelines and practices of this repository.
 
 ## 🚀 Core Agent Skill File
 

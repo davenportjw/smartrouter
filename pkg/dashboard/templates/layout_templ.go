@@ -42,183 +42,36 @@ func Layout(title string, currentTab string, content templ.Component) templ.Comp
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " - Gemini Smart Router</title><!-- Tailwind CSS CDN --><script src=\"https://cdn.tailwindcss.com\"></script><!-- HTMX CDN --><script src=\"https://unpkg.com/htmx.org@1.9.10\"></script><!-- Google Fonts --><link rel=\"preconnect\" href=\"https://fonts.googleapis.com\"><link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin><link href=\"https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@300;400;500;700&display=swap\" rel=\"stylesheet\"><style>\n\t\t\t\tbody {\n\t\t\t\t\tfont-family: 'Google Sans', 'Roboto', sans-serif;\n\t\t\t\t}\n\t\t\t</style></head><body class=\"h-full flex flex-col\"><!-- Google Branded Top Navigation Bar --><header class=\"bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50\"><div class=\"mx-auto max-w-7xl px-4 sm:px-6 lg:px-8\"><div class=\"flex h-16 justify-between items-center\"><div class=\"flex items-center gap-3\"><!-- Google Logo Style Colors on Product Title --><div class=\"flex items-center text-xl font-bold tracking-tight\"><span class=\"text-blue-600\">G</span> <span class=\"text-red-500\">e</span> <span class=\"text-yellow-500\">m</span> <span class=\"text-blue-600\">i</span> <span class=\"text-green-500\">n</span> <span class=\"text-red-500\">i</span> <span class=\"text-gray-700 ml-2\">Smart Router</span></div><span class=\"inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10\">Admin</span></div><!-- Navigation Tabs --><nav class=\"hidden md:flex space-x-8 h-full items-center\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " - Smart Router</title><!-- Tailwind CSS CDN --><script src=\"https://cdn.tailwindcss.com\"></script><!-- HTMX CDN --><script src=\"https://unpkg.com/htmx.org@1.9.10\"></script><!-- Google Fonts --><link rel=\"preconnect\" href=\"https://fonts.googleapis.com\"><link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin><link href=\"https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@300;400;500;700&display=swap\" rel=\"stylesheet\"><style>\n\t\t\t\tbody {\n\t\t\t\t\tfont-family: 'Google Sans', 'Roboto', sans-serif;\n\t\t\t\t}\n\t\t\t\t/* Smooth transition for sidebar and main container */\n\t\t\t\t.sidebar-transition {\n\t\t\t\t\ttransition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), \n\t\t\t\t\t            padding-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), \n\t\t\t\t\t            max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1);\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t/* Collapsed Sidebar custom styles */\n\t\t\t\tbody.sidebar-collapsed .desktop-sidebar {\n\t\t\t\t\twidth: 4.5rem; /* w-18 */\n\t\t\t\t}\n\t\t\t\tbody.sidebar-collapsed .main-wrapper {\n\t\t\t\t\tpadding-left: 4.5rem;\n\t\t\t\t}\n\t\t\t\tbody.sidebar-collapsed .sidebar-logo-full {\n\t\t\t\t\tdisplay: none;\n\t\t\t\t}\n\t\t\t\tbody.sidebar-collapsed .sidebar-logo-mini {\n\t\t\t\t\tdisplay: flex;\n\t\t\t\t\tjustify-content: center;\n\t\t\t\t\twidth: 100%;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t/* Smoothly slide out text labels */\n\t\t\t\t.sidebar-text {\n\t\t\t\t\tdisplay: inline-block;\n\t\t\t\t\tmax-width: 200px;\n\t\t\t\t\topacity: 1;\n\t\t\t\t\ttransition: max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), \n\t\t\t\t\t            opacity 0.2s ease-out;\n\t\t\t\t}\n\t\t\t\tbody.sidebar-collapsed .sidebar-text {\n\t\t\t\t\tmax-width: 0;\n\t\t\t\t\topacity: 0;\n\t\t\t\t\toverflow: hidden;\n\t\t\t\t\tpointer-events: none;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t/* Smoothly hide group headers */\n\t\t\t\t.sidebar-group-header {\n\t\t\t\t\topacity: 1;\n\t\t\t\t\tmax-height: 20px;\n\t\t\t\t\ttransition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), \n\t\t\t\t\t            opacity 0.2s ease-out, \n\t\t\t\t\t            margin 0.3s ease;\n\t\t\t\t}\n\t\t\t\tbody.sidebar-collapsed .sidebar-group-header {\n\t\t\t\t\tmax-height: 0;\n\t\t\t\t\topacity: 0;\n\t\t\t\t\tmargin: 0;\n\t\t\t\t\tpadding-top: 0;\n\t\t\t\t\tpadding-bottom: 0;\n\t\t\t\t\toverflow: hidden;\n\t\t\t\t\tpointer-events: none;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\tbody.sidebar-collapsed .sidebar-footer-copyright {\n\t\t\t\t\tdisplay: none;\n\t\t\t\t}\n\t\t\t\tbody.sidebar-collapsed .sidebar-btn-text {\n\t\t\t\t\tdisplay: none;\n\t\t\t\t}\n\t\t\t\tbody.sidebar-collapsed .sidebar-link-element {\n\t\t\t\t\tjustify-content: center;\n\t\t\t\t\tpadding-left: 0;\n\t\t\t\t\tpadding-right: 0;\n\t\t\t\t\tborder-left-width: 4px;\n\t\t\t\t}\n\t\t\t\tbody.sidebar-collapsed .sidebar-chevron {\n\t\t\t\t\ttransform: rotate(180deg);\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t/* Collapse style overrides for bottom Sign Out button */\n\t\t\t\tbody.sidebar-collapsed .desktop-sidebar .border-t {\n\t\t\t\t\tpadding: 0.75rem 0.5rem;\n\t\t\t\t\tbackground-color: transparent;\n\t\t\t\t\tborder-top-color: transparent;\n\t\t\t\t}\n\t\t\t\tbody.sidebar-collapsed .desktop-sidebar .border-t a {\n\t\t\t\t\tbackground-color: transparent;\n\t\t\t\t\tborder-color: transparent;\n\t\t\t\t\tbox-shadow: none;\n\t\t\t\t\tpadding: 0.5rem 0;\n\t\t\t\t\tjustify-content: center;\n\t\t\t\t\twidth: 100%;\n\t\t\t\t}\n\t\t\t</style></head><body class=\"h-full flex overflow-hidden bg-gray-50 text-gray-900\"><script>\n\t\t\t\t(function() {\n\t\t\t\t\tconst isCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';\n\t\t\t\t\tif (isCollapsed) {\n\t\t\t\t\t\tdocument.body.classList.add('sidebar-collapsed');\n\t\t\t\t\t}\n\t\t\t\t})();\n\t\t\t</script><!-- ========================================== --><!-- MOBILE SIDEBAR DRAWER (Hidden on Desktop)  --><!-- ========================================== --><div id=\"mobile-menu-drawer\" class=\"fixed inset-0 z-50 flex md:hidden opacity-0 pointer-events-none transition-opacity duration-300 ease-in-out\" role=\"dialog\" aria-modal=\"true\"><!-- Backdrop overlay --><div id=\"mobile-menu-backdrop\" class=\"fixed inset-0 bg-gray-900/60 backdrop-blur-xs transition-opacity duration-300 ease-in-out\"></div><!-- Drawer panel --><div id=\"mobile-menu-panel\" class=\"relative mr-16 flex w-full max-w-xs flex-1 transform -translate-x-full transition-transform duration-300 ease-in-out bg-white flex-col z-10 shadow-2xl\"><!-- Close Button --><div class=\"absolute right-0 top-0 -mr-12 pt-4\"><button id=\"close-mobile-menu-btn\" type=\"button\" class=\"ml-1 flex h-10 w-10 items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-white\"><span class=\"sr-only\">Close sidebar</span> <svg class=\"h-6 w-6 text-white\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div><!-- Mobile Sidebar Brand Logo Header --><div class=\"flex h-16 shrink-0 items-center justify-between px-6 border-b border-gray-150 bg-gray-50/80\"><div class=\"flex items-center gap-2\"><div class=\"flex items-center text-lg font-bold tracking-tight\"><span class=\"bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent\">Smart Router</span></div><span class=\"inline-flex items-center rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10\">Admin</span></div></div><!-- Mobile Navigation Links --><div class=\"flex flex-1 flex-col overflow-y-auto px-4 py-6 bg-white\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var3 = []any{"inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium h-full", templ.KV("border-blue-600 text-blue-600", currentTab == "apps"), templ.KV("border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700", currentTab != "apps")}
-		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var3...)
+		templ_7745c5c3_Err = mobileNavLinks(currentTab).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<a href=\"/admin/apps\" class=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div><!-- Mobile Footer / Sign Out --><div class=\"border-t border-gray-150 p-4 bg-gray-50\"><a href=\"/logout\" class=\"flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition\"><svg class=\"w-4 h-4 text-gray-500\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2.5\" d=\"M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1\"></path></svg> Sign Out</a></div></div></div><!-- ========================================== --><!-- DESKTOP SIDEBAR (Persistent Navigation)    --><!-- ========================================== --><aside class=\"desktop-sidebar sidebar-transition hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 border-r border-gray-200 bg-white h-full shadow-xs z-30 relative\"><!-- Floating edge collapse trigger button --><button id=\"toggle-sidebar-btn\" type=\"button\" class=\"absolute top-20 -right-3.5 bg-white border border-gray-200 text-gray-500 hover:text-gray-700 shadow-md rounded-full w-7 h-7 flex items-center justify-center z-40 cursor-pointer active:scale-95 transition-all duration-200 focus:outline-none\"><svg class=\"sidebar-chevron w-4 h-4 transition-transform duration-300\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M15.75 19.5L8.25 12l7.5-7.5\"></path></svg></button><!-- Sidebar Header / Logo Brand --><div class=\"flex h-16 shrink-0 items-center justify-between px-6 border-b border-gray-200 bg-white\"><div class=\"flex items-center gap-2\"><!-- Full Logo (Expanded mode) --><div class=\"sidebar-logo-full flex items-center text-lg font-bold tracking-tight\"><span class=\"bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent\">Smart Router</span></div><!-- Mini Logo (Collapsed mode) --><div class=\"sidebar-logo-mini hidden items-center text-lg font-bold tracking-tight\"><span class=\"text-blue-600 font-bold\">S</span><span class=\"text-indigo-600 font-bold\">R</span></div><span class=\"sidebar-text inline-flex items-center rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 ring-1 ring-inset ring-blue-700/10\">Admin</span></div></div><!-- Desktop Grouped Navigation Links --><nav class=\"flex-1 flex flex-col overflow-y-auto px-4 py-6 space-y-6 bg-white\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var4 string
-		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var3).String())
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/layout.templ`, Line: 1, Col: 0}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
+		templ_7745c5c3_Err = groupedNavLinks(currentTab).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\">Applications</a> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</nav><!-- Sidebar Footer / Profile & Sign Out --><div class=\"border-t border-gray-200 p-4 bg-gray-50/80 flex flex-col gap-3\"><a href=\"/logout\" title=\"Sign Out\" class=\"flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-xs hover:bg-gray-50 transition active:scale-[0.98]\"><svg class=\"w-5 h-5 text-gray-500 shrink-0\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2.5\" d=\"M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1\"></path></svg> <span class=\"sidebar-btn-text sidebar-text\">Sign Out</span></a><div class=\"sidebar-footer-copyright text-center text-[10px] text-gray-400 font-sans\">&copy; 2026 Smart Router</div></div></aside><!-- ========================================== --><!-- MAIN CONTENT WRAPPER                       --><!-- ========================================== --><div class=\"main-wrapper sidebar-transition flex-1 flex flex-col overflow-hidden md:pl-64\"><!-- Top Header Panel --><header class=\"h-16 border-b border-gray-200 bg-white sticky top-0 z-20 px-4 sm:px-6 lg:px-8 flex items-center justify-between shadow-xs\"><!-- Left Side: Menu Toggler & Page Title --><div class=\"flex items-center gap-4\"><!-- Mobile Hamburger Menu Toggle --><button id=\"open-mobile-menu-btn\" type=\"button\" class=\"inline-flex h-10 w-10 items-center justify-center rounded-md text-gray-500 hover:text-gray-600 border border-gray-200 bg-white hover:bg-gray-50 shadow-xs md:hidden focus:outline-none\"><span class=\"sr-only\">Open sidebar</span> <svg class=\"h-5 w-5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5\"></path></svg></button><!-- Dynamic Page Title --><h1 class=\"text-lg font-bold tracking-tight text-gray-900\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var5 = []any{"inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium h-full", templ.KV("border-blue-600 text-blue-600", currentTab == "keys"), templ.KV("border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700", currentTab != "keys")}
-		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var5...)
+		var templ_7745c5c3_Var3 string
+		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(title)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/layout.templ`, Line: 231, Col: 72}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<a href=\"/admin/keys\" class=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var6 string
-		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var5).String())
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/layout.templ`, Line: 1, Col: 0}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\">Access</a> ")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var7 = []any{"inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium h-full", templ.KV("border-blue-600 text-blue-600", currentTab == "headers"), templ.KV("border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700", currentTab != "headers")}
-		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var7...)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<a href=\"/admin/headers\" class=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var8 string
-		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var7).String())
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/layout.templ`, Line: 1, Col: 0}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\">Custom Headers</a> ")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var9 = []any{"inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium h-full", templ.KV("border-blue-600 text-blue-600", currentTab == "rules"), templ.KV("border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700", currentTab != "rules")}
-		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var9...)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<a href=\"/admin/rules\" class=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var10 string
-		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var9).String())
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/layout.templ`, Line: 1, Col: 0}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\">Routing Rules</a> ")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var11 = []any{"inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium h-full", templ.KV("border-blue-600 text-blue-600", currentTab == "complexity"), templ.KV("border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700", currentTab != "complexity")}
-		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var11...)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<a href=\"/admin/complexity\" class=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var12 string
-		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var11).String())
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/layout.templ`, Line: 1, Col: 0}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\">Complexity Routing</a> ")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var13 = []any{"inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium h-full", templ.KV("border-blue-600 text-blue-600", currentTab == "models"), templ.KV("border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700", currentTab != "models")}
-		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var13...)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<a href=\"/admin/models\" class=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var14 string
-		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var13).String())
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/layout.templ`, Line: 1, Col: 0}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var14)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\">Models</a> ")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var15 = []any{"inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium h-full", templ.KV("border-blue-600 text-blue-600", currentTab == "metrics"), templ.KV("border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700", currentTab != "metrics")}
-		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var15...)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<a href=\"/admin/metrics\" class=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var16 string
-		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var15).String())
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/layout.templ`, Line: 1, Col: 0}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var16)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\">Monitoring</a> ")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var17 = []any{"inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium h-full", templ.KV("border-blue-600 text-blue-600", currentTab == "costs"), templ.KV("border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700", currentTab != "costs")}
-		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var17...)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<a href=\"/admin/costs\" class=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var18 string
-		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var17).String())
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/layout.templ`, Line: 1, Col: 0}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var18)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "\">Cost Analytics</a></nav><!-- Right side: Logout button --><div class=\"flex items-center gap-4\"><a href=\"/logout\" class=\"rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition\">Sign Out</a></div></div></div></header><!-- Main Layout Wrapper --><main class=\"flex-grow py-10 bg-gray-50\"><div class=\"mx-auto max-w-7xl px-4 sm:px-6 lg:px-8\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</h1></div><!-- Right Side: Local Status Indicator & Profile Link --><div class=\"flex items-center gap-3\"><!-- Local Env Badge --><span class=\"inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/10 shadow-xs\"><span class=\"h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse\"></span> Local Server</span><!-- API Documentation Link --><a href=\"https://github.com/davenportjw/geminirouter\" target=\"_blank\" class=\"hidden sm:inline-flex items-center rounded-lg bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10 hover:bg-gray-100 transition\">API Docs</a></div></header><!-- Main Scrollable Area --><main class=\"flex-grow overflow-y-auto bg-gray-50 focus:outline-none\"><div class=\"max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -226,7 +79,356 @@ func Layout(title string, currentTab string, content templ.Component) templ.Comp
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</div></main><!-- Google Clean Footer --><footer class=\"bg-white border-t border-gray-200 py-6 mt-auto\"><div class=\"mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center text-xs text-gray-500\">&copy; 2026 Gemini Smart Router. Developed with Google-first best practices.</div></footer></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</div></main></div><!-- ========================================== --><!-- RESPONSIVE & COLLAPSIBLE SIDEBAR SCRIPTS   --><!-- ========================================== --><script>\n\t\t\t\t(function() {\n\t\t\t\t\t// Mobile Drawer toggler\n\t\t\t\t\tconst openBtn = document.getElementById('open-mobile-menu-btn');\n\t\t\t\t\tconst closeBtn = document.getElementById('close-mobile-menu-btn');\n\t\t\t\t\tconst drawer = document.getElementById('mobile-menu-drawer');\n\t\t\t\t\tconst panel = document.getElementById('mobile-menu-panel');\n\t\t\t\t\tconst backdrop = document.getElementById('mobile-menu-backdrop');\n\n\t\t\t\t\tfunction openMenu() {\n\t\t\t\t\t\tdrawer.classList.remove('opacity-0', 'pointer-events-none');\n\t\t\t\t\t\tdrawer.classList.add('opacity-100', 'pointer-events-auto');\n\t\t\t\t\t\tpanel.classList.remove('-translate-x-full');\n\t\t\t\t\t\tpanel.classList.add('translate-x-0');\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction closeMenu() {\n\t\t\t\t\t\tdrawer.classList.remove('opacity-100', 'pointer-events-auto');\n\t\t\t\t\t\tdrawer.classList.add('opacity-0', 'pointer-events-none');\n\t\t\t\t\t\tpanel.classList.remove('translate-x-0');\n\t\t\t\t\t\tpanel.classList.add('-translate-x-full');\n\t\t\t\t\t}\n\n\t\t\t\t\tif (openBtn && closeBtn && drawer && panel) {\n\t\t\t\t\t\topenBtn.addEventListener('click', openMenu);\n\t\t\t\t\t\tcloseBtn.addEventListener('click', closeMenu);\n\t\t\t\t\t\tif (backdrop) {\n\t\t\t\t\t\t\tbackdrop.addEventListener('click', closeMenu);\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\n\t\t\t\t\t// Desktop Collapsible sidebar toggler\n\t\t\t\t\tconst toggleBtn = document.getElementById('toggle-sidebar-btn');\n\t\t\t\t\tif (toggleBtn) {\n\t\t\t\t\t\ttoggleBtn.addEventListener('click', function() {\n\t\t\t\t\t\t\tconst wasCollapsed = document.body.classList.contains('sidebar-collapsed');\n\t\t\t\t\t\t\tif (wasCollapsed) {\n\t\t\t\t\t\t\t\tdocument.body.classList.remove('sidebar-collapsed');\n\t\t\t\t\t\t\t\tlocalStorage.setItem('sidebar-collapsed', 'false');\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\tdocument.body.classList.add('sidebar-collapsed');\n\t\t\t\t\t\t\t\tlocalStorage.setItem('sidebar-collapsed', 'true');\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t});\n\t\t\t\t\t}\n\t\t\t\t})();\n\t\t\t</script></body></html>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		return nil
+	})
+}
+
+// Helper template component to render desktop grouped navigation list
+func groupedNavLinks(currentTab string) templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var4 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var4 == nil {
+			templ_7745c5c3_Var4 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<!-- CONFIG & ACCESS GROUP --><div class=\"space-y-2\"><h3 class=\"sidebar-group-header px-3 text-[10px] font-bold uppercase tracking-wider text-gray-400 transition-all duration-200\">Config & Access</h3><div class=\"space-y-1\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Var5 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<svg class=\"w-5 h-5 shrink-0\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10\"></path></svg>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = sidebarLink("/admin/apps", "Applications", "apps", currentTab).Render(templ.WithChildren(ctx, templ_7745c5c3_Var5), templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Var6 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<svg class=\"w-5 h-5 shrink-0\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M15 7a2 2 0 012 2m-3.418-4.018A15.03 15.03 0 0012 2.692V12m0 0l-1.907 1.907A1.83 1.83 0 019 14.414V16H7v2H5v2h2a2 2 0 002-2v-1.586A1.83 1.83 0 019.586 16H12\"></path></svg>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = sidebarLink("/admin/keys", "Access Credentials", "keys", currentTab).Render(templ.WithChildren(ctx, templ_7745c5c3_Var6), templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</div></div><!-- TRAFFIC ROUTING GROUP --><div class=\"space-y-2\"><h3 class=\"sidebar-group-header px-3 text-[10px] font-bold uppercase tracking-wider text-gray-400 transition-all duration-200\">Traffic Routing</h3><div class=\"space-y-1\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Var7 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<svg class=\"w-5 h-5 shrink-0\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4\"></path></svg>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = sidebarLink("/admin/rules", "Routing Rules", "rules", currentTab).Render(templ.WithChildren(ctx, templ_7745c5c3_Var7), templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Var8 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<svg class=\"w-5 h-5 shrink-0\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l.707-.707m2.828 9.9a5 5 0 113.536 0V21h-3.536v-3.536z\"></path></svg>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = sidebarLink("/admin/complexity", "Complexity Routing", "complexity", currentTab).Render(templ.WithChildren(ctx, templ_7745c5c3_Var8), templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Var9 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<svg class=\"w-5 h-5 shrink-0\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M4 6h16M4 12h16M4 18h7\"></path></svg>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = sidebarLink("/admin/headers", "Custom Headers", "headers", currentTab).Render(templ.WithChildren(ctx, templ_7745c5c3_Var9), templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</div></div><!-- MODELS REGISTRY GROUP --><div class=\"space-y-2\"><h3 class=\"sidebar-group-header px-3 text-[10px] font-bold uppercase tracking-wider text-gray-400 transition-all duration-200\">Models Registry</h3><div class=\"space-y-1\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Var10 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<svg class=\"w-5 h-5 shrink-0\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4\"></path></svg>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = sidebarLink("/admin/models", "Models Registry", "models", currentTab).Render(templ.WithChildren(ctx, templ_7745c5c3_Var10), templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</div></div><!-- OBSERVABILITY GROUP --><div class=\"space-y-2\"><h3 class=\"sidebar-group-header px-3 text-[10px] font-bold uppercase tracking-wider text-gray-400 transition-all duration-200\">Observability</h3><div class=\"space-y-1\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Var11 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<svg class=\"w-5 h-5 shrink-0\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z\"></path></svg>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = sidebarLink("/admin/metrics", "Monitoring Stats", "metrics", currentTab).Render(templ.WithChildren(ctx, templ_7745c5c3_Var11), templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Var12 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<svg class=\"w-5 h-5 shrink-0\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z\"></path></svg>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = sidebarLink("/admin/costs", "Cost Analytics", "costs", currentTab).Render(templ.WithChildren(ctx, templ_7745c5c3_Var12), templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</div></div>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		return nil
+	})
+}
+
+// Helper template component to render mobile grouped navigation list
+func mobileNavLinks(currentTab string) templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var13 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var13 == nil {
+			templ_7745c5c3_Var13 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = groupedNavLinks(currentTab).Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		return nil
+	})
+}
+
+// Extensible, highly polished Sidebar Link element
+func sidebarLink(href string, text string, tabKey string, currentTab string) templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var14 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var14 == nil {
+			templ_7745c5c3_Var14 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		var templ_7745c5c3_Var15 = []any{"sidebar-link-element group flex items-center gap-3 rounded-lg border-l-4 py-2.5 px-3 text-sm font-medium transition-all duration-200 active:scale-[0.99]",
+			templ.KV("border-blue-600 bg-blue-50/80 text-blue-700 font-semibold shadow-2xs", currentTab == tabKey),
+			templ.KV("border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900 hover:border-gray-300/60", currentTab != tabKey)}
+		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var15...)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<a href=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var16 templ.SafeURL
+		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(href))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/layout.templ`, Line: 397, Col: 30}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "\" title=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var17 string
+		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.ResolveAttributeValue(text)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/layout.templ`, Line: 397, Col: 45}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var17)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "\" class=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var18 string
+		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var15).String())
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/layout.templ`, Line: 1, Col: 0}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var18)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templ_7745c5c3_Var14.Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "<span class=\"sidebar-text truncate transition-all duration-200\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var19 string
+		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(text)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/dashboard/templates/layout.templ`, Line: 401, Col: 72}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</span></a>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

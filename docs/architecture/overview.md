@@ -1,6 +1,6 @@
 # 🗺️ System Architecture Overview
 
-This document maps out the core architectural layers of the Gemini Smart Router: the App-Centric data model, the request execution lifecycle, and the sliding-window rate-limiting engine.
+This document maps out the core architectural layers of the Smart Router: the App-Centric data model, the request execution lifecycle, and the sliding-window rate-limiting engine.
 
 ---
 

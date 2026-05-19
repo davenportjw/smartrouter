@@ -1,4 +1,4 @@
-# 🌌 Gemini Smart Router
+# 🌌 Smart Router
 
 [![Go Version](https://img.shields.io/github/go-mod/go-version/jasondavenport/geminirouter?color=00ADD8)](https://go.dev)
 [![Terraform](https://img.shields.io/badge/terraform-%235835CC.svg?logo=terraform)](https://www.terraform.io/)
@@ -11,11 +11,11 @@ A high-performance, cost-effective, and extremely durable **Gemini-compliant API
 
 ## 🗺️ Architecture Overview
 
-The Gemini Smart Router acts as a drop-in proxy replacement for your Gemini API requests, giving you granular control over cost, access, and observability.
+The Smart Router acts as a drop-in proxy replacement for your Gemini API requests, giving you granular control over cost, access, and observability.
 
 ```mermaid
 flowchart TD
-    A[Client Application] -->|Gemini API Protocol| B(Gemini Smart Router - Cloud Run)
+    A[Client Application] -->|Gemini API Protocol| B(Smart Router - Cloud Run)
     B -->|Validate API Key| C[(Firestore Native DB)]
     B -->|Read Routing Rules| C
     B -->|Fetch Upstream Key| D[Secret Manager]
@@ -105,7 +105,7 @@ chmod +x deploy.sh
 2. **Firebase Integration Auto-Setup:**
    - Connects to Firebase REST endpoints using your active gcloud authentication context.
    - Checks if Firebase is enabled for the project. If not, automatically registers and links Firebase.
-   - Checks for existing registered Web Applications. If none are found, automatically provisions a new Web Application named `Gemini Router Admin`.
+   - Checks for existing registered Web Applications. If none are found, automatically provisions a new Web Application named `Smart Router Admin`.
    - Extracts all Firebase Web SDK credentials and automatically writes them to `.env`—updating active shell instances.
 3. **Infrastructure Provisioning (Terraform):**
    - Enables cloud services (`run`, `firestore`, `secretmanager`, `identitytoolkit`, `monitoring`).
@@ -125,7 +125,7 @@ If you prefer to manual configure your Firebase credentials, or do not have dire
 1. Open the [Firebase Console](https://console.firebase.google.com/).
 2. Click **Add Project** and select your existing Google Cloud Project.
 3. In the Project Overview pane, click the **Web icon (</>)** to register a new application.
-4. Enter `Gemini Router Admin` as the nickname.
+4. Enter `Smart Router Admin` as the nickname.
 5. Copy the auto-generated `firebaseConfig` object values into your `.env` file.
 6. Select **Build > Authentication** in the left-hand menu, enable the **Google** sign-in provider, and save.
 
@@ -133,7 +133,7 @@ If you prefer to manual configure your Firebase credentials, or do not have dire
 
 ## 🎛️ Local Development & Execution
 
-To run the Gemini Smart Router locally:
+To run the Smart Router locally:
 
 ### 1. Install Go Dependencies
 ```bash
@@ -156,7 +156,7 @@ By default, the router will launch on `http://localhost:8080`. You can navigate 
 
 ## 🧪 Compatibility Auditing & Verification
 
-To ensure the Gemini Smart Router remains completely synchronized and compatible with both standard Gemini APIs and the **Gemini Enterprise Agent Platform** (Vertex AI Reasoning Engine / Agent Engine and RAG Engine), we provide an automated compatibility test suite and repeatable agent audit skills.
+To ensure the Smart Router remains completely synchronized and compatible with both standard Gemini APIs and the **Gemini Enterprise Agent Platform** (Vertex AI Reasoning Engine / Agent Engine and RAG Engine), we provide an automated compatibility test suite and repeatable agent audit skills.
 
 ### 1. Running Automated Compatibility Tests
 We provide in-memory, offline-compatible integration tests that simulate standard and enterprise API calls (mapping routing rules, rate limits, auth token injection, and path translation):
@@ -171,7 +171,7 @@ We provide a repeatable capability audit skill file at [skills/compatibility_aud
 
 ## 🔌 Deployed Client Examples & Integrations
 
-We provide production-ready, fully containerized client service templates deployed on **Google Cloud Run** that demonstrate how to connect to and call the Gemini Smart Router using the most cost-effective model (`gemini-2.5-flash-lite`):
+We provide production-ready, fully containerized client service templates deployed on **Google Cloud Run** that demonstrate how to connect to and call the Smart Router using the most cost-effective model (`gemini-2.5-flash-lite`):
 
 | Example | Type | Auth Protocol | Key Security | Best Use Case |
 | :--- | :--- | :--- | :--- | :--- |
