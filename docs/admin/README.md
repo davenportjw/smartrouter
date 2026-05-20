@@ -1,51 +1,37 @@
 # 🗂️ Administrative Dashboard Overview
 
-The Smart Router includes an elegant, compiled HTMX-powered administrative control panel accessible at `/admin`. Operators use this dashboard to manage applications, provision keys, configure declarative request routing, and audit throughput costs in real time.
+The Smart Router dashboard is located at `/admin`. It is used to manage applications, configure keys, setup routing rules, and view metrics.
 
 ---
 
 ## 🔒 Google Sign-In Authentication
 
-To protect your proxy against unauthorized access, the dashboard enforces Firebase-backed **Google Sign-In OIDC Authentication**.
+Dashboard access is secured via Firebase **Google Sign-In OIDC Authentication**.
 
-### 🛡️ Configurable Email & Domain Suffix Restriction
-By default, login authorization is locked down to email addresses ending in `@google.com` and `@cloudadvocacyorg.joonix.net` to prevent unauthorized administrative entry.
+### Authorized Emails and Domains
+By default, access is restricted to emails ending in `@google.com` and `@cloudadvocacyorg.joonix.net`. 
 
-If you are running a custom deployment on a personal or corporate Google Cloud project, you can configure your authorized email suffixes or specific individual email addresses using the `ALLOWED_EMAIL_DOMAINS` variable in your `.env` file (or the Cloud Run service configuration environment):
-```ini
-# Supports both whole domains and specific individual email addresses simultaneously
-ALLOWED_EMAIL_DOMAINS="mycompany.com,operator@gmail.com,another-team.org"
-```
+To configure authorized emails and/or domains:
+1. Set `ALLOWED_EMAIL_DOMAINS` in `.env`:
+   ```ini
+   ALLOWED_EMAIL_DOMAINS="mycompany.com,operator@gmail.com"
+   ```
 
-### Authenticating as an Administrator
-1. Navigate to the base URL: `http://localhost:8080/admin` (or your live Cloud Run service URL).
-2. If unauthenticated, the router redirects you to `/admin/login` showing the secure login screen.
-3. Click **Sign In with Google**.
-4. Authentic credentials are verified by Firebase. Once approved, Firebase yields an OIDC token which is committed to a secure HTTP-only session cookie in your browser.
-5. You are redirected to the keys console (`/admin/keys`).
+### Logging In
+1. Open `/admin` in your browser.
+2. If unauthenticated, you are redirected to `/admin/login`.
+3. Click **Sign In with Google** and authorize with your Google credentials.
 
 ---
 
-## 🗺️ Navigation Tab Map
+## 🗺️ Dashboard Sections
 
-The dashboard is divided into 7 dedicated operational tabs:
-
-| Tab / View | Endpoint | Purpose |
+| View | Endpoint | Purpose |
 | :--- | :--- | :--- |
-| **[Apps & API Keys](file:///Users/jasondavenport/GitHub/geminirouter/docs/admin/apps-and-keys.md)** | `/admin/keys` & `/admin/apps` | Manage active application profiles, map client tiers, and issue static keys. |
-| **[Custom Headers](file:///Users/jasondavenport/GitHub/geminirouter/docs/admin/custom-headers.md)** | `/admin/headers` | Enforce declarative parameters validation for incoming API requests. |
-| **[Routing Rules](file:///Users/jasondavenport/GitHub/geminirouter/docs/admin/routing-rules.md)** | `/admin/rules` | Override target models, regional endpoints, weight priorities, and fallbacks. |
-| **[Complexity Tuning](file:///Users/jasondavenport/GitHub/geminirouter/docs/admin/routing-rules.md#user-flow-5-tuning-complexity-based-dynamic-routing)** | `/admin/complexity` | Tweak character boundaries mapping virtual `gemini-dynamic` calls. |
-| **[GCP Models Viewer](file:///Users/jasondavenport/GitHub/geminirouter/docs/admin/routing-rules.md#user-flow-4-implementing-fallback-models-and-dynamic-target-upgrades)** | `/admin/models` | Natively inspect active GCP Vertex endpoints, locations, and foundation model tiers. |
-| **[Metrics Dashboard](file:///Users/jasondavenport/GitHub/geminirouter/docs/admin/metrics-and-costs.md)** | `/admin/metrics` | Track real-time throughput volume, error rates, and latency curves. |
-| **[Cost Analytics](file:///Users/jasondavenport/GitHub/geminirouter/docs/admin/metrics-and-costs.md#user-flow-7-spend-allocation-and-cost-tracking)** | `/admin/costs` | Audit token counts, and calculate dynamic spend savings charts. |
-
----
-
-## 🚀 Primary Operator Workflows
-
-To execute standard management procedures, follow the specialized operational runbooks:
-* **To onboard a new application context and provision API keys**: Refer to **[Apps & API Keys Runbook](file:///Users/jasondavenport/GitHub/geminirouter/docs/admin/apps-and-keys.md)**.
-* **To require a specific token header from clients**: Refer to **[Custom Request Verification Guide](file:///Users/jasondavenport/GitHub/geminirouter/docs/admin/custom-headers.md)**.
-* **To override upstream routing paths dynamically**: Refer to **[Routing & Complexity Rules Guide](file:///Users/jasondavenport/GitHub/geminirouter/docs/admin/routing-rules.md)**.
-* **To evaluate token costs and system analytics**: Refer to **[Performance & Spend Auditing Guide](file:///Users/jasondavenport/GitHub/geminirouter/docs/admin/metrics-and-costs.md)**.
+| **[Apps & API Keys](file:///Users/jasondavenport/GitHub/geminirouter/docs/admin/apps-and-keys.md)** | `/admin/keys` & `/admin/apps` | Manage applications, client tiers, and API keys. |
+| **[Custom Headers](file:///Users/jasondavenport/GitHub/geminirouter/docs/admin/custom-headers.md)** | `/admin/headers` | Configure request header requirements. |
+| **[Routing Rules](file:///Users/jasondavenport/GitHub/geminirouter/docs/admin/routing-rules.md)** | `/admin/rules` | Set model overrides, locations, and fallbacks. |
+| **[Complexity Tuning](file:///Users/jasondavenport/GitHub/geminirouter/docs/admin/routing-rules.md#user-flow-5-tuning-complexity-based-dynamic-routing)** | `/admin/complexity` | Set character thresholds for the virtual `gemini-dynamic` model. |
+| **[GCP Models Viewer](file:///Users/jasondavenport/GitHub/geminirouter/docs/admin/routing-rules.md#user-flow-4-implementing-fallback-models-and-dynamic-target-upgrades)** | `/admin/models` | Inspect active GCP Vertex AI model endpoints and locations. |
+| **[Metrics Dashboard](file:///Users/jasondavenport/GitHub/geminirouter/docs/admin/metrics-and-costs.md)** | `/admin/metrics` | Track requests, error rates, and latency. |
+| **[Cost Analytics](file:///Users/jasondavenport/GitHub/geminirouter/docs/admin/metrics-and-costs.md#user-flow-7-spend-allocation-and-cost-tracking)** | `/admin/costs` | Monitor token counts and calculated cost savings. |

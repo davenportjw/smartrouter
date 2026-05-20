@@ -1,47 +1,40 @@
 # 🛡️ Upstream Model Compliance Policy
 
-To ensure optimal system performance, reasoning capabilities, and long-term maintenance, this repository enforces strict constraints on upstream Gemini model configurations.
+This policy enforces constraints on upstream Gemini model configurations.
 
 ---
 
-## ⚠️ The Baseline Gemini 2.5+ Requirement
+## ⚠️ Gemini 2.5+ Requirement
 
 > [!IMPORTANT]
-> **CRITICAL COMPLIANCE RULE**: You must NEVER use, route to, or configure an upstream Gemini model version older than the **Gemini 2.5** series.
+> **COMPLIANCE RULE**: Do not use or configure upstream Gemini models older than the **Gemini 2.5** series.
 
-Legacy model versions (such as `gemini-1.0-*`, `gemini-1.5-*`, and `gemini-2.0-*`) are deprecated. They are prohibited for active routing rule configurations in this codebase.
+Legacy model versions (e.g., `gemini-1.0-*`, `gemini-1.5-*`, `gemini-2.0-*`) are prohibited.
 
 ---
 
 ## ✅ Authorized Upstream Gemini Models
 
-When seeding database rules, writing integration tests, or setting up complexity targets, use only the following authorized models:
+Use only the following authorized models in database rules, integration tests, or complexity targets:
 
-* **`gemini-2.5-flash`**: Default choice for general-purpose, high-throughput content generation tasks. Offers the perfect balance of latency and cost.
-* **`gemini-2.5-pro`**: Mandatory choice for heavy reasoning, complex programming analysis, math, or multimodal files requiring advanced reasoning.
-* **`gemini-2.5-flash-lite`**: Optimized for ultra-low latency and high-frequency, cost-sensitive requests.
-* **Subsequent 2.5+ & 3.x+ Series**: Future releases exceeding the 2.5 baseline (e.g. Gemini 3.0, Gemini 3.5) are fully compliant.
-* **Preview Models**: Compliant model versions ending in `-preview` (with or without date suffixes, e.g. `gemini-3.1-pro-preview`, `gemini-2.5-flash-preview-09-2025`) are fully supported.
+* **`gemini-2.5-flash`**: Default choice for standard content generation.
+* **`gemini-2.5-pro`**: Used for complex reasoning, programming, math, or large multimodal files.
+* **`gemini-2.5-flash-lite`**: Used for low latency, cost-sensitive requests.
+* **Subsequent 2.5+ & 3.x+ Series**: Models exceeding the 2.5 baseline are supported.
+* **Preview Models**: Compliant versions ending in `-preview` are supported.
 
 ---
 
-## 🧪 Ensuring Compliance in Development
+## 🧪 Compliance in Development
 
-### 1. Database Seeding / Config Files
-Ensure all seeded rules inside `/data/local_db.json` or Firestore target authorized models.
-* **Non-Compliant**:
-  ```json
-  "target_model": "gemini-1.5-flash"
-  ```
-* **Compliant**:
-  ```json
-  "target_model": "gemini-2.5-flash-lite"
-  ```
+### 1. Database Configurations
+Ensure seeded rules in `/data/local_db.json` or Firestore target authorized models:
+* **Non-Compliant**: `"target_model": "gemini-1.5-flash"`
+* **Compliant**: `"target_model": "gemini-2.5-flash-lite"`
 
 ### 2. Integration Tests
-When seeding mock routing pathways inside `pkg/proxy/proxy_test.go`, target only authorized models to ensure test suite validity:
+Target only authorized models in tests:
 ```go
-// Seeding compliant dynamic rule inside test setup
 _ = store.SaveRule(ctx, config.RoutingRule{
     ID:             "rule-tdd-1",
     ModelPattern:   "gemini-dynamic",

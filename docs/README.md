@@ -1,6 +1,6 @@
 # 🌌 Smart Router Documentation
 
-Welcome to the Smart Router docset. Use this high-performance, Firebase-secured drop-in proxy on Google Cloud Run to manage API keys, rate limits, and dynamic routing for upstream Gemini and Vertex AI workloads.
+Welcome to the Smart Router documentation. The Smart Router is a Google Cloud Run proxy for API keys, rate limits, and routing of Gemini and Vertex AI workloads.
 
 ---
 
