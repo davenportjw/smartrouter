@@ -213,6 +213,15 @@ func (ac *APIConfigStore) DeleteApp(ctx context.Context, id string) error {
 	return ac.makeRequest(ctx, "DELETE", path, nil, nil)
 }
 
+func (ac *APIConfigStore) SaveClient(ctx context.Context, client Client) error {
+	return ac.makeRequest(ctx, "POST", "/api/clients", client, nil)
+}
+
+func (ac *APIConfigStore) DeleteClient(ctx context.Context, id string) error {
+	path := fmt.Sprintf("/api/clients?id=%s", url.QueryEscape(id))
+	return ac.makeRequest(ctx, "DELETE", path, nil, nil)
+}
+
 func (ac *APIConfigStore) GetQueueStatus(ctx context.Context) ([]QueueSnapshotItem, error) {
 	var status []QueueSnapshotItem
 	err := ac.makeRequest(ctx, "GET", "/api/queue", nil, &status)

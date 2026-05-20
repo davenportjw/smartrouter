@@ -22,5 +22,7 @@ type AdminStore interface {
 	DeleteModel(ctx context.Context, id string) error
 	SaveApp(ctx context.Context, app App) error
 	DeleteApp(ctx context.Context, id string) error
+	SaveClient(ctx context.Context, client Client) error
+	DeleteClient(ctx context.Context, id string) error
 	GetQueueStatus(ctx context.Context) ([]QueueSnapshotItem, error)
 }

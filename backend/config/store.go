@@ -861,6 +861,22 @@ func (cs *ConfigStore) SaveClient(ctx context.Context, client config.Client) err
 	return err
 }
 
+func (cs *ConfigStore) DeleteClient(ctx context.Context, id string) error {
+	cs.mu.RLock()
+	isDev := cs.isLocalDev
+	cs.mu.RUnlock()
+
+	if isDev {
+		cs.mu.Lock()
+		delete(cs.clients, id)
+		cs.mu.Unlock()
+		return cs.saveLocalDB()
+	}
+
+	_, err := cs.Client.Collection("clients").Doc(id).Delete(ctx)
+	return err
+}
+
 func (cs *ConfigStore) SaveKey(ctx context.Context, key config.APIKey) error {
 	cs.mu.RLock()
 	isDev := cs.isLocalDev

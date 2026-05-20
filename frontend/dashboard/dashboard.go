@@ -2818,6 +2818,149 @@ func (dc *DashboardController) DeleteApp(w http.ResponseWriter, r *http.Request)
 	w.Write([]byte(""))
 }
 
+// ServeClients renders the Client Organizations tab.
+func (dc *DashboardController) ServeClients(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	clients, err := dc.Store.GetAllClients(ctx)
+	if err != nil {
+		log.Printf("[Dashboard] Error loading clients: %v", err)
+		http.Error(w, "Internal Server Error loading clients", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	content := templates.ClientsTab(clients)
+	_ = templates.Layout("Client Organizations", "clients", content).Render(ctx, w)
+}
+
+// ServeClientsNewModal renders the dynamic client creation modal form.
+func (dc *DashboardController) ServeClientsNewModal(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	w.Header().Set("Content-Type", "text/html")
+	_ = templates.ClientModal(nil).Render(ctx, w)
+}
+
+// ServeClientsEditModal renders the dynamic settings modal form to edit a client.
+func (dc *DashboardController) ServeClientsEditModal(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	clientID := r.URL.Query().Get("id")
+	if clientID == "" {
+		http.Error(w, "Missing client ID", http.StatusBadRequest)
+		return
+	}
+
+	clients, err := dc.Store.GetAllClients(ctx)
+	if err != nil {
+		log.Printf("[Dashboard] Error loading clients for edit modal: %v", err)
+		http.Error(w, "Failed to load client organizations", http.StatusInternalServerError)
+		return
+	}
+
+	var foundClient *config.Client
+	for _, c := range clients {
+		if c.ID == clientID {
+			foundClient = &c
+			break
+		}
+	}
+
+	if foundClient == nil {
+		http.Error(w, "Client Organization not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	_ = templates.ClientModal(foundClient).Render(ctx, w)
+}
+
+// CreateClient handles client profile creation and edition submissions.
+func (dc *DashboardController) CreateClient(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx := r.Context()
+
+	clientID := strings.TrimSpace(r.FormValue("client_id"))
+	clientName := strings.TrimSpace(r.FormValue("client_name"))
+	tier := strings.TrimSpace(r.FormValue("tier"))
+	priority := strings.TrimSpace(r.FormValue("priority"))
+	rpmStr := strings.TrimSpace(r.FormValue("rpm"))
+	tpmStr := strings.TrimSpace(r.FormValue("tpm"))
+
+	if clientID == "" {
+		http.Error(w, "Client ID (Slug) cannot be empty.", http.StatusBadRequest)
+		return
+	}
+
+	for _, char := range clientID {
+		if !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9') || char == '-' || char == '.') {
+			http.Error(w, "Client ID must be a valid slug (alphanumeric, hyphens, and dots only).", http.StatusBadRequest)
+			return
+		}
+	}
+
+	if clientName == "" {
+		http.Error(w, "Client Name cannot be empty.", http.StatusBadRequest)
+		return
+	}
+
+	rpm, err := strconv.Atoi(rpmStr)
+	if err != nil || rpm <= 0 {
+		http.Error(w, "Fallback RPM limit must be a positive integer.", http.StatusBadRequest)
+		return
+	}
+
+	tpm, err := strconv.Atoi(tpmStr)
+	if err != nil || tpm <= 0 {
+		http.Error(w, "Fallback TPM limit must be a positive integer.", http.StatusBadRequest)
+		return
+	}
+
+	err = dc.Store.SaveClient(ctx, config.Client{
+		ID:       clientID,
+		Name:     clientName,
+		Tier:     tier,
+		RPM:      rpm,
+		TPM:      tpm,
+		Priority: priority,
+	})
+	if err != nil {
+		log.Printf("[Dashboard] Error saving client organization: %v", err)
+		http.Error(w, "Failed to save client organization", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/clients", http.StatusSeeOther)
+}
+
+// DeleteClient deletes a client organization profile dynamically.
+func (dc *DashboardController) DeleteClient(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx := r.Context()
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "Missing client ID", http.StatusBadRequest)
+		return
+	}
+
+	err := dc.Store.DeleteClient(ctx, id)
+	if err != nil {
+		log.Printf("[Dashboard] Error deleting client organization: %v", err)
+		http.Error(w, "Failed to delete client organization", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(""))
+}
+
 // ServeComplexity renders the Dynamic Complexity Routing administration view.
 func (dc *DashboardController) ServeComplexity(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()

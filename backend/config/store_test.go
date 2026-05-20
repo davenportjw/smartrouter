@@ -82,3 +82,72 @@ func TestFirstStartModelSeedingEmpty(t *testing.T) {
 		t.Errorf("expected 0 seeded models on first start before discovery, got %d", len(models))
 	}
 }
+
+func TestConfigStoreClientsCRUD(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+	defer os.RemoveAll("data/local_db.json")
+
+	ctx := context.Background()
+	store, err := NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to initialize config store: %v", err)
+	}
+
+	// 1. Verify initial state
+	clients, err := store.GetAllClients(ctx)
+	if err != nil {
+		t.Fatalf("failed to get clients: %v", err)
+	}
+	initialCount := len(clients)
+
+	// 2. Save new client
+	newClient := config.Client{
+		ID:       "test-crud-client",
+		Name:     "Test CRUD Client",
+		Tier:     "premium",
+		RPM:      150,
+		TPM:      200000,
+		Priority: "high",
+	}
+
+	if err := store.SaveClient(ctx, newClient); err != nil {
+		t.Fatalf("failed to save client: %v", err)
+	}
+
+	// 3. GetAllClients and find new client
+	clients, err = store.GetAllClients(ctx)
+	if err != nil {
+		t.Fatalf("failed to get clients: %v", err)
+	}
+	if len(clients) != initialCount+1 {
+		t.Errorf("expected %d clients, got %d", initialCount+1, len(clients))
+	}
+
+	found := false
+	for _, c := range clients {
+		if c.ID == newClient.ID {
+			found = true
+			if c.Name != newClient.Name || c.Tier != newClient.Tier || c.RPM != newClient.RPM || c.TPM != newClient.TPM || c.Priority != newClient.Priority {
+				t.Errorf("saved client details mismatch: %+v", c)
+			}
+			break
+		}
+	}
+	if !found {
+		t.Errorf("saved client not found in GetAllClients")
+	}
+
+	// 4. Delete client
+	if err := store.DeleteClient(ctx, newClient.ID); err != nil {
+		t.Fatalf("failed to delete client: %v", err)
+	}
+
+	// 5. Verify client was deleted
+	clients, err = store.GetAllClients(ctx)
+	if err != nil {
+		t.Fatalf("failed to get clients: %v", err)
+	}
+	if len(clients) != initialCount {
+		t.Errorf("expected %d clients after delete, got %d", initialCount, len(clients))
+	}
+}

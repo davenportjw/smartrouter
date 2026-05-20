@@ -25,9 +25,10 @@ ALLOWED_EMAIL_DOMAINS="mycompany.com,operator@gmail.com"
 
 | View | Endpoint | Purpose |
 | :--- | :--- | :--- |
-| **[Apps & API Keys](file:///Users/jasondavenport/GitHub/geminirouter/docs/admin/apps-and-keys.md)** | `/admin/keys` & `/admin/apps` | Manage applications, client tiers, and API keys. |
-| **[Custom Headers](file:///Users/jasondavenport/GitHub/geminirouter/docs/admin/custom-headers.md)** | `/admin/headers` | Configure request header requirements. |
-| **[Routing Rules](file:///Users/jasondavenport/GitHub/geminirouter/docs/admin/routing-rules.md)** | `/admin/rules` | Set model overrides, locations, and fallbacks. |
+| **[Client Organizations](file:///Users/jasondavenport/GitHub/smartrouter/docs/admin/client-organizations.md)** | `/admin/clients` | Manage subscriber organizations and billing tiers. |
+| **[Apps & API Keys](file:///Users/jasondavenport/GitHub/smartrouter/docs/admin/apps-and-keys.md)** | `/admin/keys` & `/admin/apps` | Manage applications, client tiers, and API keys. |
+| **[Custom Headers](file:///Users/jasondavenport/GitHub/smartrouter/docs/admin/custom-headers.md)** | `/admin/headers` | Configure request header requirements. |
+| **[Routing Rules](file:///Users/jasondavenport/GitHub/smartrouter/docs/admin/routing-rules.md)** | `/admin/rules` | Set model overrides, locations, and fallbacks. |
 | **[Complexity Tuning](file:///Users/jasondavenport/GitHub/geminirouter/docs/admin/routing-rules.md#user-flow-5-tuning-complexity-based-dynamic-routing)** | `/admin/complexity` | Set character thresholds for the virtual `gemini-dynamic` model. |
 | **[GCP Models Viewer](file:///Users/jasondavenport/GitHub/geminirouter/docs/admin/routing-rules.md#user-flow-4-implementing-fallback-models-and-dynamic-target-upgrades)** | `/admin/models` | Inspect active GCP Vertex AI model endpoints and locations. |
 | **[Metrics Dashboard](file:///Users/jasondavenport/GitHub/geminirouter/docs/admin/metrics-and-costs.md)** | `/admin/metrics` | Track requests, error rates, and latency. |

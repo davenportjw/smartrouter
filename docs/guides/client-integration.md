@@ -2,6 +2,22 @@
 
 This guide explains the request formats and headers needed to authenticate with the Smart Router.
 
+---
+
+## 🧠 Authentication & Hierarchy Context
+
+To integrate with the Smart Router, it is helpful to understand the data hierarchy under which your credentials operate:
+
+- **Client Organization**: The top-level subscriber or department account. It governs the overall subscription tier (`premium`, `standard`, `free`) for billing purposes.
+- **Logical Application (App)**: A functional project or service under the Client Organization (e.g., `customer-support-bot`, `internal-hr-portal`). **All RPM and TPM rate limits, along with request queueing priorities, are governed at the Application level.**
+- **Credentials (API Key or Google IAM)**: Bind directly to a single **Application**.
+
+When you invoke the Smart Router API, your credential maps your request to its associated **Application**. Your traffic is instantly checked against that application's isolated rate limit limits, inherits its priority weight, and applies its custom header/routing rules.
+
+---
+
+## 🔐 Authentication Methods
+
 The proxy supports two authentication methods: **Static API Key** and **Zero-Key IAM Service Account OIDC**.
 
 ---

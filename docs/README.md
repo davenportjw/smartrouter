@@ -12,8 +12,9 @@ Learn how the proxy processes requests, validates keys, and calculates costs.
 
 ## 👑 Operator & Admin Manuals
 Manage all operational tasks using the HTMX dashboard at `/admin`.
-* 🗂️ **[Administration Overview](file:///Users/jasondavenport/GitHub/geminirouter/docs/admin/README.md)**: Overview of the Portal interface and secure Google Firebase Sign-In.
-* 📱 **[Apps & API Keys Lifecycle](file:///Users/jasondavenport/GitHub/geminirouter/docs/admin/apps-and-keys.md)**: Register applications, set priority weights, map client tiers, and manage static keys.
+* 🗂️ **[Administration Overview](file:///Users/jasondavenport/GitHub/smartrouter/docs/admin/README.md)**: Overview of the Portal interface and secure Google Firebase Sign-In.
+* 🏢 **[Client Organizations Manual](file:///Users/jasondavenport/GitHub/smartrouter/docs/admin/client-organizations.md)**: Register parent client organizations, edit fallback limits, and manage billing tiers.
+* 📱 **[Apps & API Keys Lifecycle](file:///Users/jasondavenport/GitHub/smartrouter/docs/admin/apps-and-keys.md)**: Register applications, set priority weights, map client tiers, and manage static keys.
 * 🔒 **[Custom Request Verification](file:///Users/jasondavenport/GitHub/geminirouter/docs/admin/custom-headers.md)**: Declare and enforce custom HTTP headers with regex, enum, and presence checks.
 * 🌐 **[Routing & Complexity Rules](file:///Users/jasondavenport/GitHub/geminirouter/docs/admin/routing-rules.md)**: Configure regional failover overrides, fallback targets, and prompt-complexity threshold mappings.
 * 📊 **[Performance & Spend Auditing](file:///Users/jasondavenport/GitHub/geminirouter/docs/admin/metrics-and-costs.md)**: Monitor real-time RPM/TPM traffic, audit API error spikes, and track cost savings.

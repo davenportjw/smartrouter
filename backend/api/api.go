@@ -147,18 +147,48 @@ func (ac *APIController) HandleAppsLookup(w http.ResponseWriter, r *http.Request
 }
 
 func (ac *APIController) HandleClients(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		w.Header().Set("Allow", "GET")
-		respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed")
-		return
-	}
 	ctx := r.Context()
-	clients, err := ac.Store.GetAllClients(ctx)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, err.Error())
-		return
+	switch r.Method {
+	case http.MethodGet:
+		clients, err := ac.Store.GetAllClients(ctx)
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		respondWithJSON(w, http.StatusOK, clients)
+
+	case http.MethodPost:
+		var client config.Client
+		if err := json.NewDecoder(r.Body).Decode(&client); err != nil {
+			respondWithError(w, http.StatusBadRequest, "Invalid request payload")
+			return
+		}
+		if client.ID == "" {
+			respondWithError(w, http.StatusBadRequest, "Missing client ID")
+			return
+		}
+		if err := ac.Store.SaveClient(ctx, client); err != nil {
+			respondWithError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		respondWithJSON(w, http.StatusOK, client)
+
+	case http.MethodDelete:
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			respondWithError(w, http.StatusBadRequest, "Missing client id query parameter")
+			return
+		}
+		if err := ac.Store.DeleteClient(ctx, id); err != nil {
+			respondWithError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		respondWithJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+
+	default:
+		w.Header().Set("Allow", "GET, POST, DELETE")
+		respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed")
 	}
-	respondWithJSON(w, http.StatusOK, clients)
 }
 
 func (ac *APIController) HandleKeys(w http.ResponseWriter, r *http.Request) {
