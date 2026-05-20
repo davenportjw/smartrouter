@@ -965,7 +965,7 @@ func TestRequestSchedulerClientDisconnect(t *testing.T) {
 	rp.Proxy.Transport = &mockRoundTripper{Target: backendURL}
 
 	// Hold the slot
-	_, err := rp.Scheduler.Enqueue(ctx, "medium", "standard")
+	item, err := rp.Scheduler.Enqueue(ctx, "app-1", "medium", "standard", "gemini-2.5-flash")
 	if err != nil {
 		t.Fatalf("enqueue block failed: %v", err)
 	}
@@ -987,7 +987,7 @@ func TestRequestSchedulerClientDisconnect(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Release slot
-	rp.Scheduler.Release()
+	rp.Scheduler.Release(item)
 	time.Sleep(100 * time.Millisecond)
 
 	mu.Lock()
@@ -2807,6 +2807,160 @@ func TestProxyGlobalLocationRouting(t *testing.T) {
 	expectedPath := "/v1/projects/test-project/locations/global/publishers/google/models/gemini-3.1-pro-preview:generateContent"
 	if path != expectedPath {
 		t.Errorf("expected rewritten path to be %q, got %q", expectedPath, path)
+	}
+
+	os.RemoveAll("data/local_db.json")
+}
+
+func TestProxyModelOverloadQueuingAndAPI(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("ROUTER_CONCURRENCY_LIMIT", "10")
+	t.Setenv("ROUTER_MAX_QUEUE_SIZE", "5")
+
+	ctx := context.Background()
+	store, _ := store.NewConfigStore(ctx, "test-project")
+
+	app := config.App{ID: "app-1", ClientID: "client-1", RPM: 100, TPM: 500000, Priority: "high"}
+	app2 := config.App{ID: "app-2", ClientID: "client-1", RPM: 100, TPM: 500000, Priority: "low"}
+	client1 := config.Client{ID: "client-1", Tier: "premium"}
+	key1 := config.APIKey{KeyHash: config.HashKey("key-1"), AppID: "app-1", Status: "active"}
+	key2 := config.APIKey{KeyHash: config.HashKey("key-2"), AppID: "app-2", Status: "active"}
+
+	_ = store.SaveClient(ctx, client1)
+	_ = store.SaveApp(ctx, app)
+	_ = store.SaveApp(ctx, app2)
+	_ = store.SaveKey(ctx, key1)
+	_ = store.SaveKey(ctx, key2)
+	_ = store.DeleteHeader(ctx, "header-1")
+
+	var mu sync.Mutex
+	should429 := true
+	backendCalls := 0
+
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		backendCalls++
+		is429 := should429
+		mu.Unlock()
+
+		if is429 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			w.Write([]byte(`{"error": "too many requests"}`))
+		} else {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"status": "ok"}`))
+		}
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+	rp, _ := NewRouterProxy(store, "test-project", "us-central1")
+	rp.TokenSource = &mockTokenSource{}
+	rp.Target = backendURL
+	rp.Proxy.Transport = &mockRoundTripper{Target: backendURL}
+
+	// 1. Send first request which will return 429 (and retry, but fail)
+	req1 := httptest.NewRequest("POST", "/v1/models/gemini-2.5-flash:generateContent?key=key-1", nil)
+	req1.Header.Set("x-goog-api-key", "key-1")
+	rr1 := httptest.NewRecorder()
+	rp.ServeHTTP(rr1, req1)
+
+	if rr1.Code != http.StatusTooManyRequests {
+		t.Errorf("expected 429, got %d", rr1.Code)
+	}
+
+	// Verify that model is marked as overloaded
+	if !rp.Scheduler.isModelOverloaded("gemini-2.5-flash") {
+		t.Errorf("expected gemini-2.5-flash to be overloaded")
+	}
+
+	// 2. Hold one active request block to keep the overloaded slot occupied
+	blockChan := make(chan struct{})
+	defer func() {
+		select {
+		case <-blockChan:
+		default:
+			close(blockChan)
+		}
+	}()
+
+	// Set backend to not 429 anymore so that we can block a successful request
+	mu.Lock()
+	should429 = false
+	mu.Unlock()
+
+	// Send a request that blocks in the backend, occupying the 1 overloaded slot
+	backendBlocked := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-blockChan
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status": "ok"}`))
+	}))
+	defer backendBlocked.Close()
+	blockedURL, _ := url.Parse(backendBlocked.URL)
+
+	rpBlocked, _ := NewRouterProxy(store, "test-project", "us-central1")
+	rpBlocked.TokenSource = &mockTokenSource{}
+	rpBlocked.Target = blockedURL
+	rpBlocked.Proxy.Transport = &mockRoundTripper{Target: blockedURL}
+	// Set it to also believe it's overloaded
+	rpBlocked.Scheduler.overloadedModels["gemini-2.5-flash"] = time.Now().Add(15 * time.Second)
+
+	// Launch the request to block
+	reqBlock := httptest.NewRequest("POST", "/v1/models/gemini-2.5-flash:generateContent?key=key-1", nil)
+	reqBlock.Header.Set("x-goog-api-key", "key-1")
+	rrBlock := httptest.NewRecorder()
+	go func() {
+		rpBlocked.ServeHTTP(rrBlock, reqBlock)
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Now, any subsequent requests should queue! Let's submit a low priority one first, then a high priority one.
+	// Since they are queued, we submit them concurrently.
+	reqLow := httptest.NewRequest("POST", "/v1/models/gemini-2.5-flash:generateContent?key=key-2", nil)
+	reqLow.Header.Set("x-goog-api-key", "key-2")
+	rrLow := httptest.NewRecorder()
+
+	reqHigh := httptest.NewRequest("POST", "/v1/models/gemini-2.5-flash:generateContent?key=key-1", nil)
+	reqHigh.Header.Set("x-goog-api-key", "key-1")
+	rrHigh := httptest.NewRecorder()
+
+	go func() { rpBlocked.ServeHTTP(rrLow, reqLow) }()
+	time.Sleep(50 * time.Millisecond)
+	go func() { rpBlocked.ServeHTTP(rrHigh, reqHigh) }()
+	time.Sleep(100 * time.Millisecond)
+
+	// 3. Verify the queue snapshot API output
+	snapshot := rpBlocked.Scheduler.GetQueueStatus()
+	if len(snapshot) != 3 {
+		t.Fatalf("expected 3 items in snapshot, got %d: %+v", len(snapshot), snapshot)
+	}
+
+	// The first one should be processing, and the next two should be queued, ordered by priority (high priority first)
+	if snapshot[0].Status != "processing" {
+		t.Errorf("expected first snapshot item to be processing, got %s", snapshot[0].Status)
+	}
+	if snapshot[1].Status != "queued" || snapshot[1].AppID != "app-1" {
+		t.Errorf("expected second snapshot item to be queued for high priority app-1, got status %s, appID %s", snapshot[1].Status, snapshot[1].AppID)
+	}
+	if snapshot[2].Status != "queued" || snapshot[2].AppID != "app-2" {
+		t.Errorf("expected third snapshot item to be queued for low priority app-2, got status %s, appID %s", snapshot[2].Status, snapshot[2].AppID)
+	}
+
+	// 4. Unblock! They should run and succeed.
+	close(blockChan)
+	time.Sleep(200 * time.Millisecond)
+
+	if rrLow.Code != http.StatusOK {
+		t.Errorf("expected low priority request to succeed with 200, got %d", rrLow.Code)
+	}
+	if rrHigh.Code != http.StatusOK {
+		t.Errorf("expected high priority request to succeed with 200, got %d", rrHigh.Code)
+	}
+
+	// Verify that overloaded status is now cleared because of successful requests!
+	if rpBlocked.Scheduler.isModelOverloaded("gemini-2.5-flash") {
+		t.Errorf("expected gemini-2.5-flash overloaded status to be cleared")
 	}
 
 	os.RemoveAll("data/local_db.json")

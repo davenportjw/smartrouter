@@ -25,6 +25,7 @@ scratch/
 
 # Local Database
 data/local_db.json
+data/local_logs.jsonl
 
 # OS Metadata
 .DS_Store

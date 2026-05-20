@@ -7,19 +7,22 @@ import (
 	"os"
 
 	store "geminirouter/backend/config"
+	"geminirouter/backend/proxy"
 	"geminirouter/pkg/config"
 )
 
 // APIController handles the administrative REST APIs on the backend.
 type APIController struct {
 	Store        *store.ConfigStore
+	Scheduler    *proxy.RequestScheduler
 	SharedSecret string
 }
 
 // NewAPIController initializes a new backend API controller.
-func NewAPIController(store *store.ConfigStore, sharedSecret string) *APIController {
+func NewAPIController(store *store.ConfigStore, scheduler *proxy.RequestScheduler, sharedSecret string) *APIController {
 	return &APIController{
 		Store:        store,
+		Scheduler:    scheduler,
 		SharedSecret: sharedSecret,
 	}
 }
@@ -57,6 +60,7 @@ func (ac *APIController) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("/api/models", ac.AuthMiddleware(http.HandlerFunc(ac.HandleModels)))
 	mux.Handle("/api/models/refresh", ac.AuthMiddleware(http.HandlerFunc(ac.HandleModelsRefresh)))
 	mux.Handle("/api/models/toggle", ac.AuthMiddleware(http.HandlerFunc(ac.HandleModelsToggle)))
+	mux.Handle("/api/queue", ac.AuthMiddleware(http.HandlerFunc(ac.HandleQueue)))
 }
 
 // Response helpers
@@ -398,4 +402,17 @@ func (ac *APIController) HandleModelsToggle(w http.ResponseWriter, r *http.Reque
 	}
 
 	respondWithJSON(w, http.StatusOK, map[string]string{"status": "toggled", "active": fmt.Sprintf("%t", foundModel.Active)})
+}
+
+func (ac *APIController) HandleQueue(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	if ac.Scheduler == nil {
+		respondWithError(w, http.StatusInternalServerError, "Scheduler not initialized")
+		return
+	}
+	status := ac.Scheduler.GetQueueStatus()
+	respondWithJSON(w, http.StatusOK, status)
 }

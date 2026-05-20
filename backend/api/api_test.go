@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	store "geminirouter/backend/config"
+	"geminirouter/backend/proxy"
 	"geminirouter/pkg/config"
 )
 
@@ -25,7 +26,7 @@ func TestAPIConfigStoreAndBackendAPIIntegration(t *testing.T) {
 	dbStore, _ = store.NewConfigStore(ctx, "test-project")
 
 	sharedSecret := "super-secret-bypass-token"
-	apiController := NewAPIController(dbStore, sharedSecret)
+	apiController := NewAPIController(dbStore, proxy.NewRequestScheduler(1000, 100), sharedSecret)
 
 	mux := http.NewServeMux()
 	apiController.RegisterRoutes(mux)

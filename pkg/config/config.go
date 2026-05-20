@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // Client represents a router consumer client.
@@ -231,5 +232,16 @@ func GetVertexEndpointHost(loc string) string {
 	}
 	// Fallback for any other multiregion
 	return fmt.Sprintf("aiplatform.%s.rep.googleapis.com", loc)
+}
+
+// QueueSnapshotItem represents a request in the scheduling queue.
+type QueueSnapshotItem struct {
+	AppID       string    `json:"app_id"`
+	Model       string    `json:"model"`
+	Priority    string    `json:"priority"`
+	Tier        string    `json:"tier"`
+	Status      string    `json:"status"`
+	ArrivalTime time.Time `json:"arrival_time"`
+	DurationMs  int64     `json:"duration_ms"`
 }
 

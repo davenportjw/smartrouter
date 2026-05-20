@@ -50,3 +50,14 @@ type CostsViewModel struct {
 	ModelCostSVG  string
 	ClientCostSVG string
 }
+
+// QueueSnapshotItem represents a request in the scheduling queue.
+type QueueSnapshotItem struct {
+	AppID       string `json:"app_id"`
+	Model       string `json:"model"`
+	Priority    string `json:"priority"`
+	Tier        string `json:"tier"`
+	Status      string `json:"status"`
+	ArrivalTime string `json:"arrival_time"`
+	DurationMs  int64  `json:"duration_ms"`
+}

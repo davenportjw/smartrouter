@@ -107,3 +107,27 @@ X-Routed-Model: gemini-2.5-flash-lite
 X-Client-Tier: standard
 X-App-ID: mobile-chat-app
 ```
+
+---
+
+## ⏳ 5. Adaptive Throttling & Queueing Pipeline (429 Handling)
+
+To protect upstream Vertex AI quotas and guarantee high-priority traffic delivery, the Smart Router operates a dynamic backpressure queue.
+
+### Overload Detection
+* When any upstream model request returns an HTTP `429 Too Many Requests` (after exhausted retries and exponential backoffs), the router automatically flags that specific model as **Overloaded**.
+* The overloaded status initiates a cooldown period (default 15 seconds).
+
+### Pipeline Execution & Prioritization
+* **Healthy Models**: Requests are submitted immediately for execution if global router concurrency capacity is available (`ROUTER_CONCURRENCY_LIMIT`).
+* **Overloaded Models**:
+  * Concurrency to the overloaded model is restricted (default max 1 concurrent check).
+  * All other concurrent incoming requests for that model are immediately enqueued in the **Priority Queue**.
+  * The Priority Queue sorts requests using App priority and Client tier (`PriorityValue`):
+    * **High Priority** (RPM/TPM rate bounds, e.g., `high` priority App) gets executed first.
+    * **Client Tier** acts as the tiebreaker (e.g., `premium` tier Client preceding `free` tier).
+    * **FIFO** (First-In, First-Out) is applied for identical priority values.
+  * If an active check succeeds (returns 200 OK), the overloaded status is cleared immediately, and the queue dispatches held requests at full speed.
+
+### Real-Time Queue Dashboard
+View the active and queued request list dynamically inside the **Request Queue** tab (`/admin/queue`) in the administrative panel. The pipeline stats and tables auto-refresh every 2 seconds via HTMX.

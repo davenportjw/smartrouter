@@ -11,6 +11,7 @@ import (
 
 	"geminirouter/backend/api"
 	store "geminirouter/backend/config"
+	"geminirouter/backend/proxy"
 	"geminirouter/pkg/config"
 )
 
@@ -28,7 +29,7 @@ func TestDashboardUIAndRESTBackendIntegration(t *testing.T) {
 	dbStore, _ = store.NewConfigStore(ctx, "test-project")
 
 	sharedSecret := "dashboard-secure-rest-token"
-	apiController := api.NewAPIController(dbStore, sharedSecret)
+	apiController := api.NewAPIController(dbStore, proxy.NewRequestScheduler(1000, 100), sharedSecret)
 
 	muxAPI := http.NewServeMux()
 	apiController.RegisterRoutes(muxAPI)
@@ -334,4 +335,102 @@ func TestDashboardUIAndRESTBackendIntegration(t *testing.T) {
 	})
 
 	os.RemoveAll("data/local_db.json")
+}
+
+func TestLocalLogsTelemetryAndDashboards(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+
+	// 1. Clean up previous local logs if any
+	os.RemoveAll("data/local_logs.jsonl")
+	defer os.RemoveAll("data/local_logs.jsonl")
+
+	// Create data folder if not exists
+	_ = os.MkdirAll("data", 0755)
+
+	// Write mock log entries to data/local_logs.jsonl
+	logsContent := `{"severity":"INFO","time":"2026-05-20T12:00:00Z","method":"POST","path":"/v1beta/models/gemini-2.5-flash:generateContent","client_id":"test-client","app_id":"test-app","tier":"premium","model_requested":"gemini-2.5-flash","model_routed":"gemini-2.5-flash","status":200,"latency_ms":120,"bytes_sent":600}
+{"severity":"INFO","time":"2026-05-20T12:05:00Z","method":"POST","path":"/v1beta/models/gemini-2.5-pro:generateContent","client_id":"test-client","app_id":"test-app","tier":"premium","model_requested":"gemini-2.5-pro","model_routed":"gemini-2.5-pro","status":200,"latency_ms":550,"bytes_sent":1500}
+{"severity":"WARNING","time":"2026-05-20T12:10:00Z","method":"POST","path":"/v1beta/models/gemini-2.5-flash:generateContent","client_id":"other-client","app_id":"other-app","tier":"standard","model_requested":"gemini-2.5-flash","model_routed":"gemini-2.5-flash","status":429,"latency_ms":10,"bytes_sent":0}
+`
+	err := os.WriteFile("data/local_logs.jsonl", []byte(logsContent), 0644)
+	if err != nil {
+		t.Fatalf("failed to write mock local logs: %v", err)
+	}
+
+	// Initialize Dashboard Controller backed by a dummy store
+	apiConfigStore := config.NewAPIConfigStore("http://localhost:8080", "bypass")
+	dash := NewDashboardController(apiConfigStore, "dev-project", "us-central1")
+
+	// 2. Test fetchLocalLogsCosts
+	t.Run("Local Logs Costs Integration", func(t *testing.T) {
+		costsVM, err := dash.fetchLocalLogsCosts()
+		if err != nil {
+			t.Fatalf("fetchLocalLogsCosts failed: %v", err)
+		}
+
+		// We should have 3 sessions
+		if len(costsVM.RecentSessions) != 3 {
+			t.Errorf("expected 3 sessions, got %d", len(costsVM.RecentSessions))
+		}
+
+		// Verification of cost estimation
+		if costsVM.TotalSpend <= 0 {
+			t.Errorf("expected positive cumulative spend, got %f", costsVM.TotalSpend)
+		}
+
+		// Verify client spend mapping
+		foundTestClient := false
+		for _, breakdown := range costsVM.ClientBreakdowns {
+			if breakdown.ClientID == "test-client" {
+				foundTestClient = true
+				if breakdown.Cost <= 0 {
+					t.Errorf("expected positive cost breakdown for test-client")
+				}
+			}
+		}
+		if !foundTestClient {
+			t.Errorf("expected to find test-client cost breakdown")
+		}
+	})
+
+	// 3. Test fetchLocalLogsMetrics
+	t.Run("Local Logs Metrics Integration", func(t *testing.T) {
+		metricsVM, err := dash.fetchLocalLogsMetrics()
+		if err != nil {
+			t.Fatalf("fetchLocalLogsMetrics failed: %v", err)
+		}
+
+		// Total requests should be 3
+		if metricsVM.TotalRequests != 3 {
+			t.Errorf("expected 3 total requests, got %d", metricsVM.TotalRequests)
+		}
+
+		// 1 error out of 3 -> ~33.33% error rate
+		expectedErrRate := (1.0 / 3.0) * 100.0
+		if metricsVM.ErrorRate < expectedErrRate-1.0 || metricsVM.ErrorRate > expectedErrRate+1.0 {
+			t.Errorf("expected error rate around %f, got %f", expectedErrRate, metricsVM.ErrorRate)
+		}
+
+		// Volume SVG charts should be non-empty strings
+		if len(metricsVM.VolumeChartSVG) == 0 || len(metricsVM.LatencyChartSVG) == 0 {
+			t.Errorf("expected generated SVG charts to be non-empty")
+		}
+	})
+
+	// 4. Test UI dashboard router invocation
+	t.Run("Dashboard ServeCosts and ServeMetrics routes", func(t *testing.T) {
+		reqCosts := httptest.NewRequest("GET", "/admin/costs", nil)
+		rrCosts := httptest.NewRecorder()
+		dash.ServeCosts(rrCosts, reqCosts)
+		if rrCosts.Code != http.StatusOK {
+			t.Errorf("expected costs page to render 200, got %d", rrCosts.Code)
+		}
+
+		reqMetrics := httptest.NewRequest("GET", "/admin/metrics", nil)
+		rrMetrics := httptest.NewRecorder()
+		dash.ServeMetrics(rrMetrics, reqMetrics)
+		if rrMetrics.Code != http.StatusOK {
+			t.Errorf("expected metrics page to render 200, got %d", rrMetrics.Code)
+		}
+	})
 }

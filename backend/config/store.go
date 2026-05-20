@@ -1188,3 +1188,7 @@ func (cs *ConfigStore) DeleteApp(ctx context.Context, id string) error {
 	_, err := cs.Client.Collection("apps").Doc(id).Delete(ctx)
 	return err
 }
+
+func (cs *ConfigStore) GetQueueStatus(ctx context.Context) ([]config.QueueSnapshotItem, error) {
+	return nil, nil
+}

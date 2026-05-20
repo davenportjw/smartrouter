@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/rand"
@@ -15,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -1601,10 +1603,266 @@ func estimateTokensAndCost(model string, bytesSent int64) (int, int, float64) {
 	return inTokens, outTokens, cost
 }
 
+func (dc *DashboardController) fetchLocalLogsCosts() (templates.CostsViewModel, error) {
+	file, err := os.Open("data/local_logs.jsonl")
+	if err != nil {
+		if os.IsNotExist(err) {
+			return templates.CostsViewModel{}, nil
+		}
+		return templates.CostsViewModel{}, err
+	}
+	defer file.Close()
+
+	var entries []struct {
+		Time        string `json:"time"`
+		ClientID    string `json:"client_id"`
+		ModelRouted string `json:"model_routed"`
+		BytesSent   int64  `json:"bytes_sent"`
+		Status      int    `json:"status"`
+		LatencyMs   int64  `json:"latency_ms"`
+	}
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+		var entry struct {
+			Time        string `json:"time"`
+			ClientID    string `json:"client_id"`
+			ModelRouted string `json:"model_routed"`
+			BytesSent   int64  `json:"bytes_sent"`
+			Status      int    `json:"status"`
+			LatencyMs   int64  `json:"latency_ms"`
+		}
+		if err := json.Unmarshal(line, &entry); err == nil {
+			entries = append(entries, entry)
+		}
+	}
+
+	// Reverse entries to show latest first
+	for i, j := 0, len(entries)-1; i < j; i, j = i+1, j-1 {
+		entries[i], entries[j] = entries[j], entries[i]
+	}
+
+	var sessions []templates.CostTransaction
+	modelSpend := make(map[string]float64)
+	clientSpend := make(map[string]float64)
+	totalSpend := 0.0
+	totalIn := 0
+	totalOut := 0
+
+	for i, entry := range entries {
+		clientID := entry.ClientID
+		if clientID == "" {
+			clientID = "unknown-client"
+		}
+		model := entry.ModelRouted
+		if model == "" {
+			model = "gemini-2.5-flash"
+		}
+
+		inT, outT, cost := estimateTokensAndCost(model, entry.BytesSent)
+
+		timeStr := entry.Time
+		if t, err := time.Parse(time.RFC3339, entry.Time); err == nil {
+			timeStr = t.Local().Format("2006-01-02 15:04:05")
+		}
+
+		tx := templates.CostTransaction{
+			Time:          timeStr,
+			SessionID:     fmt.Sprintf("local_%d", len(entries)-i),
+			ClientID:      clientID,
+			ModelRouted:   model,
+			InputTokens:   inT,
+			OutputTokens:  outT,
+			EstimatedCost: cost,
+		}
+
+		sessions = append(sessions, tx)
+		modelSpend[model] += cost
+		clientSpend[clientID] += cost
+		totalSpend += cost
+		totalIn += inT
+		totalOut += outT
+	}
+
+	var modelBreakdowns []templates.ModelCostBreakdown
+	for m, val := range modelSpend {
+		pct := 0.0
+		if totalSpend > 0 {
+			pct = (val / totalSpend) * 100.0
+		}
+		modelBreakdowns = append(modelBreakdowns, templates.ModelCostBreakdown{
+			ModelName: m,
+			Cost:      val,
+			Percent:   pct,
+		})
+	}
+
+	var clientBreakdowns []templates.ClientCostBreakdown
+	for c, val := range clientSpend {
+		pct := 0.0
+		if totalSpend > 0 {
+			pct = (val / totalSpend) * 100.0
+		}
+		clientBreakdowns = append(clientBreakdowns, templates.ClientCostBreakdown{
+			ClientID: c,
+			Cost:     val,
+			Percent:  pct,
+		})
+	}
+
+	avgCost := 0.0
+	if len(sessions) > 0 {
+		avgCost = (totalSpend / float64(len(sessions))) * 1000.0
+	}
+
+	if len(sessions) > 50 {
+		sessions = sessions[:50]
+	}
+
+	return templates.CostsViewModel{
+		TotalSpend:        totalSpend,
+		TotalTokensInput:  totalIn,
+		TotalTokensOutput: totalOut,
+		AvgCostPer1K:      avgCost,
+		ModelBreakdowns:   modelBreakdowns,
+		ClientBreakdowns:  clientBreakdowns,
+		RecentSessions:    sessions,
+		ModelCostSVG:      generateModelCostPieSVG(modelBreakdowns),
+		ClientCostSVG:     generateClientCostBarSVG(clientBreakdowns),
+	}, nil
+}
+
+func (dc *DashboardController) fetchLocalLogsMetrics() (templates.MetricsViewModel, error) {
+	file, err := os.Open("data/local_logs.jsonl")
+	if err != nil {
+		if os.IsNotExist(err) {
+			return templates.MetricsViewModel{}, nil
+		}
+		return templates.MetricsViewModel{}, err
+	}
+	defer file.Close()
+
+	var entries []struct {
+		Time      string `json:"time"`
+		Status    int    `json:"status"`
+		LatencyMs int64  `json:"latency_ms"`
+	}
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+		var entry struct {
+			Time      string `json:"time"`
+			Status    int    `json:"status"`
+			LatencyMs int64  `json:"latency_ms"`
+		}
+		if err := json.Unmarshal(line, &entry); err == nil {
+			entries = append(entries, entry)
+		}
+	}
+
+	counts := make([]int, 24)
+	p50 := make([]int, 24)
+	p95 := make([]int, 24)
+	labels := make([]string, 24)
+
+	now := time.Now()
+	for i := 0; i < 24; i++ {
+		t := now.Add(-time.Duration(23-i) * time.Hour)
+		labels[i] = t.Format("15:00")
+	}
+
+	hourlyLatencies := make([][]int64, 24)
+	totalReqs := 0
+	peakRate := 0
+	errorCount := 0
+
+	for _, entry := range entries {
+		t, err := time.Parse(time.RFC3339, entry.Time)
+		if err != nil {
+			continue
+		}
+
+		hrIndex := 23 - int(now.Sub(t).Hours())
+		if hrIndex >= 0 && hrIndex < 24 {
+			counts[hrIndex]++
+			totalReqs++
+			if entry.Status >= 400 {
+				errorCount++
+			}
+			hourlyLatencies[hrIndex] = append(hourlyLatencies[hrIndex], entry.LatencyMs)
+		}
+	}
+
+	for _, c := range counts {
+		if c > peakRate {
+			peakRate = c
+		}
+	}
+
+	for i := 0; i < 24; i++ {
+		lats := hourlyLatencies[i]
+		if len(lats) == 0 {
+			p50[i] = 0
+			p95[i] = 0
+			continue
+		}
+
+		sort.Slice(lats, func(x, y int) bool {
+			return lats[x] < lats[y]
+		})
+
+		p50Idx := len(lats) / 2
+		p95Idx := int(float64(len(lats)) * 0.95)
+		if p95Idx >= len(lats) {
+			p95Idx = len(lats) - 1
+		}
+
+		p50[i] = int(lats[p50Idx])
+		p95[i] = int(lats[p95Idx])
+	}
+
+	avgP95 := 0
+	activeCount := 0
+	for _, v := range p95 {
+		if v > 0 {
+			avgP95 += v
+			activeCount++
+		}
+	}
+	if activeCount > 0 {
+		avgP95 /= activeCount
+	}
+
+	errRate := 0.0
+	if totalReqs > 0 {
+		errRate = (float64(errorCount) / float64(totalReqs)) * 100.0
+	}
+
+	return templates.MetricsViewModel{
+		TotalRequests:   totalReqs,
+		PeakRate:        peakRate,
+		P95LatencyMs:    avgP95,
+		ErrorRate:       errRate,
+		VolumeChartSVG:  generateVolumeSVG(counts, labels),
+		LatencyChartSVG: generateLatencySVG(p50, p95, labels),
+	}, nil
+}
+
 // fetchCloudMonitoringMetrics collects revision volume and latency details from Cloud Monitoring.
 func (dc *DashboardController) fetchCloudMonitoringMetrics(ctx context.Context, simulate bool) (templates.MetricsViewModel, error) {
 	if simulate {
 		return dc.generateMockMetrics(), nil
+	}
+	if os.Getenv("LOCAL_DEV") == "true" {
+		return dc.fetchLocalLogsMetrics()
 	}
 	// If running locally without real project or GCP token is not initialized, serve empty state
 	if dc.ProjectID == "dev-project" || dc.TokenSource == nil {
@@ -1849,6 +2107,9 @@ func (dc *DashboardController) generateMockMetrics() templates.MetricsViewModel 
 func (dc *DashboardController) fetchCostAnalyticsData(ctx context.Context, simulate bool) (templates.CostsViewModel, error) {
 	if simulate {
 		return dc.generateMockCosts(), nil
+	}
+	if os.Getenv("LOCAL_DEV") == "true" {
+		return dc.fetchLocalLogsCosts()
 	}
 	if dc.ProjectID == "dev-project" || dc.TokenSource == nil {
 		return templates.CostsViewModel{}, nil
@@ -2737,4 +2998,40 @@ func (dc *DashboardController) ToggleSimulation(w http.ResponseWriter, r *http.R
 		ref = "/admin/metrics"
 	}
 	http.Redirect(w, r, ref, http.StatusSeeOther)
+}
+
+// ServeQueue renders the active Request Queue tab.
+func (dc *DashboardController) ServeQueue(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	status, err := dc.Store.GetQueueStatus(ctx)
+	if err != nil {
+		log.Printf("[Queue] Error loading queue status: %v", err)
+		http.Error(w, "Internal Server Error loading request queue", http.StatusInternalServerError)
+		return
+	}
+
+	var items []templates.QueueSnapshotItem
+	for _, s := range status {
+		items = append(items, templates.QueueSnapshotItem{
+			AppID:       s.AppID,
+			Model:       s.Model,
+			Priority:    s.Priority,
+			Tier:        s.Tier,
+			Status:      s.Status,
+			ArrivalTime: s.ArrivalTime.Format(time.RFC3339),
+			DurationMs:  s.DurationMs,
+		})
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	content := templates.QueueTab(items)
+
+	// If HTMX request, render content partial directly
+	if r.Header.Get("HX-Request") == "true" {
+		_ = content.Render(ctx, w)
+		return
+	}
+
+	_ = templates.Layout("Request Queue", "queue", content).Render(ctx, w)
 }

@@ -61,6 +61,9 @@ cleanup() {
     if [ -n "$FRONTEND_PID" ]; then
         kill "$FRONTEND_PID" 2>/dev/null || true
     fi
+    if [ -n "$GENERATOR_PID" ]; then
+        kill "$GENERATOR_PID" 2>/dev/null || true
+    fi
     log_success "Cleanup complete. Bye!"
     exit 0
 }
@@ -78,14 +81,19 @@ log_info "Starting Frontend Service on port 8081..."
 PORT="8081" BACKEND_API_URL="http://localhost:8080" go run frontend/main.go &
 FRONTEND_PID=$!
 
+log_info "Starting Traffic Generator on port 8082..."
+PORT="8082" ROUTER_URL="http://localhost:8080" go run generator/main.go &
+GENERATOR_PID=$!
+
 # Gorgeous boot details
 echo -e "\n----------------------------------------------------------------------"
 echo -e "     ${GREEN}S M A R T   R O U T E R   ( D E C O U P L E D   L O C A L )${NC}"
 echo -e "----------------------------------------------------------------------"
-echo -e "👉 Backend URL  : ${GREEN}http://localhost:8080${NC}"
-echo -e "👉 Admin Portal : ${GREEN}http://localhost:8081/login${NC}"
-echo -e "👉 Mode         : ${YELLOW}Decoupled Services (Backend REST APIs + Frontend UI)${NC}"
-echo -e "👉 Shared Secret: ${BLUE}local-dev-bypass-token-12345${NC}"
+echo -e "👉 Backend URL   : ${GREEN}http://localhost:8080${NC}"
+echo -e "👉 Admin Portal  : ${GREEN}http://localhost:8081/login${NC}"
+echo -e "👉 Traffic Gen   : ${GREEN}http://localhost:8082${NC}"
+echo -e "👉 Mode          : ${YELLOW}Decoupled Services (Backend + Frontend + Traffic Gen)${NC}"
+echo -e "👉 Shared Secret : ${BLUE}local-dev-bypass-token-12345${NC}"
 echo -e "----------------------------------------------------------------------\n"
 
 # Wait on background tasks to keep process alive

@@ -1,0 +1,173 @@
+package templates
+
+import "fmt"
+
+templ QueueTab(items []QueueSnapshotItem) {
+	<div class="space-y-8 animate-fadeIn">
+		<!-- Header -->
+		<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-gray-200 pb-5">
+			<div>
+				<h1 class="text-2xl font-bold tracking-tight text-gray-950">Active Request Routing Queue</h1>
+				<p class="mt-2 text-sm text-gray-500">
+					Real-time view of requests currently queued or processing. Under healthy load, requests bypass the queue.
+				</p>
+			</div>
+			<div class="flex items-center gap-3 self-start md:self-center">
+				<span class="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
+					<span class="h-1.5 w-1.5 mr-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+					Auto-refreshing every 2s
+				</span>
+				<button hx-get="/admin/queue" hx-select="#queue-container" hx-target="#queue-container" hx-swap="outerHTML" class="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition cursor-pointer">
+					Refresh Now
+				</button>
+			</div>
+		</div>
+
+		<!-- Main Queue Container with Auto-polling -->
+		<div id="queue-container" hx-get="/admin/queue" hx-trigger="every 2s" hx-select="#queue-container" hx-target="#queue-container" hx-swap="outerHTML">
+			
+			<!-- KPI Cards: Active and Queued Request counts -->
+			<div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 mb-6">
+				<div class="relative overflow-hidden rounded-2xl bg-white px-6 pb-6 pt-5 border border-gray-200/80 shadow-sm">
+					<dt>
+						<p class="text-sm font-medium text-gray-500">Processing Requests</p>
+					</dt>
+					<dd class="flex items-baseline pb-0 mt-1">
+						<p class="text-3xl font-bold tracking-tight text-blue-600">{ fmt.Sprintf("%d", countByStatus(items, "processing")) }</p>
+						<span class="ml-2 text-xs text-gray-400 font-medium">active in-flight</span>
+					</dd>
+				</div>
+
+				<div class="relative overflow-hidden rounded-2xl bg-white px-6 pb-6 pt-5 border border-gray-200/80 shadow-sm">
+					<dt>
+						<p class="text-sm font-medium text-gray-500">Queued Requests</p>
+					</dt>
+					<dd class="flex items-baseline pb-0 mt-1">
+						<p class="text-3xl font-bold tracking-tight text-amber-600">{ fmt.Sprintf("%d", countByStatus(items, "queued")) }</p>
+						<span class="ml-2 text-xs text-gray-400 font-medium">waiting for dispatch</span>
+					</dd>
+				</div>
+
+				<div class="relative overflow-hidden rounded-2xl bg-white px-6 pb-6 pt-5 border border-gray-200/80 shadow-sm">
+					<dt>
+						<p class="text-sm font-medium text-gray-500">Total Concurrency Load</p>
+					</dt>
+					<dd class="flex items-baseline pb-0 mt-1">
+						<p class="text-3xl font-bold tracking-tight text-gray-900">{ fmt.Sprintf("%d", len(items)) }</p>
+						<span class="ml-2 text-xs text-gray-400 font-medium">combined throughput</span>
+					</dd>
+				</div>
+			</div>
+
+			<!-- Queue Table Card -->
+			<div class="overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-sm">
+				<div class="px-6 py-5 border-b border-gray-100 bg-white flex items-center justify-between">
+					<h3 class="text-base font-bold text-gray-900">Request Queue & Concurrency Pipeline</h3>
+					if len(items) > 0 {
+						<span class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-600/10">
+							Load Pending
+						</span>
+					} else {
+						<span class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/10">
+							Healthy / Idle
+						</span>
+					}
+				</div>
+
+				if len(items) == 0 {
+					<div class="flex flex-col items-center justify-center py-16 px-6 bg-white text-center animate-fadeIn">
+						<div class="rounded-full bg-emerald-50 p-3 text-emerald-600 mb-4 ring-8 ring-emerald-500/5">
+							<svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+							</svg>
+						</div>
+						<h4 class="text-base font-bold text-gray-900">No queued or active requests</h4>
+						<p class="mt-1.5 text-sm text-gray-500 max-w-md">
+							All routing targets are operational and healthy. Upstream Gemini models are processing requests instantly.
+						</p>
+					</div>
+				} else {
+					<div class="overflow-x-auto">
+						<table class="min-w-full divide-y divide-gray-200">
+							<thead class="bg-gray-50/75">
+								<tr>
+									<th scope="col" class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Application</th>
+									<th scope="col" class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Target Model</th>
+									<th scope="col" class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Priority</th>
+									<th scope="col" class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Client Tier</th>
+									<th scope="col" class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Status</th>
+									<th scope="col" class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Active Duration</th>
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-gray-150 bg-white">
+								for _, item := range items {
+									<tr class="hover:bg-gray-50/50 transition">
+										<td class="whitespace-nowrap px-6 py-4.5 text-sm font-bold text-gray-900">
+											{ item.AppID }
+										</td>
+										<td class="whitespace-nowrap px-6 py-4.5 text-sm text-gray-600">
+											<span class="font-mono bg-gray-100 px-2 py-1 rounded text-xs text-gray-800">
+												{ item.Model }
+											</span>
+										</td>
+										<td class="whitespace-nowrap px-6 py-4.5 text-sm">
+											if item.Priority == "high" {
+												<span class="inline-flex items-center rounded-md bg-rose-50 px-2 py-1 text-xs font-medium text-rose-700 ring-1 ring-inset ring-rose-600/10">
+													High Priority
+												</span>
+											} else if item.Priority == "medium" {
+												<span class="inline-flex items-center rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-600/10">
+													Medium Priority
+												</span>
+											} else {
+												<span class="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10">
+													Low Priority
+												</span>
+											}
+										</td>
+										<td class="whitespace-nowrap px-6 py-4.5 text-sm text-gray-600">
+											<span class="capitalize">{ item.Tier }</span>
+										</td>
+										<td class="whitespace-nowrap px-6 py-4.5 text-sm">
+											if item.Status == "processing" {
+												<span class="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/10">
+													<span class="h-1.5 w-1.5 mr-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+													Processing
+												</span>
+											} else {
+												<span class="inline-flex items-center rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-600/10">
+													<span class="h-1.5 w-1.5 mr-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+													Queued
+												</span>
+											}
+										</td>
+										<td class="whitespace-nowrap px-6 py-4.5 text-sm text-gray-600 font-medium">
+											{ formatDuration(item.DurationMs) }
+										</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+				}
+			</div>
+		</div>
+	</div>
+}
+
+func countByStatus(items []QueueSnapshotItem, status string) int {
+	count := 0
+	for _, item := range items {
+		if item.Status == status {
+			count++
+		}
+	}
+	return count
+}
+
+func formatDuration(ms int64) string {
+	if ms < 1000 {
+		return fmt.Sprintf("%dms", ms)
+	}
+	return fmt.Sprintf("%.1fs", float64(ms)/1000.0)
+}

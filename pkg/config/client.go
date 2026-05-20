@@ -212,3 +212,9 @@ func (ac *APIConfigStore) DeleteApp(ctx context.Context, id string) error {
 	path := fmt.Sprintf("/api/apps?id=%s", url.QueryEscape(id))
 	return ac.makeRequest(ctx, "DELETE", path, nil, nil)
 }
+
+func (ac *APIConfigStore) GetQueueStatus(ctx context.Context) ([]QueueSnapshotItem, error) {
+	var status []QueueSnapshotItem
+	err := ac.makeRequest(ctx, "GET", "/api/queue", nil, &status)
+	return status, err
+}

@@ -457,8 +457,16 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	routedModel := r.Header.Get("X-Routed-Model")
+	if routedModel == "" {
+		routedModel = r.Header.Get("X-Requested-Model")
+	}
+	if routedModel == "" {
+		routedModel = "gemini-2.5-flash"
+	}
+
 	// Enqueue request in priority-based queue
-	queueItem, err := rp.Scheduler.Enqueue(r.Context(), app.Priority, client.Tier)
+	queueItem, err := rp.Scheduler.Enqueue(r.Context(), app.ID, app.Priority, client.Tier, routedModel)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusTooManyRequests)
@@ -479,7 +487,7 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case <-queueItem.Done:
 		// Slot acquired!
 	}
-	defer rp.Scheduler.Release()
+	defer rp.Scheduler.Release(queueItem)
 
 	// Apply queueing delay using cancelable select if a wait-time was assigned for priority
 	if delay > 0 {
@@ -521,6 +529,9 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Execute standard reverse proxy
 	rp.Proxy.ServeHTTP(wrapped, r)
 
+	// Report request status to scheduler for 429 overload detection
+	rp.Scheduler.ReportRequestStatus(routedModel, wrapped.statusCode)
+
 	latency := time.Since(startTime).Milliseconds()
 
 	logHeaders := make(map[string]string)
@@ -560,6 +571,12 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	logJSON, err := json.Marshal(logEntry)
 	if err == nil {
 		_, _ = os.Stdout.WriteString(string(logJSON) + "\n")
+		if os.Getenv("LOCAL_DEV") == "true" {
+			if f, err := os.OpenFile("data/local_logs.jsonl", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
+				_, _ = f.WriteString(string(logJSON) + "\n")
+				f.Close()
+			}
+		}
 	} else {
 		log.Printf("[Proxy] Error encoding log: %v", err)
 	}

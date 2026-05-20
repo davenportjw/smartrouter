@@ -88,7 +88,7 @@ func main() {
 	}
 
 	// Initialize Backend REST API Controller
-	apiController := api.NewAPIController(configStore, sharedSecret)
+	apiController := api.NewAPIController(configStore, geminiProxy.Scheduler, sharedSecret)
 
 	mux := http.NewServeMux()
 
