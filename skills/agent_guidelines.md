@@ -255,3 +255,24 @@ To ensure that developer and operator runbooks never drift from actual system ca
   - **Tactical Examples**: Focus on practical copy-pasteable config examples, `curl` requests, and visual sequence/entity diagrams.
   - **Document Index**: Ensure any newly created files are properly mapped and linked in the main `/docs/README.md` index file.
 
+---
+
+## 7. Monorepo Layout & Architectural Boundaries
+
+To avoid structural complexity, the codebase maintains a single Go module in a unified monorepo structure. You must preserve the following layout decisions:
+
+### A. Root-Level Shared Packages (`/pkg`)
+- The `/pkg/config` directory acts as the **single source of truth** for all shared models and validation helpers.
+- Both `backend` and `frontend` compile-time dependencies pull from here.
+- **Never copy or duplicate schemas** inside the sub-folders. If you need new configuration parameters, add them to `pkg/config/config.go` so they are instantly shared.
+
+### B. Root-Level Commands (`/cmd`)
+- Standard CLI binaries and post-deployment verification utilities reside under `/cmd`.
+- For example, `cmd/verify` is used after deployment by `deploy.sh` to test integration against production endpoints.
+- Do not bundle validation or testing scripts inside the runtime service containers (`/backend` or `/frontend`).
+
+### C. Docker Build Context Strategy
+- All Docker builds must execute from the repository root directory (`.`) using `gcloud builds submit` or local engine commands.
+- The Dockerfiles (`backend/Dockerfile`, `frontend/Dockerfile`) copy the root `go.mod`/`go.sum` files and `/pkg` directory during the build stage before invoking `go build`.
+
+

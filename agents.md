@@ -35,4 +35,9 @@ Before you write any code or create configuration schemas, keep these rules in m
 - **Mandatory Update Rule**: You **MUST** update or append to the corresponding files under the **`/docs`** directory in the same pull request/commit whenever adding a new feature, refactoring routing schemas, or altering dashboard workflows.
 - **Maintain Tone**: Ensure all updates adhere to the crisp, terse, active, and "humanized" technical writing style of the docset.
 
+### 5. Monorepo Code Layout & Shared Package Strategy
+- **Unified Codebase (`pkg/config`)**: To prevent schema drift and code duplication, shared configuration structures (`Client`, `App`, `APIKey`, `RoutingRule`, `CustomHeader`, `ModelConfig`) and validation helpers must be kept under `pkg/config` at the root. **Do not** duplicate these configurations inside individual backend or frontend directories.
+- **CLI Utility Boundaries (`cmd/verify`)**: Post-deployment CLI verification scripts and standalone binaries must reside inside the root `cmd/` folder. Do not embed client tools inside runtime service directories.
+- **Docker Scoping**: Both `backend/Dockerfile` and `frontend/Dockerfile` run from the repository root build context (`.`) so they can securely compile with `pkg/`.
+
 For detailed code examples and tutorials on how to implement these patterns via TDD, please open and execute the instructions in **[skills/agent_guidelines.md](skills/agent_guidelines.md)**.
