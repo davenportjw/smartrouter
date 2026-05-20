@@ -4,22 +4,28 @@ This guide explains how to configure routing rules and prompt-complexity thresho
 
 ---
 
-## ⚙️ Upgrades & Fallback Target Routing
+## 🌐 Interception & Custom Routing Rules
 
 Routing rules evaluate request variables (application ID, client tier, requested model, and headers) to rewrite target models or locations.
 
 ### Creating a Routing Rule
 1. Go to `/admin/rules`.
-2. Click **Create Routing Rule**.
+2. Click **Add Routing Rule**.
 3. Fill in the fields:
-   * **Requested Model Pattern**: The model name in the incoming request to intercept (e.g. `gemini-2.5-flash`, or `*`).
-   * **Application**: Bind the rule to a specific App, or select `all`.
-   * **Client Tier**: Apply the rule to specific tiers (e.g. `premium`), or select `all`.
-   * **Header Match**: (Optional) Require an HTTP header and value pattern (e.g., matching header `X-Route-Priority` with `gold`).
-   * **Target Model**: The upstream model to route the request to (e.g., `gemini-2.5-pro`).
-   * **Target Location**: The upstream GCP region target (e.g., `us-central1`).
-   * **Fallback Model**: (Optional) Fallback target if the primary model returns an error.
-   * **Rule Priority**: High-weight matching rules execute first.
+   * **Model Request Pattern**: The model name in the incoming request to intercept (e.g. `gemini-2.5-flash`, or `*`).
+   * **Target Application Scope**: Bind the rule to a specific App, or select `Global (All Applications)`.
+   * **Client Tier Eligibility**: Apply the rule to specific tiers (e.g. `Premium Tier Only`), or select `All Tiers`.
+   * **Header-Based Route Segmentation (Optional)**: Require an HTTP header and value pattern (e.g., matching header `X-Route-Priority` with `gold`).
+   * **Routed Target Model**: The upstream model to route the request to (e.g., `gemini-2.5-pro`).
+   * **Target Location (GCP)**: The upstream GCP region target (e.g., `us-central1`).
+   * **Fallback Model (Optional)**: Fallback target if the primary model returns an error.
+   * **Priority Weight (1-10)**: Rule match evaluation order (higher weight executes first).
+4. Click **Create Routing Rule**.
+
+### Editing a Routing Rule
+1. Go to `/admin/rules`.
+2. Click **Edit** next to the target rule row.
+3. Modify any fields in the modal (such as model pattern, scopes, target models, fallback target, or priority weights).
 4. Click **Save Routing Rule**.
 
 ### GCP Models & Endpoints Viewer

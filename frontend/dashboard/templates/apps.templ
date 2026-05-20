@@ -80,6 +80,13 @@ templ AppsTab(items []AppsViewModel) {
 									</td>
 									<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
 										<button
+											hx-get={ "/admin/apps/edit?id=" + item.App.ID }
+											hx-target="#modal-container"
+											class="text-blue-600 hover:text-blue-900 transition font-semibold mr-4"
+										>
+											Edit
+										</button>
+										<button
 											hx-delete={ "/admin/apps/delete?id=" + item.App.ID }
 											hx-confirm={ "Are you sure you want to remove application " + item.App.Name + "?" }
 											hx-target="closest tr"
@@ -102,7 +109,7 @@ templ AppsTab(items []AppsViewModel) {
 	</div>
 }
 
-templ AppModal(clients []config.Client) {
+templ AppModal(clients []config.Client, app *config.App) {
 	<!-- Modal backdrop -->
 	<div id="create-app-modal" class="relative z-50" aria-labelledby="modal-title" role="dialog" aria-modal="true">
 		<div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
@@ -128,11 +135,19 @@ templ AppModal(clients []config.Client) {
 					<div class="sm:flex sm:items-start">
 						<div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
 							<h3 class="text-lg font-semibold leading-6 text-gray-900" id="modal-title">
-								Add Logical Application
+								if app != nil {
+									Edit Logical Application
+								} else {
+									Add Logical Application
+								}
 							</h3>
 							<div class="mt-2">
 								<p class="text-xs text-gray-500">
-									Register a specific project or client-side service to define distinct rate-limits and validation rules.
+									if app != nil {
+										Update application details, priority weights, and rate limits.
+									} else {
+										Register a specific project or client-side service to define distinct rate-limits and validation rules.
+									}
 								</p>
 							</div>
 
@@ -145,11 +160,19 @@ templ AppModal(clients []config.Client) {
 								<div class="grid grid-cols-2 gap-4">
 									<div>
 										<label for="app_id" class="block text-xs font-medium text-gray-700">Application ID (Slug)</label>
-										<input type="text" name="app_id" id="app_id" required placeholder="e.g. customer-chat-prod" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
+										if app != nil {
+											<input type="text" name="app_id" id="app_id" required readonly value={ app.ID } class="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm cursor-not-allowed" />
+										} else {
+											<input type="text" name="app_id" id="app_id" required placeholder="e.g. customer-chat-prod" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
+										}
 									</div>
 									<div>
 										<label for="app_name" class="block text-xs font-medium text-gray-700">Application Title</label>
-										<input type="text" name="app_name" id="app_name" required placeholder="e.g. Customer Support Bot" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
+										if app != nil {
+											<input type="text" name="app_name" id="app_name" required value={ app.Name } placeholder="e.g. Customer Support Bot" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
+										} else {
+											<input type="text" name="app_name" id="app_name" required placeholder="e.g. Customer Support Bot" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
+										}
 									</div>
 								</div>
 
@@ -158,16 +181,26 @@ templ AppModal(clients []config.Client) {
 										<label for="client_id" class="block text-xs font-medium text-gray-700">Parent Client Organization</label>
 										<select name="client_id" id="client_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm">
 											for _, c := range clients {
-												<option value={ c.ID }>{ c.Name } ({ c.ID })</option>
+												if app != nil && app.ClientID == c.ID {
+													<option value={ c.ID } selected>{ c.Name } ({ c.ID })</option>
+												} else {
+													<option value={ c.ID }>{ c.Name } ({ c.ID })</option>
+												}
 											}
 										</select>
 									</div>
 									<div>
 										<label for="priority" class="block text-xs font-medium text-gray-700">Queueing Priority Profile</label>
 										<select name="priority" id="priority" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm">
-											<option value="low">Low (Non-critical)</option>
-											<option value="medium" selected>Medium (Standard)</option>
-											<option value="high">High (Mission Critical)</option>
+											if app != nil {
+												<option value="low" if app.Priority == "low" { selected }>Low (Non-critical)</option>
+												<option value="medium" if app.Priority == "medium" { selected }>Medium (Standard)</option>
+												<option value="high" if app.Priority == "high" { selected }>High (Mission Critical)</option>
+											} else {
+												<option value="low">Low (Non-critical)</option>
+												<option value="medium" selected>Medium (Standard)</option>
+												<option value="high">High (Mission Critical)</option>
+											}
 										</select>
 									</div>
 								</div>
@@ -175,17 +208,29 @@ templ AppModal(clients []config.Client) {
 								<div class="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded-md border border-gray-150">
 									<div>
 										<label for="rpm" class="block text-xs font-medium text-gray-700">RPM (Requests Per Minute)</label>
-										<input type="number" name="rpm" id="rpm" required value="60" min="1" max="10000" class="mt-1 block w-full bg-white rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-sm" />
+										if app != nil {
+											<input type="number" name="rpm" id="rpm" required value={ intToString(app.RPM) } min="1" max="10000" class="mt-1 block w-full bg-white rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-sm" />
+										} else {
+											<input type="number" name="rpm" id="rpm" required value="60" min="1" max="10000" class="mt-1 block w-full bg-white rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-sm" />
+										}
 									</div>
 									<div>
 										<label for="tpm" class="block text-xs font-medium text-gray-700">TPM (Tokens Per Minute)</label>
-										<input type="number" name="tpm" id="tpm" required value="40000" min="1000" max="50000000" class="mt-1 block w-full bg-white rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-sm" />
+										if app != nil {
+											<input type="number" name="tpm" id="tpm" required value={ intToString(app.TPM) } min="1000" max="50000000" class="mt-1 block w-full bg-white rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-sm" />
+										} else {
+											<input type="number" name="tpm" id="tpm" required value="40000" min="1000" max="50000000" class="mt-1 block w-full bg-white rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-sm" />
+										}
 									</div>
 								</div>
 
 								<div class="mt-6 sm:mt-4 sm:flex sm:flex-row-reverse gap-3">
 									<button type="submit" class="inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:w-auto transition">
-										Create Application
+										if app != nil {
+											Save Changes
+										} else {
+											Create Application
+										}
 									</button>
 									<button
 										type="button"

@@ -226,6 +226,13 @@ const ai = new GoogleGenAI({"{"}
 									</td>
 									<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
 										<button
+											hx-get={ "/admin/headers/edit?id=" + item.ID }
+											hx-target="#modal-container"
+											class="text-blue-600 hover:text-blue-900 transition font-semibold mr-4"
+										>
+											Edit
+										</button>
+										<button
 											hx-delete={ "/admin/headers/delete?id=" + item.ID }
 											hx-confirm={ "Are you sure you want to remove custom header rule " + item.Name + "?" }
 											hx-target="closest tr"

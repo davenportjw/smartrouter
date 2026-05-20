@@ -167,7 +167,7 @@ func (dc *DashboardController) ServeKeysNewModal(w http.ResponseWriter, r *http.
 	}
 
 	w.Header().Set("Content-Type", "text/html")
-	_ = templates.KeyModal(apps).Render(ctx, w)
+	_ = templates.KeyModal(apps, nil).Render(ctx, w)
 }
 
 // CreateKey handles form submissions and generates a new API key bound to the selected App.
@@ -247,6 +247,105 @@ func (dc *DashboardController) RevokeKey(w http.ResponseWriter, r *http.Request)
 	w.Write([]byte(""))
 }
 
+// ServeKeysEditModal renders the dynamic edit modal for an existing API Key via HTMX.
+func (dc *DashboardController) ServeKeysEditModal(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	hash := r.URL.Query().Get("hash")
+	if hash == "" {
+		http.Error(w, "Missing key hash", http.StatusBadRequest)
+		return
+	}
+
+	keys, err := dc.Store.GetAllKeys(ctx)
+	if err != nil {
+		log.Printf("[Dashboard] Error loading keys: %v", err)
+		http.Error(w, "Failed to load keys", http.StatusInternalServerError)
+		return
+	}
+
+	var targetKey *config.APIKey
+	for _, k := range keys {
+		if k.KeyHash == hash {
+			targetKey = &k
+			break
+		}
+	}
+
+	if targetKey == nil {
+		http.Error(w, "API Key not found", http.StatusNotFound)
+		return
+	}
+
+	apps, err := dc.Store.GetAllApps(ctx)
+	if err != nil {
+		log.Printf("[Dashboard] Error loading apps: %v", err)
+		http.Error(w, "Failed to load apps", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	_ = templates.KeyModal(apps, targetKey).Render(ctx, w)
+}
+
+// SaveKeyDetails updates status and/or bound app mapping of an existing API Key.
+func (dc *DashboardController) SaveKeyDetails(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx := r.Context()
+	hash := r.FormValue("hash")
+	appID := r.FormValue("app_id")
+	status := r.FormValue("status")
+
+	if hash == "" || appID == "" || status == "" {
+		http.Error(w, "Missing required key fields", http.StatusBadRequest)
+		return
+	}
+
+	keys, err := dc.Store.GetAllKeys(ctx)
+	if err != nil {
+		log.Printf("[Dashboard] Error loading keys: %v", err)
+		http.Error(w, "Failed to load keys", http.StatusInternalServerError)
+		return
+	}
+
+	var targetKey *config.APIKey
+	for _, k := range keys {
+		if k.KeyHash == hash {
+			targetKey = &k
+			break
+		}
+	}
+
+	if targetKey == nil {
+		http.Error(w, "API Key not found", http.StatusNotFound)
+		return
+	}
+
+	app, ok := dc.Store.LookupApp(appID)
+	if !ok {
+		http.Error(w, "Target Application not found", http.StatusNotFound)
+		return
+	}
+
+	// Update fields
+	targetKey.AppID = app.ID
+	targetKey.ClientID = app.ClientID
+	targetKey.Status = status
+
+	err = dc.Store.SaveKey(ctx, *targetKey)
+	if err != nil {
+		log.Printf("[Dashboard] Error saving api_key: %v", err)
+		http.Error(w, "Failed to save API Key profile", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(""))
+}
+
 // ServeRules renders the Routing Rules view tab.
 func (dc *DashboardController) ServeRules(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -285,7 +384,57 @@ func (dc *DashboardController) ServeRulesNewModal(w http.ResponseWriter, r *http
 	}
 
 	w.Header().Set("Content-Type", "text/html")
-	_ = templates.RuleModal(apps, activeCompatibleModels).Render(ctx, w)
+	_ = templates.RuleModal(apps, activeCompatibleModels, nil).Render(ctx, w)
+}
+
+// ServeRulesEditModal renders the dynamic edit modal for an existing routing rule via HTMX.
+func (dc *DashboardController) ServeRulesEditModal(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "Missing routing rule ID", http.StatusBadRequest)
+		return
+	}
+
+	rules, err := dc.Store.GetAllRules(ctx)
+	if err != nil {
+		log.Printf("[Dashboard] Error loading rules: %v", err)
+		http.Error(w, "Failed to load routing rules", http.StatusInternalServerError)
+		return
+	}
+
+	var targetRule *config.RoutingRule
+	for _, r := range rules {
+		if r.ID == id {
+			targetRule = &r
+			break
+		}
+	}
+
+	if targetRule == nil {
+		http.Error(w, "Routing rule not found", http.StatusNotFound)
+		return
+	}
+
+	apps, err := dc.Store.GetAllApps(ctx)
+	if err != nil {
+		log.Printf("[Dashboard] Error loading apps for rule modal: %v", err)
+		http.Error(w, "Failed to load apps", http.StatusInternalServerError)
+		return
+	}
+
+	allModels, err := dc.Store.GetAllModels(ctx)
+	var activeCompatibleModels []config.ModelConfig
+	if err == nil {
+		for _, m := range allModels {
+			if m.Active && config.IsLocationCompatible(dc.Location, m.Location) {
+				activeCompatibleModels = append(activeCompatibleModels, m)
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	_ = templates.RuleModal(apps, activeCompatibleModels, targetRule).Render(ctx, w)
 }
 
 // CreateRule handles dynamic routing rule submission form.
@@ -342,10 +491,14 @@ func (dc *DashboardController) CreateRule(w http.ResponseWriter, r *http.Request
 		priorityWeight = pw
 	}
 
-	// Generate unique random ID for this rule
-	idBytes := make([]byte, 8)
-	_, _ = rand.Read(idBytes)
-	id := "rule-" + hex.EncodeToString(idBytes)
+	// If editing an existing rule, it will pass the rule ID in the form
+	id := strings.TrimSpace(r.FormValue("id"))
+	if id == "" {
+		// Generate unique random ID for this rule
+		idBytes := make([]byte, 8)
+		_, _ = rand.Read(idBytes)
+		id = "rule-" + hex.EncodeToString(idBytes)
+	}
 
 	err := dc.Store.SaveRule(ctx, config.RoutingRule{
 		ID:             id,
@@ -423,7 +576,47 @@ func (dc *DashboardController) ServeHeadersNewModal(w http.ResponseWriter, r *ht
 	}
 
 	w.Header().Set("Content-Type", "text/html")
-	_ = templates.HeaderModal(apps).Render(ctx, w)
+	_ = templates.HeaderModal(apps, nil).Render(ctx, w)
+}
+
+// ServeHeadersEditModal renders the dynamic edit modal for an existing custom header via HTMX.
+func (dc *DashboardController) ServeHeadersEditModal(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "Missing custom header ID", http.StatusBadRequest)
+		return
+	}
+
+	headers, err := dc.Store.GetAllHeaders(ctx)
+	if err != nil {
+		log.Printf("[Dashboard] Error loading headers: %v", err)
+		http.Error(w, "Failed to load custom headers", http.StatusInternalServerError)
+		return
+	}
+
+	var targetHeader *config.CustomHeader
+	for _, h := range headers {
+		if h.ID == id {
+			targetHeader = &h
+			break
+		}
+	}
+
+	if targetHeader == nil {
+		http.Error(w, "Custom header rule not found", http.StatusNotFound)
+		return
+	}
+
+	apps, err := dc.Store.GetAllApps(ctx)
+	if err != nil {
+		log.Printf("[Dashboard] Error loading apps for header modal: %v", err)
+		http.Error(w, "Failed to load apps", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	_ = templates.HeaderModal(apps, targetHeader).Render(ctx, w)
 }
 
 // CreateHeader handles custom header rule submission form.
@@ -464,10 +657,14 @@ func (dc *DashboardController) CreateHeader(w http.ResponseWriter, r *http.Reque
 
 	required := requiredStr == "true"
 
-	// Generate unique random ID for this rule
-	idBytes := make([]byte, 8)
-	_, _ = rand.Read(idBytes)
-	id := "header-" + hex.EncodeToString(idBytes)
+	// If editing an existing header rule, it will pass the header ID in the form
+	id := strings.TrimSpace(r.FormValue("id"))
+	if id == "" {
+		// Generate unique random ID for this rule
+		idBytes := make([]byte, 8)
+		_, _ = rand.Read(idBytes)
+		id = "header-" + hex.EncodeToString(idBytes)
+	}
 
 	err := dc.Store.SaveHeader(ctx, config.CustomHeader{
 		ID:           id,
@@ -2211,7 +2408,33 @@ func (dc *DashboardController) ServeAppsNewModal(w http.ResponseWriter, r *http.
 	}
 
 	w.Header().Set("Content-Type", "text/html")
-	_ = templates.AppModal(clients).Render(ctx, w)
+	_ = templates.AppModal(clients, nil).Render(ctx, w)
+}
+
+// ServeAppsEditModal renders the dynamic settings modal form via HTMX to edit an app.
+func (dc *DashboardController) ServeAppsEditModal(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	appID := r.URL.Query().Get("id")
+	if appID == "" {
+		http.Error(w, "Missing application ID", http.StatusBadRequest)
+		return
+	}
+
+	app, ok := dc.Store.LookupApp(appID)
+	if !ok {
+		http.Error(w, "Application not found", http.StatusNotFound)
+		return
+	}
+
+	clients, err := dc.Store.GetAllClients(ctx)
+	if err != nil {
+		log.Printf("[Dashboard] Error loading clients for app modal: %v", err)
+		http.Error(w, "Failed to load client organizations", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	_ = templates.AppModal(clients, &app).Render(ctx, w)
 }
 
 // CreateApp handles logical application profile creation submissions.
@@ -2271,14 +2494,12 @@ func (dc *DashboardController) CreateApp(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	err = dc.Store.SaveApp(ctx, config.App{
-		ID:       appID,
-		ClientID: clientID,
-		Name:     appName,
-		RPM:      rpm,
-		TPM:      tpm,
-		Priority: priority,
-		Complexity: config.ComplexityRouting{
+	existingApp, exists := dc.Store.LookupApp(appID)
+	var complexity config.ComplexityRouting
+	if exists {
+		complexity = existingApp.Complexity
+	} else {
+		complexity = config.ComplexityRouting{
 			Enabled:                false,
 			AlwaysOverride:         false,
 			SimpleModel:            "gemini-2.5-flash-lite",
@@ -2290,7 +2511,17 @@ func (dc *DashboardController) CreateApp(w http.ResponseWriter, r *http.Request)
 			ForceComplexTools:      true,
 			UseLLMClassifier:       false,
 			ClassifierModel:        "gemini-3.1-flash-lite",
-		},
+		}
+	}
+
+	err = dc.Store.SaveApp(ctx, config.App{
+		ID:         appID,
+		ClientID:   clientID,
+		Name:       appName,
+		RPM:        rpm,
+		TPM:        tpm,
+		Priority:   priority,
+		Complexity: complexity,
 	})
 	if err != nil {
 		log.Printf("[Dashboard] Error saving application profile: %v", err)

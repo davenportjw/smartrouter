@@ -287,6 +287,13 @@ curl -X POST "<span class="dynamic-origin-url">http://localhost:8080</span>/v1/m
 									}
 								</td>
 								<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+									<button
+										hx-get={ "/admin/keys/edit?hash=" + item.Key.KeyHash }
+										hx-target="#modal-container"
+										class="text-blue-600 hover:text-blue-900 transition font-semibold mr-4"
+									>
+										Edit
+									</button>
 									if item.Key.Status == "active" {
 										<button
 											hx-post={ "/admin/keys/revoke?hash=" + item.Key.KeyHash }

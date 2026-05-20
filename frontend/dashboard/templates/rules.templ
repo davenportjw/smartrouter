@@ -119,6 +119,13 @@ templ RulesTab(rules []config.RoutingRule) {
 									</td>
 									<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
 										<button
+											hx-get={ "/admin/rules/edit?id=" + item.ID }
+											hx-target="#modal-container"
+											class="text-blue-600 hover:text-blue-900 transition font-semibold mr-4"
+										>
+											Edit
+										</button>
+										<button
 											hx-delete={ "/admin/rules/delete?id=" + item.ID }
 											hx-confirm={ "Are you sure you want to remove routing rule for " + item.ModelPattern + "?" }
 											hx-target="closest tr"
@@ -141,7 +148,7 @@ templ RulesTab(rules []config.RoutingRule) {
 	</div>
 }
 
-templ RuleModal(apps []config.App, activeModels []config.ModelConfig) {
+templ RuleModal(apps []config.App, activeModels []config.ModelConfig, rule *config.RoutingRule) {
 	<!-- Modal backdrop -->
 	<div id="create-rule-modal" class="relative z-50" aria-labelledby="modal-title" role="dialog" aria-modal="true">
 		<div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
@@ -167,11 +174,19 @@ templ RuleModal(apps []config.App, activeModels []config.ModelConfig) {
 					<div class="sm:flex sm:items-start">
 						<div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
 							<h3 class="text-lg font-semibold leading-6 text-gray-900" id="modal-title">
-								Add Dynamic Routing Rule
+								if rule != nil {
+									Edit Dynamic Routing Rule
+								} else {
+									Add Dynamic Routing Rule
+								}
 							</h3>
 							<div class="mt-2">
 								<p class="text-xs text-gray-500">
-									Define re-routing rules based on requested models, tiers, and application boundary constraints.
+									if rule != nil {
+										Modify this smart target, client tier eligibility, and request priority weight constraints.
+									} else {
+										Define re-routing rules based on requested models, tiers, and application boundary constraints.
+									}
 								</p>
 							</div>
 
@@ -181,17 +196,32 @@ templ RuleModal(apps []config.App, activeModels []config.ModelConfig) {
 								class="mt-6 space-y-4"
 								onsubmit="document.getElementById('create-rule-modal').remove()"
 							>
+								if rule != nil {
+									<input type="hidden" name="id" value={ rule.ID } />
+								}
 								<div class="grid grid-cols-2 gap-4">
 									<div>
 										<label for="model_pattern" class="block text-xs font-medium text-gray-700">Model Request Pattern</label>
-										<input type="text" name="model_pattern" id="model_pattern" required placeholder="e.g. * or gemini-2.5-pro" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
+										if rule != nil {
+											<input type="text" name="model_pattern" id="model_pattern" required value={ rule.ModelPattern } placeholder="e.g. * or gemini-2.5-pro" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
+										} else {
+											<input type="text" name="model_pattern" id="model_pattern" required placeholder="e.g. * or gemini-2.5-pro" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
+										}
 									</div>
 									<div>
 										<label for="app_id" class="block text-xs font-medium text-gray-700">Target Application Scope</label>
 										<select name="app_id" id="app_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm">
-											<option value="">Global (All Applications)</option>
+											if rule != nil && rule.AppID == "" {
+												<option value="" selected>Global (All Applications)</option>
+											} else {
+												<option value="">Global (All Applications)</option>
+											}
 											for _, a := range apps {
-												<option value={ a.ID }>{ a.Name } ({ a.ID })</option>
+												if rule != nil && rule.AppID == a.ID {
+													<option value={ a.ID } selected>{ a.Name } ({ a.ID })</option>
+												} else {
+													<option value={ a.ID }>{ a.Name } ({ a.ID })</option>
+												}
 											}
 										</select>
 									</div>
@@ -201,15 +231,26 @@ templ RuleModal(apps []config.App, activeModels []config.ModelConfig) {
 									<div>
 										<label for="client_tier" class="block text-xs font-medium text-gray-700">Client Tier Eligibility</label>
 										<select name="client_tier" id="client_tier" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm">
-											<option value="all">All Tiers</option>
-											<option value="free">Free Tier Only</option>
-											<option value="standard">Standard Tier Only</option>
-											<option value="premium">Premium Tier Only</option>
+											if rule != nil {
+												<option value="all" if rule.ClientTier == "all" { selected }>All Tiers</option>
+												<option value="free" if rule.ClientTier == "free" { selected }>Free Tier Only</option>
+												<option value="standard" if rule.ClientTier == "standard" { selected }>Standard Tier Only</option>
+												<option value="premium" if rule.ClientTier == "premium" { selected }>Premium Tier Only</option>
+											} else {
+												<option value="all">All Tiers</option>
+												<option value="free">Free Tier Only</option>
+												<option value="standard">Standard Tier Only</option>
+												<option value="premium">Premium Tier Only</option>
+											}
 										</select>
 									</div>
 									<div>
 										<label for="priority_weight" class="block text-xs font-medium text-gray-700">Priority Weight (1-10)</label>
-										<input type="number" name="priority_weight" id="priority_weight" min="1" max="10" value="1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
+										if rule != nil {
+											<input type="number" name="priority_weight" id="priority_weight" min="1" max="10" value={ intToString(rule.PriorityWeight) } class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
+										} else {
+											<input type="number" name="priority_weight" id="priority_weight" min="1" max="10" value="1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
+										}
 									</div>
 								</div>
 
@@ -218,11 +259,19 @@ templ RuleModal(apps []config.App, activeModels []config.ModelConfig) {
 									<div class="grid grid-cols-2 gap-3">
 										<div>
 											<label for="header_name" class="block text-[10px] font-medium text-gray-600">HTTP Header Name</label>
-											<input type="text" name="header_name" id="header_name" placeholder="e.g. X-Client-App-ID" class="mt-1 block w-full rounded-md bg-white border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-xs" />
+											if rule != nil {
+												<input type="text" name="header_name" id="header_name" value={ rule.HeaderName } placeholder="e.g. X-Client-App-ID" class="mt-1 block w-full rounded-md bg-white border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-xs" />
+											} else {
+												<input type="text" name="header_name" id="header_name" placeholder="e.g. X-Client-App-ID" class="mt-1 block w-full rounded-md bg-white border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-xs" />
+											}
 										</div>
 										<div>
 											<label for="header_value" class="block text-[10px] font-medium text-gray-600">Value Match / Pattern</label>
-											<input type="text" name="header_value" id="header_value" placeholder="e.g. prod-chat or /canary/" class="mt-1 block w-full rounded-md bg-white border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-xs" />
+											if rule != nil {
+												<input type="text" name="header_value" id="header_value" value={ rule.HeaderValue } placeholder="e.g. prod-chat or /canary/" class="mt-1 block w-full rounded-md bg-white border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-xs" />
+											} else {
+												<input type="text" name="header_value" id="header_value" placeholder="e.g. prod-chat or /canary/" class="mt-1 block w-full rounded-md bg-white border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-xs" />
+											}
 										</div>
 									</div>
 									<p class="text-[10px] text-gray-400 leading-relaxed">
@@ -235,13 +284,21 @@ templ RuleModal(apps []config.App, activeModels []config.ModelConfig) {
 										<label for="target_model" class="block text-xs font-medium text-gray-700">Routed Target Model</label>
 										<select name="target_model" id="target_model" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm font-mono">
 											for _, m := range activeModels {
-												<option value={ m.ID }>{ m.DisplayName }</option>
+												if rule != nil && rule.TargetModel == m.ID {
+													<option value={ m.ID } selected>{ m.DisplayName }</option>
+												} else {
+													<option value={ m.ID }>{ m.DisplayName }</option>
+												}
 											}
 										</select>
 									</div>
 									<div>
 										<label for="target_location" class="block text-xs font-medium text-gray-700">Target Location (GCP)</label>
-										<input type="text" name="target_location" id="target_location" required value="us-central1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm font-mono" />
+										if rule != nil {
+											<input type="text" name="target_location" id="target_location" required value={ rule.TargetLocation } class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm font-mono" />
+										} else {
+											<input type="text" name="target_location" id="target_location" required value="us-central1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm font-mono" />
+										}
 									</div>
 								</div>
 
@@ -249,9 +306,17 @@ templ RuleModal(apps []config.App, activeModels []config.ModelConfig) {
 									<div>
 										<label for="fallback_model" class="block text-xs font-medium text-gray-700">Fallback Model (Optional)</label>
 										<select name="fallback_model" id="fallback_model" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm font-mono">
-											<option value="">None</option>
+											if rule != nil && rule.FallbackModel == "" {
+												<option value="" selected>None</option>
+											} else {
+												<option value="">None</option>
+											}
 											for _, m := range activeModels {
-												<option value={ m.ID }>{ m.DisplayName }</option>
+												if rule != nil && rule.FallbackModel == m.ID {
+													<option value={ m.ID } selected>{ m.DisplayName }</option>
+												} else {
+													<option value={ m.ID }>{ m.DisplayName }</option>
+												}
 											}
 										</select>
 									</div>
@@ -259,7 +324,11 @@ templ RuleModal(apps []config.App, activeModels []config.ModelConfig) {
 
 								<div class="mt-6 sm:mt-4 sm:flex sm:flex-row-reverse gap-3">
 									<button type="submit" class="inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:w-auto transition">
-										Save Routing Rule
+										if rule != nil {
+											Save Routing Rule
+										} else {
+											Create Routing Rule
+										}
 									</button>
 									<button
 										type="button"
