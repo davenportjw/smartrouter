@@ -38,7 +38,7 @@ func AppsTab(items []AppsViewModel) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"space-y-8\"><!-- Header & Actions --><div class=\"sm:flex sm:items-center sm:justify-between\"><div><h1 class=\"text-2xl font-bold tracking-tight text-gray-900\">Applications</h1><p class=\"mt-2 text-sm text-gray-700\">Configure client-specific applications, customize RPM/TPM rate capacity, and allocate request priority queueing.</p></div><div class=\"mt-4 sm:ml-16 sm:mt-0 sm:flex-none\"><button hx-get=\"/admin/apps/new\" hx-target=\"#modal-container\" class=\"block rounded-md bg-blue-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-blue-500 transition\">Add Application</button></div></div><!-- Apps Data Table --><div class=\"bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden\"><div class=\"inline-block min-w-full align-middle\"><table class=\"min-w-full divide-y divide-gray-300\"><thead class=\"bg-gray-50\"><tr><th scope=\"col\" class=\"py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6\">Application Name</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Owner Client</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Client Tier</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Priority</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Limits (RPM/TPM)</th><th scope=\"col\" class=\"relative py-3.5 pl-3 pr-4 sm:pr-6\"><span class=\"sr-only\">Actions</span></th></tr></thead> <tbody class=\"divide-y divide-gray-200 bg-white\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"space-y-8\"><!-- Header & Actions --><div class=\"sm:flex sm:items-center sm:justify-between\"><div><h1 class=\"text-2xl font-bold tracking-tight text-gray-900\">Applications</h1><p class=\"mt-2 text-sm text-gray-700\">Configure client-specific applications, customize RPM/TPM rate capacity, and allocate request priority queueing.</p></div><div class=\"mt-4 sm:ml-16 sm:mt-0 sm:flex-none\"><button hx-get=\"/admin/apps/new\" hx-target=\"#modal-container\" class=\"block rounded-md bg-blue-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-blue-500 transition\">Add Application</button></div></div><!-- Premium Application Limits & Scheduling Priority Explanation Card --><div class=\"bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5 shadow-xs\"><div class=\"flex gap-4\"><div class=\"flex-shrink-0 p-2 bg-emerald-500 text-white rounded-lg self-start\"><svg class=\"h-6 w-6\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z\"></path></svg></div><div class=\"space-y-1\"><h3 class=\"text-base font-bold text-emerald-950\">Application-Level Enforcement & Priority Queueing</h3><p class=\"text-sm text-emerald-900 leading-relaxed\">Smart Router enforces all active rate limits (RPM/TPM) on the Application boundary. Under high system load, pending requests are enqueued and sorted dynamically based on App Priority and Org Tier.</p><div class=\"grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 pt-3 border-t border-emerald-100 text-xs\"><div><span class=\"block font-bold text-emerald-950\">Active Enforced Limits</span> <span class=\"block text-emerald-800 mt-0.5\">Incoming requests are rate-limited strictly using the RPM and TPM settings configured for each Application below.</span></div><div><span class=\"block font-bold text-emerald-950\">Queue Sorting Formula</span> <span class=\"block text-emerald-800 mt-0.5\">Priority value calculated as: <strong>App Priority Weight</strong> (High=300, Med=200, Low=100) + <strong>Parent Org Tier</strong> (Premium=3, Standard=2, Free=1).</span></div><div><span class=\"block font-bold text-emerald-950\">Priority Queue Buffers</span> <span class=\"block text-emerald-800 mt-0.5\">High priority Apps wait up to <strong>5s</strong> during spikes, Medium up to <strong>2s</strong>, and Low priority requests are rejected immediately.</span></div></div></div></div></div><!-- Apps Data Table --><div class=\"bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden\"><div class=\"inline-block min-w-full align-middle\"><table class=\"min-w-full divide-y divide-gray-300\"><thead class=\"bg-gray-50\"><tr><th scope=\"col\" class=\"py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6\">Application Name</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Owner Client</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Client Tier</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Priority</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Limits (RPM/TPM)</th><th scope=\"col\" class=\"relative py-3.5 pl-3 pr-4 sm:pr-6\"><span class=\"sr-only\">Actions</span></th></tr></thead> <tbody class=\"divide-y divide-gray-200 bg-white\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -56,7 +56,7 @@ func AppsTab(items []AppsViewModel) templ.Component {
 				var templ_7745c5c3_Var2 string
 				templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(item.App.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 60, Col: 66}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 91, Col: 66}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 				if templ_7745c5c3_Err != nil {
@@ -69,7 +69,7 @@ func AppsTab(items []AppsViewModel) templ.Component {
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(item.App.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 61, Col: 68}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 92, Col: 68}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
@@ -82,7 +82,7 @@ func AppsTab(items []AppsViewModel) templ.Component {
 				var templ_7745c5c3_Var4 string
 				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(item.Client.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 64, Col: 67}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 95, Col: 67}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 				if templ_7745c5c3_Err != nil {
@@ -95,7 +95,7 @@ func AppsTab(items []AppsViewModel) templ.Component {
 				var templ_7745c5c3_Var5 string
 				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(item.Client.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 65, Col: 71}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 96, Col: 71}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 				if templ_7745c5c3_Err != nil {
@@ -130,7 +130,7 @@ func AppsTab(items []AppsViewModel) templ.Component {
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(item.Client.Tier)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 69, Col: 29}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 100, Col: 29}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 				if templ_7745c5c3_Err != nil {
@@ -165,7 +165,7 @@ func AppsTab(items []AppsViewModel) templ.Component {
 				var templ_7745c5c3_Var11 string
 				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(item.App.Priority)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 74, Col: 30}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 105, Col: 30}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 				if templ_7745c5c3_Err != nil {
@@ -178,7 +178,7 @@ func AppsTab(items []AppsViewModel) templ.Component {
 				var templ_7745c5c3_Var12 string
 				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(intToString(item.App.RPM))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 78, Col: 79}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 109, Col: 79}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 				if templ_7745c5c3_Err != nil {
@@ -191,7 +191,7 @@ func AppsTab(items []AppsViewModel) templ.Component {
 				var templ_7745c5c3_Var13 string
 				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(intToString(item.App.TPM))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 79, Col: 79}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 110, Col: 79}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 				if templ_7745c5c3_Err != nil {
@@ -204,7 +204,7 @@ func AppsTab(items []AppsViewModel) templ.Component {
 				var templ_7745c5c3_Var14 string
 				templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.ResolveAttributeValue("/admin/apps/edit?id=" + item.App.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 83, Col: 56}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 114, Col: 56}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var14)
 				if templ_7745c5c3_Err != nil {
@@ -217,7 +217,7 @@ func AppsTab(items []AppsViewModel) templ.Component {
 				var templ_7745c5c3_Var15 string
 				templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.ResolveAttributeValue("/admin/apps/delete?id=" + item.App.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 90, Col: 61}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 121, Col: 61}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var15)
 				if templ_7745c5c3_Err != nil {
@@ -230,7 +230,7 @@ func AppsTab(items []AppsViewModel) templ.Component {
 				var templ_7745c5c3_Var16 string
 				templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.ResolveAttributeValue("Are you sure you want to remove application " + item.App.Name + "?")
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 91, Col: 92}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 122, Col: 92}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var16)
 				if templ_7745c5c3_Err != nil {
@@ -313,7 +313,7 @@ func AppModal(clients []config.Client, app *config.App) templ.Component {
 			var templ_7745c5c3_Var18 string
 			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.ResolveAttributeValue(app.ID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 164, Col: 88}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 195, Col: 88}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var18)
 			if templ_7745c5c3_Err != nil {
@@ -341,7 +341,7 @@ func AppModal(clients []config.Client, app *config.App) templ.Component {
 			var templ_7745c5c3_Var19 string
 			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.ResolveAttributeValue(app.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 172, Col: 85}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 203, Col: 85}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var19)
 			if templ_7745c5c3_Err != nil {
@@ -370,7 +370,7 @@ func AppModal(clients []config.Client, app *config.App) templ.Component {
 				var templ_7745c5c3_Var20 string
 				templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.ResolveAttributeValue(c.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 185, Col: 33}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 216, Col: 33}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var20)
 				if templ_7745c5c3_Err != nil {
@@ -383,7 +383,7 @@ func AppModal(clients []config.Client, app *config.App) templ.Component {
 				var templ_7745c5c3_Var21 string
 				templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(c.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 185, Col: 53}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 216, Col: 53}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 				if templ_7745c5c3_Err != nil {
@@ -396,7 +396,7 @@ func AppModal(clients []config.Client, app *config.App) templ.Component {
 				var templ_7745c5c3_Var22 string
 				templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(c.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 185, Col: 63}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 216, Col: 63}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 				if templ_7745c5c3_Err != nil {
@@ -414,7 +414,7 @@ func AppModal(clients []config.Client, app *config.App) templ.Component {
 				var templ_7745c5c3_Var23 string
 				templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.ResolveAttributeValue(c.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 187, Col: 33}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 218, Col: 33}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var23)
 				if templ_7745c5c3_Err != nil {
@@ -427,7 +427,7 @@ func AppModal(clients []config.Client, app *config.App) templ.Component {
 				var templ_7745c5c3_Var24 string
 				templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(c.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 187, Col: 44}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 218, Col: 44}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 				if templ_7745c5c3_Err != nil {
@@ -440,7 +440,7 @@ func AppModal(clients []config.Client, app *config.App) templ.Component {
 				var templ_7745c5c3_Var25 string
 				templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(c.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 187, Col: 54}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 218, Col: 54}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 				if templ_7745c5c3_Err != nil {
@@ -452,7 +452,7 @@ func AppModal(clients []config.Client, app *config.App) templ.Component {
 				}
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "</select></div><div><label for=\"priority\" class=\"block text-xs font-medium text-gray-700\">Queueing Priority Profile</label> <select name=\"priority\" id=\"priority\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "</select><p class=\"text-[10px] text-gray-500 mt-0.5\">💡 Secondary tie-breaker in priority queueing (Premium=+3, Standard=+2, Free=+1).</p></div><div><label for=\"priority\" class=\"block text-xs font-medium text-gray-700\">Queueing Priority Profile</label> <select name=\"priority\" id=\"priority\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -467,7 +467,7 @@ func AppModal(clients []config.Client, app *config.App) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, ">Low (Non-critical)</option> <option value=\"medium\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, ">Low (Non-critical, Fail Instantly)</option> <option value=\"medium\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -477,7 +477,7 @@ func AppModal(clients []config.Client, app *config.App) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, ">Medium (Standard)</option> <option value=\"high\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, ">Medium (Standard, Up to 2s Buffer)</option> <option value=\"high\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -487,17 +487,17 @@ func AppModal(clients []config.Client, app *config.App) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, ">High (Mission Critical)</option>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, ">High (Mission Critical, Up to 5s Buffer)</option>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "<option value=\"low\">Low (Non-critical)</option> <option value=\"medium\" selected>Medium (Standard)</option> <option value=\"high\">High (Mission Critical)</option>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "<option value=\"low\">Low (Non-critical, Fail Instantly)</option> <option value=\"medium\" selected>Medium (Standard, Up to 2s Buffer)</option> <option value=\"high\">High (Mission Critical, Up to 5s Buffer)</option>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "</select></div></div><div class=\"grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded-md border border-gray-150\"><div><label for=\"rpm\" class=\"block text-xs font-medium text-gray-700\">RPM (Requests Per Minute)</label> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "</select><p class=\"text-[10px] text-gray-500 mt-0.5\">💡 Primary sort weight (High=+300, Med=+200, Low=+100) and controls active spike queue buffer capacity.</p></div></div><div class=\"grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded-md border border-gray-150\"><div class=\"col-span-2 text-xs font-medium text-gray-700 border-b border-gray-200 pb-1.5\">Active Enforced Capacity Limits</div><div><label for=\"rpm\" class=\"block text-xs font-medium text-gray-500\">RPM (Requests Per Minute)</label> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -509,7 +509,7 @@ func AppModal(clients []config.Client, app *config.App) templ.Component {
 			var templ_7745c5c3_Var26 string
 			templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.ResolveAttributeValue(intToString(app.RPM))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 212, Col: 89}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 248, Col: 89}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var26)
 			if templ_7745c5c3_Err != nil {
@@ -525,7 +525,7 @@ func AppModal(clients []config.Client, app *config.App) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "</div><div><label for=\"tpm\" class=\"block text-xs font-medium text-gray-700\">TPM (Tokens Per Minute)</label> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "</div><div><label for=\"tpm\" class=\"block text-xs font-medium text-gray-500\">TPM (Tokens Per Minute)</label> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -537,7 +537,7 @@ func AppModal(clients []config.Client, app *config.App) templ.Component {
 			var templ_7745c5c3_Var27 string
 			templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.ResolveAttributeValue(intToString(app.TPM))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 220, Col: 89}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 256, Col: 89}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var27)
 			if templ_7745c5c3_Err != nil {
@@ -553,7 +553,7 @@ func AppModal(clients []config.Client, app *config.App) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "</div></div><div class=\"mt-6 sm:mt-4 sm:flex sm:flex-row-reverse gap-3\"><button type=\"submit\" class=\"inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:w-auto transition\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "</div><div class=\"col-span-2 text-[10px] text-gray-500 italic mt-1\">💡 Smart Router rate limits are strictly checked and enforced at this Application boundary. Ensure correct values are set.</div></div><div class=\"mt-6 sm:mt-4 sm:flex sm:flex-row-reverse gap-3\"><button type=\"submit\" class=\"inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:w-auto transition\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
