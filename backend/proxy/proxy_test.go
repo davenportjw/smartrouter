@@ -13,8 +13,9 @@ import (
 	"testing"
 	"time"
 
+	store "geminirouter/backend/config"
 	"geminirouter/pkg/config"
-	"geminirouter/pkg/dashboard"
+	"geminirouter/frontend/dashboard"
 
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/oauth2"
@@ -46,7 +47,7 @@ func TestRouterProxyCompatibility(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
 
 	ctx := context.Background()
-	store, err := config.NewConfigStore(ctx, "test-project")
+	store, err := store.NewConfigStore(ctx, "test-project")
 	if err != nil {
 		t.Fatalf("failed to initialize config store: %v", err)
 	}
@@ -234,7 +235,7 @@ func TestRouterProxyCustomHeaders(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
 
 	ctx := context.Background()
-	store, err := config.NewConfigStore(ctx, "test-project")
+	store, err := store.NewConfigStore(ctx, "test-project")
 	if err != nil {
 		t.Fatalf("failed to initialize config store: %v", err)
 	}
@@ -379,7 +380,7 @@ func TestRouterProxyHeaderRouting(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
 
 	ctx := context.Background()
-	store, err := config.NewConfigStore(ctx, "test-project")
+	store, err := store.NewConfigStore(ctx, "test-project")
 	if err != nil {
 		t.Fatalf("failed to initialize config store: %v", err)
 	}
@@ -534,7 +535,7 @@ func TestRouterProxyAppCentricFlows(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
 
 	ctx := context.Background()
-	store, err := config.NewConfigStore(ctx, "test-project")
+	store, err := store.NewConfigStore(ctx, "test-project")
 	if err != nil {
 		t.Fatalf("failed to initialize config store: %v", err)
 	}
@@ -641,7 +642,7 @@ func TestRouterProxyGoogleIdentityAuth(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
 
 	ctx := context.Background()
-	store, err := config.NewConfigStore(ctx, "test-project")
+	store, err := store.NewConfigStore(ctx, "test-project")
 	if err != nil {
 		t.Fatalf("failed to initialize config store: %v", err)
 	}
@@ -762,7 +763,7 @@ func TestRequestSchedulerOrdering(t *testing.T) {
 	t.Setenv("ROUTER_MAX_QUEUE_SIZE", "5")
 
 	ctx := context.Background()
-	store, err := config.NewConfigStore(ctx, "test-project")
+	store, err := store.NewConfigStore(ctx, "test-project")
 	if err != nil {
 		t.Fatalf("failed to initialize config store: %v", err)
 	}
@@ -872,7 +873,7 @@ func TestRequestSchedulerQueueFull(t *testing.T) {
 	t.Setenv("ROUTER_MAX_QUEUE_SIZE", "1")
 
 	ctx := context.Background()
-	store, _ := config.NewConfigStore(ctx, "test-project")
+	store, _ := store.NewConfigStore(ctx, "test-project")
 
 	app := config.App{ID: "app-1", ClientID: "client-1", RPM: 10, TPM: 1000, Priority: "medium"}
 	client1 := config.Client{ID: "client-1", Tier: "standard"}
@@ -935,7 +936,7 @@ func TestRequestSchedulerClientDisconnect(t *testing.T) {
 	t.Setenv("ROUTER_MAX_QUEUE_SIZE", "5")
 
 	ctx := context.Background()
-	store, _ := config.NewConfigStore(ctx, "test-project")
+	store, _ := store.NewConfigStore(ctx, "test-project")
 
 	app := config.App{ID: "app-1", ClientID: "client-1", RPM: 10, TPM: 1000, Priority: "medium"}
 	client1 := config.Client{ID: "client-1", Tier: "standard"}
@@ -1002,7 +1003,7 @@ func TestProxyUpstream429Retry(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
 
 	ctx := context.Background()
-	store, _ := config.NewConfigStore(ctx, "test-project")
+	store, _ := store.NewConfigStore(ctx, "test-project")
 
 	app := config.App{ID: "app-1", ClientID: "client-1", RPM: 10, TPM: 1000, Priority: "medium"}
 	client1 := config.Client{ID: "client-1", Tier: "standard"}
@@ -1061,7 +1062,7 @@ func TestProxyComplexityRoutingHeuristics(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
 
 	ctx := context.Background()
-	store, _ := config.NewConfigStore(ctx, "test-project")
+	store, _ := store.NewConfigStore(ctx, "test-project")
 
 	// Seed Client and App with complexity heuristics enabled
 	app := config.App{
@@ -1183,7 +1184,7 @@ func TestProxyComplexityRoutingValidation(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
 
 	ctx := context.Background()
-	store, _ := config.NewConfigStore(ctx, "test-project")
+	store, _ := store.NewConfigStore(ctx, "test-project")
 
 	// Seed Client, App with complexity DISABLED, and active key
 	app := config.App{
@@ -1249,7 +1250,7 @@ func TestProxyComplexityRoutingLLMClassifier(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
 
 	ctx := context.Background()
-	store, _ := config.NewConfigStore(ctx, "test-project")
+	store, _ := store.NewConfigStore(ctx, "test-project")
 
 	// Seed Client, App with LLM Semantic Classification enabled
 	app := config.App{
@@ -1359,7 +1360,7 @@ func TestProxyDynamicRoutingSuite(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
 
 	ctx := context.Background()
-	store, _ := config.NewConfigStore(ctx, "test-project")
+	store, _ := store.NewConfigStore(ctx, "test-project")
 
 	// 1. Seed Client and App with complexity heuristics enabled
 	app := config.App{
@@ -1519,7 +1520,7 @@ func TestProxyRegionalModelRouting(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
 
 	ctx := context.Background()
-	store, err := config.NewConfigStore(ctx, "test-project")
+	store, err := store.NewConfigStore(ctx, "test-project")
 	if err != nil {
 		t.Fatalf("failed to initialize config store: %v", err)
 	}
@@ -1585,22 +1586,22 @@ func TestProxyRegionalModelRouting(t *testing.T) {
 	}
 
 	locationHeader := rr.Header().Get("X-Routed-Model-Location")
-	if locationHeader != "us-central1" {
-		t.Errorf("expected X-Routed-Model-Location to be 'us-central1', got %q", locationHeader)
+	if locationHeader != "us" {
+		t.Errorf("expected X-Routed-Model-Location to be 'us', got %q", locationHeader)
 	}
 
 	mu.Lock()
 	path := receivedPath
 	mu.Unlock()
 
-	// The request host should be rewritten to "us-central1-aiplatform.googleapis.com"
-	expectedHost := "us-central1-aiplatform.googleapis.com"
+	// The request host should be rewritten to "us-aiplatform.googleapis.com"
+	expectedHost := "us-aiplatform.googleapis.com"
 	if capturer.CapturedHost != expectedHost {
 		t.Errorf("expected rewritten host to be %q, got %q", expectedHost, capturer.CapturedHost)
 	}
 
-	// The path location should be rewritten to "us-central1"
-	expectedPath := "/v1/projects/test-project/locations/us-central1/publishers/google/models/gemini-custom-us:generateContent"
+	// The path location should be rewritten to "us"
+	expectedPath := "/v1/projects/test-project/locations/us/publishers/google/models/gemini-custom-us:generateContent"
 	if path != expectedPath {
 		t.Errorf("expected rewritten path to be %q, got %q", expectedPath, path)
 	}
@@ -1636,7 +1637,7 @@ func TestProxyModelDiscoveryAndRoutingWorkflow(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
 
 	ctx := context.Background()
-	store, err := config.NewConfigStore(ctx, "test-project")
+	store, err := store.NewConfigStore(ctx, "test-project")
 	if err != nil {
 		t.Fatalf("failed to initialize config store: %v", err)
 	}
@@ -1867,7 +1868,7 @@ func TestProxySmallestCompatibleLocationRouting(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
 
 	ctx := context.Background()
-	store, err := config.NewConfigStore(ctx, "test-project")
+	store, err := store.NewConfigStore(ctx, "test-project")
 	if err != nil {
 		t.Fatalf("failed to initialize config store: %v", err)
 	}
@@ -1924,13 +1925,13 @@ func TestProxySmallestCompatibleLocationRouting(t *testing.T) {
 		t.Fatalf("expected proxy response code 200, got %d", rr1.Code)
 	}
 
-	// Location should be downscaled/resolved to the smaller compatible location (us-central1)
+	// Location remains "us" because that is the smallest compatible location supported by the model (since downscaling is prevented)
 	locationHeader1 := rr1.Header().Get("X-Routed-Model-Location")
-	if locationHeader1 != "us-central1" {
-		t.Errorf("expected X-Routed-Model-Location to be 'us-central1', got %q", locationHeader1)
+	if locationHeader1 != "us" {
+		t.Errorf("expected X-Routed-Model-Location to be 'us', got %q", locationHeader1)
 	}
 
-	expectedHost1 := "us-central1-aiplatform.googleapis.com"
+	expectedHost1 := "us-aiplatform.googleapis.com"
 	if capturer1.CapturedHost != expectedHost1 {
 		t.Errorf("expected host to be %q, got %q", expectedHost1, capturer1.CapturedHost)
 	}
@@ -1939,7 +1940,7 @@ func TestProxySmallestCompatibleLocationRouting(t *testing.T) {
 	path1 := receivedPath
 	mu.Unlock()
 
-	expectedPath1 := "/v1/projects/test-project/locations/us-central1/publishers/google/models/gemini-3.5-pro:generateContent"
+	expectedPath1 := "/v1/projects/test-project/locations/us/publishers/google/models/gemini-3.5-pro:generateContent"
 	if path1 != expectedPath1 {
 		t.Errorf("expected Scenario A rewritten path to be %q, got %q", expectedPath1, path1)
 	}
@@ -1988,7 +1989,7 @@ func TestProxyIncompatibleLocationRouting(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
 
 	ctx := context.Background()
-	store, err := config.NewConfigStore(ctx, "test-project")
+	store, err := store.NewConfigStore(ctx, "test-project")
 	if err != nil {
 		t.Fatalf("failed to initialize config store: %v", err)
 	}
@@ -2071,7 +2072,7 @@ func TestPublisherModelsDiscovery(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
 
 	ctx := context.Background()
-	store, err := config.NewConfigStore(ctx, "test-project")
+	store, err := store.NewConfigStore(ctx, "test-project")
 	if err != nil {
 		t.Fatalf("failed to initialize config store: %v", err)
 	}
@@ -2173,7 +2174,7 @@ func TestFirstStartDiscoveryBootstrap(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
 
 	ctx := context.Background()
-	store, err := config.NewConfigStore(ctx, "test-project")
+	store, err := store.NewConfigStore(ctx, "test-project")
 	if err != nil {
 		t.Fatalf("failed to initialize config store: %v", err)
 	}
@@ -2262,7 +2263,7 @@ func TestDiscoveryRegistryObsoleteDisabling(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
 
 	ctx := context.Background()
-	store, err := config.NewConfigStore(ctx, "test-project")
+	store, err := store.NewConfigStore(ctx, "test-project")
 	if err != nil {
 		t.Fatalf("failed to initialize config store: %v", err)
 	}
@@ -2416,6 +2417,122 @@ func TestStaticLocationsResolution(t *testing.T) {
 		}
 	}
 }
+
+func TestModelRefreshLocationCorrectionAndDisabling(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+
+	ctx := context.Background()
+	store, err := store.NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to initialize config store: %v", err)
+	}
+
+	// 1. Seed models initially in local region (us-central1)
+	mFlash := config.ModelConfig{
+		ID:          "gemini-3.5-flash",
+		DisplayName: "Gemini 3.5 Flash",
+		Location:    "us-central1",
+		Type:        "foundation",
+		Active:      true,
+	}
+	mPro := config.ModelConfig{
+		ID:          "gemini-3.5-pro",
+		DisplayName: "Gemini 3.5 Pro",
+		Location:    "us-central1",
+		Type:        "foundation",
+		Active:      true,
+	}
+	_ = store.SaveModel(ctx, mFlash)
+	_ = store.SaveModel(ctx, mPro)
+
+	dash := dashboard.NewDashboardController(store, "test-project", "us-central1")
+
+	// 2. Mock Vertex AI REST API
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if strings.Contains(r.URL.Path, "/publishers/google/models") {
+			if strings.Contains(r.URL.Path, "generateContent") {
+				// Verification calls
+				if strings.Contains(r.URL.Path, "/models/gemini-3.5-flash") {
+					if strings.Contains(r.URL.Path, "/locations/us/") {
+						w.WriteHeader(http.StatusOK)
+						w.Write([]byte(`{"candidates": []}`))
+					} else {
+						w.WriteHeader(http.StatusNotFound)
+						w.Write([]byte(`{"error": {"message": "Model not found"}}`))
+					}
+				} else if strings.Contains(r.URL.Path, "/models/gemini-3.5-pro") {
+					// gemini-3.5-pro is completely unqueryable in all locations
+					w.WriteHeader(http.StatusNotFound)
+					w.Write([]byte(`{"error": {"message": "Model not found"}}`))
+				} else {
+					w.WriteHeader(http.StatusNotFound)
+				}
+			} else {
+				// Fetch publisher models
+				w.Write([]byte(`{
+					"publisherModels": [
+						{"name": "publishers/google/models/gemini-3.5-flash", "displayName": "Gemini 3.5 Flash"},
+						{"name": "publishers/google/models/gemini-3.5-pro", "displayName": "Gemini 3.5 Pro"}
+					]
+				}`))
+			}
+		} else {
+			w.Write([]byte(`{}`))
+		}
+	}))
+	defer mockServer.Close()
+
+	mockServerURL, _ := url.Parse(mockServer.URL)
+	dash.HTTPClient = &http.Client{
+		Transport: &mockGCPRoundTripper{Target: mockServerURL},
+	}
+
+	// 3. Trigger refresh
+	err = dash.DiscoverAndCacheModels(ctx)
+	if err != nil {
+		t.Fatalf("failed to run DiscoverAndCacheModels: %v", err)
+	}
+
+	// 4. Retrieve updated models
+	updatedModels, err := store.GetAllModels(ctx)
+	if err != nil {
+		t.Fatalf("failed to load models: %v", err)
+	}
+
+	var resFlash, resPro *config.ModelConfig
+	for _, m := range updatedModels {
+		mCopy := m
+		if m.ID == "gemini-3.5-flash" {
+			resFlash = &mCopy
+		} else if m.ID == "gemini-3.5-pro" {
+			resPro = &mCopy
+		}
+	}
+
+	if resFlash == nil {
+		t.Fatalf("expected gemini-3.5-flash to remain in registry")
+	}
+	// Location should be corrected to "us"
+	if resFlash.Location != "us" {
+		t.Errorf("expected gemini-3.5-flash location to be corrected to 'us', got %q", resFlash.Location)
+	}
+	// It should still be active
+	if !resFlash.Active {
+		t.Errorf("expected gemini-3.5-flash to remain active")
+	}
+
+	if resPro == nil {
+		t.Fatalf("expected gemini-3.5-pro to remain in registry")
+	}
+	// It should be disabled
+	if resPro.Active {
+		t.Errorf("expected gemini-3.5-pro to be disabled (Active=false) since it failed all verifications")
+	}
+
+	os.RemoveAll("data/local_db.json")
+}
+
 
 
 

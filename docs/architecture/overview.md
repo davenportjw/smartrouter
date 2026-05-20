@@ -118,3 +118,29 @@ Rate limiting tracks usage per **App** in-memory. The engine uses a precise **Sl
 
 ### Garbage Collection
 To prevent memory leaks, a background scheduler executes continuously in `scheduler.go`, sweeping inactive app sliding windows and releasing memory.
+
+---
+
+## 🌐 4. Decoupled Services Layout
+
+The Smart Router is deployed as two separate, decoupled service components to achieve optimal isolation, security, and horizontal scaling:
+
+```mermaid
+graph LR
+    User([Browser Client]) -->|Login / Dashboard UI| Frontend["Frontend Service (/frontend)"]
+    APIClient([API Clients]) -->|Vertex AI / Gemini Proxy| Backend["Backend Service (/backend)"]
+    Frontend -->|Admin REST APIs + OIDC Auth| Backend
+```
+
+### Decoupled Components
+
+* **Backend Service (`/backend`)**:
+  - Core Proxy handler representing the Vertex AI / Gemini routing engine.
+  - Exposes a fully API-callable, authenticated administration REST API (`/api/*`) for configuration CRUD and model discovery.
+  - Maintains the `ConfigStore` Firestore listeners and active cache layers.
+* **Frontend Service (`/frontend`)**:
+  - Serves all HTML Templ templates and dashboard pages.
+  - Manages browser session cookies and user logins via Firebase Authentication.
+  - Employs the REST-based `APIConfigStore` client to interact with the Backend Service's REST API.
+  - Securely authenticates requests against the Backend API using **Google OIDC Service Account identity tokens** in production, or a local shared secret in development.
+

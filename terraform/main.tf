@@ -36,9 +36,7 @@ resource "google_firestore_database" "database" {
   deletion_policy = "DELETE"
 }
 
-# Secret Manager is no longer required for upstream Gemini calls.
-
-# Service Account for Cloud Run
+# Service Account for Cloud Run Services
 resource "google_service_account" "router_sa" {
   depends_on   = [google_project_service.apis]
   account_id   = "gemini-router-runner"
@@ -80,8 +78,7 @@ resource "google_project_iam_member" "firebase_auth_access" {
   member  = "serviceAccount:${google_service_account.router_sa.email}"
 }
 
-
-# Cloud Run Service (Deployed initially with Google Placeholder)
+# 1. BACKEND SERVICE (Gemini Router API and Administrative Configuration APIs)
 resource "google_cloud_run_v2_service" "router_service" {
   depends_on = [
     google_project_service.apis,
@@ -96,17 +93,90 @@ resource "google_cloud_run_v2_service" "router_service" {
     service_account = google_service_account.router_sa.email
 
     containers {
-      image = "gcr.io/cloudrun/placeholder" # Initial placeholder; updated dynamically during deploy
+      image = "gcr.io/cloudrun/placeholder" # Updated dynamically in build/deploy script
 
       ports {
         container_port = 8080
       }
 
-      # Inject Firebase web variables directly into env
       env {
         name  = "GOOGLE_CLOUD_PROJECT"
         value = var.project_id
       }
+
+      env {
+        name  = "GEMINI_LOCATION"
+        value = var.region
+      }
+
+      resources {
+        limits = {
+          cpu    = "1"
+          memory = "512Mi"
+        }
+      }
+    }
+  }
+
+  lifecycle {
+    ignore_changes = [
+      client,
+      client_version,
+      template[0].containers[0].image,
+    ]
+  }
+}
+
+# Make Backend Cloud Run publicly accessible for proxy calls and admin integrations
+resource "google_cloud_run_v2_service_iam_member" "public_access" {
+  location = google_cloud_run_v2_service.router_service.location
+  name     = google_cloud_run_v2_service.router_service.name
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
+
+# 2. FRONTEND SERVICE (Dashboard Admin Portal)
+resource "google_cloud_run_v2_service" "frontend_service" {
+  depends_on = [
+    google_project_service.apis,
+    google_service_account.router_sa
+  ]
+
+  name     = "${var.service_name}-ui"
+  location = var.region
+  ingress  = "INGRESS_TRAFFIC_ALL"
+
+  template {
+    service_account = google_service_account.router_sa.email
+
+    containers {
+      image = "gcr.io/cloudrun/placeholder" # Updated dynamically in build/deploy script
+
+      ports {
+        container_port = 8081
+      }
+
+      env {
+        name  = "GOOGLE_CLOUD_PROJECT"
+        value = var.project_id
+      }
+
+      env {
+        name  = "BACKEND_API_URL"
+        value = google_cloud_run_v2_service.router_service.uri
+      }
+
+      env {
+        name  = "BACKEND_SERVICE_NAME"
+        value = var.service_name
+      }
+
+      env {
+        name  = "GEMINI_LOCATION"
+        value = var.region
+      }
+
+      # Inject Firebase Web SDK credentials
       env {
         name  = "FIREBASE_API_KEY"
         value = var.firebase_api_key
@@ -131,23 +201,20 @@ resource "google_cloud_run_v2_service" "router_service" {
         name  = "FIREBASE_APP_ID"
         value = var.firebase_app_id
       }
-
-      # Dynamic Location targeting for Vertex AI Gemini REST endpoint
       env {
-        name  = "GEMINI_LOCATION"
-        value = var.region
+        name  = "ALLOWED_EMAIL_DOMAINS"
+        value = var.allowed_email_domains
       }
 
       resources {
         limits = {
           cpu    = "1"
-          memory = "512Mi" # Go is extremely lightweight, but 512Mi is minimum for unthrottled CPU
+          memory = "512Mi"
         }
       }
     }
   }
 
-  # Let gcloud handles container version updates without Terraform marking state drift
   lifecycle {
     ignore_changes = [
       client,
@@ -157,10 +224,10 @@ resource "google_cloud_run_v2_service" "router_service" {
   }
 }
 
-# Make Cloud Run Publicly Accessible
-resource "google_cloud_run_v2_service_iam_member" "public_access" {
-  location = google_cloud_run_v2_service.router_service.location
-  name     = google_cloud_run_v2_service.router_service.name
+# Make Frontend UI service publicly accessible for admin users
+resource "google_cloud_run_v2_service_iam_member" "frontend_public_access" {
+  location = google_cloud_run_v2_service.frontend_service.location
+  name     = google_cloud_run_v2_service.frontend_service.name
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
@@ -176,10 +243,11 @@ resource "google_identity_platform_config" "auth_config" {
     "gemini-smart-router-txgsracloq-uc.a.run.app",
     "gemini-smart-router-834476222725.us-central1.run.app",
     "${var.project_id}.firebaseapp.com",
-    "${var.project_id}.web.app"
+    "${var.project_id}.web.app",
+    replace(replace(google_cloud_run_v2_service.frontend_service.uri, "https://", ""), "/", ""),
+    replace(replace(google_cloud_run_v2_service.router_service.uri, "https://", ""), "/", "")
   ]
 
-  # Safeguard: ignore changes to sign_in and other configs managed via Firebase console or other processes.
   lifecycle {
     ignore_changes = [
       autodelete_anonymous_users,
@@ -199,7 +267,7 @@ resource "google_identity_platform_config" "auth_config" {
   ]
 }
 
-# Cloud Run Service for Traffic Generator (Deployed initially with Google Placeholder)
+# 3. TRAFFIC GENERATOR SERVICE (Targets the Backend Service endpoint for load simulation)
 resource "google_cloud_run_v2_service" "generator_service" {
   depends_on = [
     google_project_service.apis,
@@ -251,4 +319,3 @@ resource "google_cloud_run_v2_service" "generator_service" {
     ]
   }
 }
-

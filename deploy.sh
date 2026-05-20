@@ -202,14 +202,19 @@ cd terraform
 
 terraform init
 
-log_info "Applying Terraform configuration..."
+if [ -z "$ALLOWED_EMAIL_DOMAINS" ]; then
+    ALLOWED_EMAIL_DOMAINS="google.com,cloudadvocacyorg.joonix.net"
+fi
+
+log_info "Applying Terraform configuration with authorized domains: $ALLOWED_EMAIL_DOMAINS"
 terraform apply -auto-approve \
   -var="project_id=$GOOGLE_CLOUD_PROJECT" \
   -var="firebase_api_key=$FIREBASE_API_KEY" \
   -var="firebase_auth_domain=$FIREBASE_AUTH_DOMAIN" \
   -var="firebase_storage_bucket=$FIREBASE_STORAGE_BUCKET" \
   -var="firebase_messaging_sender_id=$FIREBASE_MESSAGING_SENDER_ID" \
-  -var="firebase_app_id=$FIREBASE_APP_ID"
+  -var="firebase_app_id=$FIREBASE_APP_ID" \
+  -var="allowed_email_domains=$ALLOWED_EMAIL_DOMAINS"
 
 cd ..
 
@@ -219,35 +224,37 @@ cd ..
 log_info "Compiling Go HTML Templ components..."
 go run github.com/a-h/templ/cmd/templ generate
 
-# 5. Build container on Cloud Build and Deploy to Cloud Run
-log_info "Triggering Google Cloud Build and Deploying active Go server to Cloud Run..."
-gcloud run deploy gemini-smart-router \
-  --source . \
-  --region us-central1 \
-  --service-account "gemini-router-runner@$GOOGLE_CLOUD_PROJECT.iam.gserviceaccount.com" \
-  --project "$GOOGLE_CLOUD_PROJECT" \
-  --quiet
+# 5. Build containers on Cloud Build and Deploy to Cloud Run
+log_info "Building Smart Router Backend Container via Cloud Build..."
+gcloud builds submit --config cloudbuild-backend.yaml --project "$GOOGLE_CLOUD_PROJECT" .
+
+log_info "Deploying Smart Router Backend to Cloud Run..."
+gcloud run deploy gemini-smart-router --image "gcr.io/$GOOGLE_CLOUD_PROJECT/smart-router-backend" --region us-central1 --service-account "gemini-router-runner@$GOOGLE_CLOUD_PROJECT.iam.gserviceaccount.com" --project "$GOOGLE_CLOUD_PROJECT" --quiet
+
+log_info "Building Smart Router Frontend UI Container via Cloud Build..."
+gcloud builds submit --config cloudbuild-frontend.yaml --project "$GOOGLE_CLOUD_PROJECT" .
+
+log_info "Deploying Smart Router Frontend UI to Cloud Run..."
+gcloud run deploy gemini-smart-router-ui --image "gcr.io/$GOOGLE_CLOUD_PROJECT/smart-router-frontend" --region us-central1 --service-account "gemini-router-runner@$GOOGLE_CLOUD_PROJECT.iam.gserviceaccount.com" --project "$GOOGLE_CLOUD_PROJECT" --quiet
 
 log_info "Triggering Google Cloud Build and Deploying active Go traffic generator to Cloud Run..."
-gcloud run deploy gemini-traffic-generator \
-  --source ./generator \
-  --region us-central1 \
-  --service-account "gemini-router-runner@$GOOGLE_CLOUD_PROJECT.iam.gserviceaccount.com" \
-  --project "$GOOGLE_CLOUD_PROJECT" \
-  --quiet
+gcloud run deploy gemini-traffic-generator --source ./generator --region us-central1 --service-account "gemini-router-runner@$GOOGLE_CLOUD_PROJECT.iam.gserviceaccount.com" --project "$GOOGLE_CLOUD_PROJECT" --quiet
 
 log_success "Deployment completed successfully!"
 
-# Get Cloud Run service URL
-SERVICE_URL=$(gcloud run services describe gemini-smart-router --region us-central1 --format="value(status.url)" --project="$GOOGLE_CLOUD_PROJECT" 2>/dev/null || true)
-if [ -n "$SERVICE_URL" ]; then
+# Get Cloud Run service URLs
+BACKEND_URL=$(gcloud run services describe gemini-smart-router --region us-central1 --format="value(status.url)" --project="$GOOGLE_CLOUD_PROJECT" 2>/dev/null || true)
+FRONTEND_URL=$(gcloud run services describe gemini-smart-router-ui --region us-central1 --format="value(status.url)" --project="$GOOGLE_CLOUD_PROJECT" 2>/dev/null || true)
+
+if [ -n "$BACKEND_URL" ] && [ -n "$FRONTEND_URL" ]; then
     echo -e "\n------------------------------------------------------------"
-    echo -e "Gemini Smart Router API Endpoint:"
-    echo -e "👉 ${GREEN}$SERVICE_URL${NC}"
+    echo -e "Smart Router Service URLs:"
+    echo -e "👉 Backend API & Proxy: ${GREEN}$BACKEND_URL${NC}"
+    echo -e "👉 Frontend Dashboard : ${GREEN}$FRONTEND_URL${NC}"
     echo -e "------------------------------------------------------------\n"
 
     log_info "Initiating post-deployment verification tests..."
-    export SERVICE_URL="$SERVICE_URL"
+    export SERVICE_URL="$BACKEND_URL"
     if go run cmd/verify/main.go; then
         log_success "Post-deployment verification tests passed!"
     else

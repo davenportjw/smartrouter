@@ -1,6 +1,6 @@
 #!/bin/bash
-# Gemini Smart Router local development startup script
-# Highly polished for instant boot, mock configurations, and real Vertex AI calls.
+# Smart Router local development startup script
+# Decoupled Multi-Service orchestrator (Backend + Frontend)
 
 set -e
 
@@ -38,32 +38,55 @@ if [ ! -f .env ]; then
 fi
 
 log_info "Loading environment configurations from .env..."
-# Export variables from .env, filtering out comments
 export $(grep -v '^#' .env | xargs)
 
-# Validate standard GCP baseline
 if [ -z "$GOOGLE_CLOUD_PROJECT" ]; then
     log_warn "GOOGLE_CLOUD_PROJECT variable not found. Upstream Vertex AI proxy calls may fail unless specified."
 fi
 
-# 2. Force Local Dev configurations
-export LOCAL_DEV="true"
-export PORT="8080"
-
-# 3. Rebuild dynamic HTML components
+# 2. Dynamic UI Code Compilation
 log_info "Compiling Go HTML Templ components..."
 go run github.com/a-h/templ/cmd/templ generate
 
-# 4. Gorgeous header and boot information
-echo -e "\n----------------------------------------------------------------------"
-echo -e "     ${GREEN}G E M I N I   S M A R T   R O U T E R   ( L O C A L   D E V )${NC}"
-echo -e "----------------------------------------------------------------------"
-echo -e "👉 Local Server: ${GREEN}http://localhost:8080${NC}"
-echo -e "👉 Admin Portal: ${GREEN}http://localhost:8080/login${NC}"
-echo -e "👉 Mode        : ${YELLOW}Local Development (Mock DB & Mock Firebase Auth)${NC}"
-echo -e "👉 Upstream API: ${BLUE}LIVE Vertex AI Gemini (via your local credentials)${NC}"
-echo -e "----------------------------------------------------------------------"
-log_info "Starting Go server...\n"
+# 3. Re-orchestration Parameters
+export LOCAL_DEV="true"
+export BACKEND_SHARED_SECRET="local-dev-bypass-token-12345"
 
-# 5. Launch server
-go run main.go
+# 4. Graceful exit traps
+cleanup() {
+    log_warn "Interrupt signal caught! Cleaning up running services..."
+    if [ -n "$BACKEND_PID" ]; then
+        kill "$BACKEND_PID" 2>/dev/null || true
+    fi
+    if [ -n "$FRONTEND_PID" ]; then
+        kill "$FRONTEND_PID" 2>/dev/null || true
+    fi
+    log_success "Cleanup complete. Bye!"
+    exit 0
+}
+trap cleanup SIGINT SIGTERM EXIT
+
+# 5. Boot Up Services in Background
+log_info "Starting Backend Service on port 8080..."
+PORT="8080" go run backend/main.go &
+BACKEND_PID=$!
+
+# Wait 1.5 seconds to let backend boot and start listeners
+sleep 1.5
+
+log_info "Starting Frontend Service on port 8081..."
+PORT="8081" BACKEND_API_URL="http://localhost:8080" go run frontend/main.go &
+FRONTEND_PID=$!
+
+# Gorgeous boot details
+echo -e "\n----------------------------------------------------------------------"
+echo -e "     ${GREEN}S M A R T   R O U T E R   ( D E C O U P L E D   L O C A L )${NC}"
+echo -e "----------------------------------------------------------------------"
+echo -e "👉 Backend URL  : ${GREEN}http://localhost:8080${NC}"
+echo -e "👉 Admin Portal : ${GREEN}http://localhost:8081/login${NC}"
+echo -e "👉 Mode         : ${YELLOW}Decoupled Services (Backend REST APIs + Frontend UI)${NC}"
+echo -e "👉 Shared Secret: ${BLUE}local-dev-bypass-token-12345${NC}"
+echo -e "----------------------------------------------------------------------\n"
+
+# Wait on background tasks to keep process alive
+wait

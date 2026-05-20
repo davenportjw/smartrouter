@@ -15,15 +15,12 @@ The Smart Router acts as a drop-in proxy replacement for your Gemini API request
 
 ```mermaid
 flowchart TD
-    A[Client Application] -->|Gemini API Protocol| B(Smart Router - Cloud Run)
+    A[Client Application] -->|Gemini API Protocol| B(Smart Router Backend - Port 8080)
+    A2[Admin User Browser] -->|HTML/HTMX UI| B2(Smart Router Frontend - Port 8081)
+    B2 -->|REST Admin API + OIDC| B
     B -->|Validate API Key| C[(Firestore Native DB)]
-    B -->|Read Routing Rules| C
-    B -->|Fetch Upstream Key| D[Secret Manager]
-    D -->|Return Gemini API Key| B
     B -->|Proxy Request| E[Official Gemini API / Vertex AI]
-    
-    F[Admin Dashboard] -->|Manage Keys & Rules| B
-    F -->|Google Sign-In| G[Firebase Authentication]
+    B2 -->|Google Sign-In| G[Firebase Authentication]
 ```
 
 ---
@@ -71,29 +68,62 @@ FIREBASE_APP_ID="1:1234:web:abcd"
 
 ---
 
-## 🚀 Automated Cloud Deployment
+## 🚀 Cloud Deployment (New & Existing GCP Projects)
 
-Deploying to Google Cloud is fully automated. 
+Deploying the Smart Router to Google Cloud is automated via a robust combination of **Terraform** (for infrastructure) and a single-command **deployment pipeline wrapper (`deploy.sh`)** (for automated Firebase Web SDK registration, templ rendering, container builds, and system deployments).
 
-### 1. Authenticate `gcloud`
+### 📋 New Google Cloud Project: Manual Pre-requisites
 
-Before running the deployment script, make sure you are authenticated with Google Cloud and have set your target project:
+If you are deploying the Smart Router to a **brand new Google Cloud Project**, there are a few one-time manual steps you must perform in the Google Cloud Console first:
+
+1. **Enable Billing (Mandatory)**:
+   - Associate an active **Billing Account** with your Google Cloud project. The deployment provisions serverless containers (Cloud Run), Secret Manager secrets, a native Firestore Database, Cloud Build triggers, and Google Identity Platform, which are only accessible on billing-enabled projects.
+2. **Configure OAuth Consent Screen (Mandatory for Google Sign-In)**:
+   - Navigate to the [Google Cloud Console](https://console.cloud.google.com/).
+   - Go to **APIs & Services > OAuth consent screen**.
+   - Select a **User Type**:
+     - **Internal** (Recommended if deploying for your organization/team, restricting login strictly to your domain members).
+     - **External** (If you want to authorize any individual Google email address to access).
+   - Fill out the required fields: **App name** (e.g. `Smart Router Admin`), **User support email**, and **Developer contact information**. Click **Save and Continue**.
+3. **Enable Google Sign-In Provider in Identity Platform (Mandatory)**:
+   - Search for **Identity Platform** in the GCP search bar (this is the underlying engine for Firebase Auth).
+   - Go to **Providers** in the left-hand menu.
+   - Click **Add Provider** and select **Google**.
+   - Toggle the **Enabled** switch.
+   - Select your project's **Support email** in the dropdown, and click **Save**.
+
+### 1. Authenticate `gcloud` Locally
+
+Ensure your local terminal context is authenticated and set to your target GCP project:
 
 ```bash
-# Login to gcloud CLI
+# 1. Authenticate standard gcloud CLI
 gcloud auth login
 
-# Configure your active CLI project context
+# 2. Configure active CLI project context
 gcloud config set project your-gcp-project-id
 
-# Authorize Application Default Credentials (ADC) for Terraform & scripts
+# 3. Authorize Application Default Credentials (ADC)
+# (This enables Terraform and the deploy script to act programmatically on your behalf)
 gcloud auth application-default login
 gcloud auth application-default set-quota-project your-gcp-project-id
 ```
 
-### 2. Run the Deploy Script
+### 2. (Optional) Set Authorized Domains & Specific Email Addresses
 
-Execute the primary deployment pipeline:
+By default, admin dashboard logins are restricted to email addresses ending in `@google.com` and `@cloudadvocacyorg.joonix.net` to prevent unauthorized console access.
+
+To authorize your own domain suffixes or individual email addresses (e.g., a specific team email alongside whole company domains):
+1. Open `.env` (copied from `.env.sample`).
+2. Add or update the `ALLOWED_EMAIL_DOMAINS` variable with a comma-separated list of domains and/or specific emails:
+   ```ini
+   # Supports both whole domains (e.g. 'mycompany.com') and specific individual emails (e.g. 'operator@gmail.com') simultaneously:
+   ALLOWED_EMAIL_DOMAINS="mycompany.com,operator@gmail.com,another-team.org"
+   ```
+
+### 3. Run the Deploy Script
+
+Now, initiate the primary deployment pipeline:
 
 ```bash
 chmod +x deploy.sh
@@ -133,24 +163,21 @@ If you prefer to manual configure your Firebase credentials, or do not have dire
 
 ## 🎛️ Local Development & Execution
 
-To run the Smart Router locally:
+To run the decoupled Smart Router services concurrently locally:
 
 ### 1. Install Go Dependencies
 ```bash
 go mod download
 ```
 
-### 2. Generate Web Components
+### 2. Orchestrate Service Bootup
 ```bash
-go run github.com/a-h/templ/cmd/templ generate
+./run_local.sh
 ```
 
-### 3. Run the Server
-```bash
-go run main.go
-```
-
-By default, the router will launch on `http://localhost:8080`. You can navigate to `http://localhost:8080/admin` to access the administration control panel.
+This orchestrator compiles UI Templ modules and boots both backend and frontend services:
+* **Backend Proxy & REST API Service**: Launches on `http://localhost:8080` (direct proxy and config API callable).
+* **Frontend Portal UI Service**: Launches on `http://localhost:8081` (access web interface at `http://localhost:8081/login`).
 
 ---
 

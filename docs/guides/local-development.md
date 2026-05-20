@@ -44,17 +44,28 @@ GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
 GEMINI_API_KEY="your-gemini-api-key"
 ```
 
-### 4. Run the Service
-Start the Go web application:
-```bash
-go run main.go
-```
-* (Or run the helper startup script: `./run_local.sh`)
+### 4. Run the Decoupled Services
 
-Navigate to the dashboard index in your browser:
+The Smart Router is split into separate services. To run them both locally under local dev orchestration:
+
+```bash
+./run_local.sh
 ```
-http://localhost:8080/admin
+
+This startup script automatically:
+1. Compiles all Go HTML templates inside the UI codebase.
+2. Boots the **Backend Proxy & REST API Service** on Port `8080` in the background.
+3. Boots the **Frontend Dashboard Service** on Port `8081` in the background, targeting the backend at `http://localhost:8080`.
+4. Configures a secure bypass auth token `BACKEND_SHARED_SECRET=local-dev-bypass-token-12345` to allow communication.
+
+To explore the UI portal in your browser, navigate to:
 ```
+http://localhost:8081/login
+```
+
+To directly query the API proxy or call the administrative APIs:
+- **Vertex API Proxy**: `http://localhost:8080/v1/models/...`
+- **Administrative REST APIs**: `http://localhost:8080/api/apps`, `http://localhost:8080/api/rules`, etc. (requires `Authorization: Bearer local-dev-bypass-token-12345` header).
 
 ---
 

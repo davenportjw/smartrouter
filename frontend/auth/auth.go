@@ -93,10 +93,23 @@ func (as *AuthStore) CreateSession(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Restrict authentication access to google.com and cloudadvocacyorg.joonix.net users
-		if !strings.HasSuffix(email, "@google.com") && !strings.HasSuffix(email, "@cloudadvocacyorg.joonix.net") {
-			log.Printf("[Auth] Access denied for unauthorized domain email: %s", email)
-			http.Error(w, "Access restricted to authorized domains", http.StatusForbidden)
+		// Restrict authentication access to authorized domains or specific email addresses
+		allowedDomainsEnv := os.Getenv("ALLOWED_EMAIL_DOMAINS")
+		allowedDomains := []string{"google.com", "cloudadvocacyorg.joonix.net"}
+		if allowedDomainsEnv != "" {
+			parts := strings.Split(allowedDomainsEnv, ",")
+			var trimmed []string
+			for _, p := range parts {
+				trimmed = append(trimmed, strings.TrimSpace(p))
+			}
+			if len(trimmed) > 0 {
+				allowedDomains = trimmed
+			}
+		}
+
+		if !isEmailAuthorized(email, allowedDomains) {
+			log.Printf("[Auth] Access denied for unauthorized email: %s", email)
+			http.Error(w, "Access restricted to authorized domains or specific email addresses", http.StatusForbidden)
 			return
 		}
 
@@ -194,4 +207,26 @@ func (as *AuthStore) Middleware(next http.Handler) http.Handler {
 		ctx := context.WithValue(r.Context(), uidContextKey, uid)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// isEmailAuthorized checks if the provided email is authorized based on a list of specific emails or domains.
+func isEmailAuthorized(email string, allowedList []string) bool {
+	email = strings.ToLower(strings.TrimSpace(email))
+	for _, entry := range allowedList {
+		entry = strings.ToLower(strings.TrimSpace(entry))
+		// Trim leading '@' if user input includes it (e.g., @gmail.com)
+		cleanedEntry := strings.TrimPrefix(entry, "@")
+		if strings.Contains(cleanedEntry, "@") {
+			// Match specific email address exactly
+			if email == cleanedEntry {
+				return true
+			}
+		} else {
+			// Match entire domain suffix
+			if strings.HasSuffix(email, "@"+cleanedEntry) {
+				return true
+			}
+		}
+	}
+	return false
 }

@@ -65,20 +65,24 @@ If a `premium` client sends a request to `gemini-2.5-flash` and provides the hea
 To align with standard enterprise security architectures, Lower Latencies, and Data Residency requirements, the Smart Router dynamically regulates and steers traffic using the **most specific compatible regional boundary available**.
 
 ### Serving Location Compatibility & Coercion Rules
-When a router is instantiated in a primary serving region (configured via `GEMINI_LOCATION`, e.g. `us-central1`), operators can route traffic to models residing in compatible locations. However, to optimize regional locality and data paths, **the reverse proxy always downscales routing to the smallest compatible location where possible**:
+When a router is instantiated in a primary serving region (configured via `GEMINI_LOCATION`, e.g. `us-central1`), operators can route traffic to models residing in compatible locations. However, to maximize reliability and align routing with verified operational bounds, **the reverse proxy always routes to the model's verified operational location, avoiding unsafe downscaling to a specific region if not explicitly verified**:
 1. **Specific regional locations** (e.g., `us-central1`) are Level 1 (Smallest).
 2. **Multi-regions** (e.g., `us`, `eu`) are Level 2.
 3. **Global baselines** (`global`) are Level 3 (Broadest).
 
 For example:
-* If the router is in `us-central1` (Level 1) and the target model supports `us` (Level 2), the proxy automatically routes to **`us-central1`** (the smallest compatible location).
+* If the router is in `us-central1` (Level 1) and the target model has its verified/operational location at `us` (Level 2), the proxy routes to **`us`** (rather than downscaling to `us-central1` where it might be unavailable) to ensure the call succeeds.
+* If the model is registered at `us-central1` (Level 1) and the router is in `us` (Level 2), they are compatible and the proxy routes to **`us-central1`** as it is supported by the model and is within the router's geographic serving boundary.
 * If the model is pinned to `europe-west9` (Level 1) and the router is in `us` (Level 2), they are incompatible. The proxy preserves the model's location **`europe-west9`** to ensure routing succeeds.
 
 Incompatible routes (e.g., routing from an EU router strictly to a model residing in a `us-` region) are filtered out and prevented, guaranteeing that regional boundaries are enforced.
 
-### Exact Location Extraction during Model Discovery
-When refreshing custom models and endpoints via `/admin/models/refresh`, the Smart Router extracts the exact regional code from the model or endpoint's GCP resource path (e.g., `projects/{project}/locations/us-central1/models/custom-weights` -> `us-central1`).
-It stores this model configuration utilizing the most specific location possible, so routing decisions automatically benefit from precise locality routing.
+### Exact Location Extraction & Active Queryability Verification
+When refreshing custom models, endpoints, and publisher models via `/admin/models/refresh`:
+- For **custom models and endpoints**, the Smart Router extracts the exact regional code from their GCP resource path (e.g., `projects/{project}/locations/us-central1/models/custom-weights` -> `us-central1`).
+- For **publisher (foundation) models** (which do not embed a location in their path), the router dynamically resolves and validates the correct location on refresh. It tests all compatible candidate locations in order of specificity (e.g., local region `us-central1` -> parent multiregion `us` -> `global`).
+- **Queryability & Verification Loop**: Every discovered model undergoes active queryability verification via Vertex AI content generation pings. The most specific candidate location that successfully passes verification is selected and saved as the model's operational location (correcting any outdated or misconfigured "local" locations to their proper multiregion/regional bounds, such as correcting `gemini-3.5-flash` to `us`).
+- **Automatic Model Disabling**: If a model fails verification at all candidate locations (indicating it is no longer queryable, deprecated, or restricted in the target GCP environment), the Smart Router automatically disables the model by setting its state to inactive (`Active = false`) rather than routing traffic to a broken endpoint.
 
 ### Dynamic Host & Path Rewriting in the Proxy
 When a request is dynamically routed to a model:

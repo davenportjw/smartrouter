@@ -40,3 +40,9 @@ variable "firebase_app_id" {
   type        = string
   description = "Firebase Web Client App ID."
 }
+
+variable "allowed_email_domains" {
+  type        = string
+  default     = "google.com,cloudadvocacyorg.joonix.net"
+  description = "Comma-separated list of email domains authorized to sign in to the admin dashboard."
+}

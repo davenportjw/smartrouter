@@ -2,11 +2,16 @@ package templates
 
 import (
 	"context"
+	"os"
 )
 
 func IsSimulating(ctx context.Context) bool {
 	val, ok := ctx.Value("simulate_metrics").(bool)
 	return ok && val
+}
+
+func IsLocalDev() bool {
+	return os.Getenv("LOCAL_DEV") == "true"
 }
 
 templ Layout(title string, currentTab string, content templ.Component) {
@@ -259,10 +264,17 @@ templ Layout(title string, currentTab string, content templ.Component) {
 						</form>
 
 						<!-- Local Env Badge -->
-						<span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/10 shadow-xs">
-							<span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-							Local Server
-						</span>
+						if IsLocalDev() {
+							<span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/10 shadow-xs">
+								<span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+								Local Server
+							</span>
+						} else {
+							<span class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/10 shadow-xs">
+								<span class="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+								Cloud Server
+							</span>
+						}
 						
 						<!-- API Documentation Link -->
 						<a href="https://github.com/davenportjw/geminirouter" target="_blank" class="hidden sm:inline-flex items-center rounded-lg bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10 hover:bg-gray-100 transition">

@@ -8,6 +8,15 @@ The Smart Router includes an elegant, compiled HTMX-powered administrative contr
 
 To protect your proxy against unauthorized access, the dashboard enforces Firebase-backed **Google Sign-In OIDC Authentication**.
 
+### 🛡️ Configurable Email & Domain Suffix Restriction
+By default, login authorization is locked down to email addresses ending in `@google.com` and `@cloudadvocacyorg.joonix.net` to prevent unauthorized administrative entry.
+
+If you are running a custom deployment on a personal or corporate Google Cloud project, you can configure your authorized email suffixes or specific individual email addresses using the `ALLOWED_EMAIL_DOMAINS` variable in your `.env` file (or the Cloud Run service configuration environment):
+```ini
+# Supports both whole domains and specific individual email addresses simultaneously
+ALLOWED_EMAIL_DOMAINS="mycompany.com,operator@gmail.com,another-team.org"
+```
+
 ### Authenticating as an Administrator
 1. Navigate to the base URL: `http://localhost:8080/admin` (or your live Cloud Run service URL).
 2. If unauthenticated, the router redirects you to `/admin/login` showing the secure login screen.

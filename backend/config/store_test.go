@@ -1,9 +1,11 @@
-package config
+package store
 
 import (
 	"context"
 	"os"
 	"testing"
+
+	"geminirouter/pkg/config"
 )
 
 func TestIsValidModelName(t *testing.T) {
@@ -19,6 +21,13 @@ func TestIsValidModelName(t *testing.T) {
 		{"Gemini 3.0 Flash", "gemini-3.0-flash", true},
 		{"Gemini 3.1 Pro", "gemini-3.1-pro", true},
 		{"Gemini 3.5 Flash-Lite", "gemini-3.5-flash-lite", true},
+
+		// Valid Preview Models (2.5+ / 3.x+)
+		{"Gemini 3.1 Pro Preview", "gemini-3.1-pro-preview", true},
+		{"Gemini 3.1 Flash-Lite Preview", "gemini-3.1-flash-lite-preview", true},
+		{"Gemini 2.5 Flash Preview Date-Suffix", "gemini-2.5-flash-preview-09-2025", true},
+		{"Gemini 3.0 Pro Preview", "gemini-3-pro-preview", true},
+
 		
 		// Valid Embeddings and Virtual Router
 		{"Text Embedding 004", "text-embedding-004", true},
@@ -34,6 +43,9 @@ func TestIsValidModelName(t *testing.T) {
 		{"Gemini 1.5 Pro (Legacy)", "gemini-1.5-pro", false},
 		{"Gemini 1.0 Pro (Legacy)", "gemini-1.0-pro", false},
 		{"Gemini 2.0 Flash (Legacy)", "gemini-2.0-flash", false},
+		{"Gemini 1.5 Pro Preview (Legacy)", "gemini-1.5-pro-preview", false},
+		{"Gemini 2.0 Flash Preview (Legacy)", "gemini-2.0-flash-preview", false},
+
 
 		// Invalid names
 		{"Arbitrary string", "some-random-model", false},
@@ -43,7 +55,7 @@ func TestIsValidModelName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual := IsValidModelName(tt.modelName)
+			actual := config.IsValidModelName(tt.modelName)
 			if actual != tt.expected {
 				t.Errorf("IsValidModelName(%q) = %t; expected %t", tt.modelName, actual, tt.expected)
 			}

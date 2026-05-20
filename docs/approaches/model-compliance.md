@@ -21,6 +21,7 @@ When seeding database rules, writing integration tests, or setting up complexity
 * **`gemini-2.5-pro`**: Mandatory choice for heavy reasoning, complex programming analysis, math, or multimodal files requiring advanced reasoning.
 * **`gemini-2.5-flash-lite`**: Optimized for ultra-low latency and high-frequency, cost-sensitive requests.
 * **Subsequent 2.5+ & 3.x+ Series**: Future releases exceeding the 2.5 baseline (e.g. Gemini 3.0, Gemini 3.5) are fully compliant.
+* **Preview Models**: Compliant model versions ending in `-preview` (with or without date suffixes, e.g. `gemini-3.1-pro-preview`, `gemini-2.5-flash-preview-09-2025`) are fully supported.
 
 ---
 

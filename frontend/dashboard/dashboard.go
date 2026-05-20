@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"geminirouter/pkg/config"
-	"geminirouter/pkg/dashboard/templates"
+	"geminirouter/frontend/dashboard/templates"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -28,7 +28,7 @@ import (
 
 // DashboardController handles the administration dashboard HTTP routes.
 type DashboardController struct {
-	Store       *config.ConfigStore
+	Store       config.AdminStore
 	Firebase    templates.FirebaseConfig
 	ProjectID   string
 	Location    string
@@ -37,7 +37,7 @@ type DashboardController struct {
 }
 
 // NewDashboardController initializes a new dashboard controller.
-func NewDashboardController(store *config.ConfigStore, projectID, location string) *DashboardController {
+func NewDashboardController(store config.AdminStore, projectID, location string) *DashboardController {
 	ts, err := google.DefaultTokenSource(context.Background(), "https://www.googleapis.com/auth/cloud-platform")
 	if err != nil {
 		log.Printf("[Warning] Failed to initialize live Google Cloud DefaultTokenSource: %v", err)
@@ -643,11 +643,12 @@ func (dc *DashboardController) ServeModels(w http.ResponseWriter, r *http.Reques
 }
 
 // verifyModel sends a very basic query to check if the model works or needs template reconstruction.
-func (dc *DashboardController) verifyModel(ctx context.Context, model config.ModelConfig) {
+func (dc *DashboardController) verifyModel(ctx context.Context, model config.ModelConfig) error {
 	type basicPart struct {
 		Text string `json:"text"`
 	}
 	type basicContent struct {
+		Role  string      `json:"role,omitempty"`
 		Parts []basicPart `json:"parts"`
 	}
 	type basicReq struct {
@@ -656,6 +657,7 @@ func (dc *DashboardController) verifyModel(ctx context.Context, model config.Mod
 	reqBody := basicReq{
 		Contents: []basicContent{
 			{
+				Role:  "user",
 				Parts: []basicPart{{Text: "ping"}},
 			},
 		},
@@ -678,8 +680,7 @@ func (dc *DashboardController) verifyModel(ctx context.Context, model config.Mod
 
 	reqJSON, err := json.Marshal(reqBody)
 	if err != nil {
-		log.Printf("[Discovery] Verification: Failed to marshal verification request for model %s: %v", model.ID, err)
-		return
+		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
 	// 1.5-second quick verification timeout so discovery sync is not delayed
@@ -688,14 +689,14 @@ func (dc *DashboardController) verifyModel(ctx context.Context, model config.Mod
 
 	req, err := http.NewRequestWithContext(callCtx, "POST", targetURL, bytes.NewReader(reqJSON))
 	if err != nil {
-		log.Printf("[Discovery] Verification: Failed to create verification request for model %s: %v", model.ID, err)
-		return
+		return fmt.Errorf("failed to create request: %w", err)
 	}
 
 	if dc.TokenSource != nil {
 		token, err := dc.TokenSource.Token()
 		if err == nil {
 			req.Header.Set("Authorization", "Bearer "+token.AccessToken)
+			req.Header.Set("X-Goog-User-Project", dc.ProjectID)
 		}
 	}
 	req.Header.Set("Content-Type", "application/json")
@@ -703,18 +704,17 @@ func (dc *DashboardController) verifyModel(ctx context.Context, model config.Mod
 	client := dc.getHTTPClient()
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Printf("[Discovery] Verification: Query failed for model %s at location %s: %v (prompt template may need reconstruction)", model.ID, model.Location, err)
-		return
+		return fmt.Errorf("query failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		bodyErr, _ := io.ReadAll(resp.Body)
-		log.Printf("[Discovery] Verification: Model %s at location %s returned status %s: %s (prompt template may need reconstruction)", model.ID, model.Location, resp.Status, string(bodyErr))
-		return
+		return fmt.Errorf("API returned status %s: %s", resp.Status, string(bodyErr))
 	}
 
 	log.Printf("[Discovery] Verification: Successfully verified model %s at location %s.", model.ID, model.Location)
+	return nil
 }
 
 // DiscoverAndCacheModels queries Vertex AI APIs and caches all discovered models and endpoints.
@@ -892,8 +892,45 @@ func (dc *DashboardController) DiscoverAndCacheModels(ctx context.Context) error
 
 	// Save all final resolved discovered models to the database
 	for _, modelToSave := range discoveredModelsMap {
-		// Ad-hoc verify the model to make sure it works and log warnings if prompt template needs reconstruction
-		dc.verifyModel(ctx, modelToSave)
+		var candidates []string
+		// 1. If custom model/endpoint has fixed location embedded in ID, test only that
+		if strings.HasPrefix(modelToSave.ID, "projects/") {
+			if extLoc := config.ExtractLocationFromResourceName(modelToSave.ID); extLoc != "" {
+				candidates = []string{extLoc}
+			}
+		}
+		// 2. Otherwise, try compatible locations in order of specificity
+		if len(candidates) == 0 {
+			routerLoc := dc.Location
+			if routerLoc == "" {
+				routerLoc = "us-central1"
+			}
+			candidates = append(candidates, routerLoc)
+			if parent := config.GetMultiRegionParent(routerLoc); parent != "" {
+				candidates = append(candidates, parent)
+			}
+			candidates = append(candidates, "global")
+		}
+
+		success := false
+		var lastErr error
+		for _, candidateLoc := range candidates {
+			modelToSave.Location = candidateLoc
+			err := dc.verifyModel(ctx, modelToSave)
+			if err == nil {
+				success = true
+				log.Printf("[Discovery] Successfully verified model %s at location %s.", modelToSave.ID, candidateLoc)
+				break
+			}
+			lastErr = err
+			log.Printf("[Discovery] Verification failed for model %s at candidate location %s: %v", modelToSave.ID, candidateLoc, err)
+		}
+
+		if !success {
+			log.Printf("[Discovery] Model %s failed verification at all candidate locations. Soft-disabling model. Last error: %v", modelToSave.ID, lastErr)
+			modelToSave.Active = false
+		}
+
 		_ = dc.Store.SaveModel(ctx, modelToSave)
 	}
 
@@ -1000,6 +1037,7 @@ func (dc *DashboardController) gcpGet(ctx context.Context, url string) ([]byte, 
 	}
 
 	req.Header.Set("Authorization", "Bearer "+token.AccessToken)
+	req.Header.Set("X-Goog-User-Project", dc.ProjectID)
 	client := dc.getHTTPClient()
 	resp, err := client.Do(req)
 	if err != nil {
@@ -1194,7 +1232,7 @@ func (dc *DashboardController) fetchPublisherModels(ctx context.Context, loc str
 			hostLoc = "us-central1"
 		}
 	}
-	url := fmt.Sprintf("https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models", hostLoc, dc.ProjectID, loc)
+	url := fmt.Sprintf("https://%s-aiplatform.googleapis.com/v1beta1/publishers/google/models", hostLoc)
 	body, err := dc.gcpGet(ctx, url)
 	if err != nil {
 		return nil, err
@@ -1323,9 +1361,12 @@ func (dc *DashboardController) fetchCloudMonitoringMetrics(ctx context.Context, 
 		return templates.MetricsViewModel{}, nil
 	}
 
-	serviceName := os.Getenv("K_SERVICE")
+	serviceName := os.Getenv("BACKEND_SERVICE_NAME")
 	if serviceName == "" {
-		serviceName = "gemini-smart-router" // standard fallback
+		serviceName = os.Getenv("K_SERVICE")
+		if serviceName == "" {
+			serviceName = "gemini-smart-router" // standard fallback
+		}
 	}
 
 	// Query time-series for request_count
@@ -1563,9 +1604,12 @@ func (dc *DashboardController) fetchCostAnalyticsData(ctx context.Context, simul
 		return templates.CostsViewModel{}, nil
 	}
 
-	serviceName := os.Getenv("K_SERVICE")
+	serviceName := os.Getenv("BACKEND_SERVICE_NAME")
 	if serviceName == "" {
-		serviceName = "gemini-smart-router"
+		serviceName = os.Getenv("K_SERVICE")
+		if serviceName == "" {
+			serviceName = "gemini-smart-router"
+		}
 	}
 
 	// Retrieve raw proxy StructuredLogs from Cloud Logging

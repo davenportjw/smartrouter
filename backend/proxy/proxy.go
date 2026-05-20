@@ -15,8 +15,9 @@ import (
 	"strings"
 	"time"
 
+	store "geminirouter/backend/config"
 	"geminirouter/pkg/config"
-	"geminirouter/pkg/limiter"
+	"geminirouter/backend/limiter"
 
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/oauth2"
@@ -28,7 +29,7 @@ import (
 type RouterProxy struct {
 	Target      *url.URL
 	Proxy       *httputil.ReverseProxy
-	Store       *config.ConfigStore
+	Store       *store.ConfigStore
 	Limiter     *limiter.RateLimiterRegistry
 	Scheduler   *RequestScheduler
 	TokenSource oauth2.TokenSource
@@ -95,7 +96,7 @@ type StructuredLog struct {
 }
 
 // NewRouterProxy creates a new reverse proxy pointing to the upstream Gemini API.
-func NewRouterProxy(store *config.ConfigStore, projectID, location string) (*RouterProxy, error) {
+func NewRouterProxy(store *store.ConfigStore, projectID, location string) (*RouterProxy, error) {
 	targetHost := location + "-aiplatform.googleapis.com"
 	target, err := url.Parse("https://" + targetHost)
 	if err != nil {
