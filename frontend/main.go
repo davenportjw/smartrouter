@@ -78,6 +78,7 @@ func main() {
 	mux.Handle("/admin/models", authStore.Middleware(http.HandlerFunc(dashController.ServeModels)))
 	mux.Handle("/admin/models/refresh", authStore.Middleware(http.HandlerFunc(dashController.RefreshModels)))
 	mux.Handle("/admin/models/toggle", authStore.Middleware(http.HandlerFunc(dashController.ToggleModel)))
+	mux.Handle("/admin/models/delete", authStore.Middleware(http.HandlerFunc(dashController.DeleteModel)))
 	mux.Handle("/admin/metrics", authStore.Middleware(http.HandlerFunc(dashController.ServeMetrics)))
 	mux.Handle("/admin/costs", authStore.Middleware(http.HandlerFunc(dashController.ServeCosts)))
 	mux.Handle("/admin/toggle-simulation", authStore.Middleware(http.HandlerFunc(dashController.ToggleSimulation)))

@@ -1594,8 +1594,8 @@ func TestProxyRegionalModelRouting(t *testing.T) {
 	path := receivedPath
 	mu.Unlock()
 
-	// The request host should be rewritten to "us-aiplatform.googleapis.com"
-	expectedHost := "us-aiplatform.googleapis.com"
+	// The request host should be rewritten to "aiplatform.us.rep.googleapis.com"
+	expectedHost := "aiplatform.us.rep.googleapis.com"
 	if capturer.CapturedHost != expectedHost {
 		t.Errorf("expected rewritten host to be %q, got %q", expectedHost, capturer.CapturedHost)
 	}
@@ -1837,6 +1837,21 @@ func TestProxyModelDiscoveryAndRoutingWorkflow(t *testing.T) {
 		t.Errorf("expected path rewrite for custom endpoint to be %q, got %q", expectedPath2, path2)
 	}
 
+	// 7. Test DeleteModel dynamic handler
+	wRecDelete := httptest.NewRecorder()
+	reqDelete := httptest.NewRequest("DELETE", "/admin/models/delete?id="+targetModelID+"@us-central1", nil)
+	dash.DeleteModel(wRecDelete, reqDelete)
+
+	if wRecDelete.Code != http.StatusOK {
+		t.Fatalf("expected delete model status 200, got %d", wRecDelete.Code)
+	}
+
+	// Verify it was deleted from the store
+	_, deletedOk := store.LookupActiveModel(targetModelID, "us-central1")
+	if deletedOk {
+		t.Errorf("expected model option %s@us-central1 to be deleted from registry", targetModelID)
+	}
+
 	os.RemoveAll("data/local_db.json")
 }
 
@@ -1931,7 +1946,7 @@ func TestProxySmallestCompatibleLocationRouting(t *testing.T) {
 		t.Errorf("expected X-Routed-Model-Location to be 'us', got %q", locationHeader1)
 	}
 
-	expectedHost1 := "us-aiplatform.googleapis.com"
+	expectedHost1 := "aiplatform.us.rep.googleapis.com"
 	if capturer1.CapturedHost != expectedHost1 {
 		t.Errorf("expected host to be %q, got %q", expectedHost1, capturer1.CapturedHost)
 	}
@@ -1968,7 +1983,7 @@ func TestProxySmallestCompatibleLocationRouting(t *testing.T) {
 		t.Errorf("expected X-Routed-Model-Location to be 'us', got %q", locationHeader2)
 	}
 
-	expectedHost2 := "us-aiplatform.googleapis.com"
+	expectedHost2 := "aiplatform.us.rep.googleapis.com"
 	if capturer2.CapturedHost != expectedHost2 {
 		t.Errorf("expected host to be %q, got %q", expectedHost2, capturer2.CapturedHost)
 	}
@@ -2099,7 +2114,7 @@ func TestPublisherModelsDiscovery(t *testing.T) {
 	// Mock Vertex AI REST endpoints:
 	// 1. return custom models (empty list)
 	// 2. return endpoints (empty list)
-	// 3. return publisher models containing publishers/google/models/gemini-3.5-flash
+	// 3. return publisher models containing gemini-3.5-flash and text-embedding-005
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if strings.Contains(r.URL.Path, "/publishers/google/models") {
@@ -2108,6 +2123,10 @@ func TestPublisherModelsDiscovery(t *testing.T) {
 					{
 						"name": "publishers/google/models/gemini-3.5-flash",
 						"displayName": "Gemini 3.5 Flash (Mocked)"
+					},
+					{
+						"name": "publishers/google/models/text-embedding-005",
+						"displayName": "Text Embedding 005 (Mocked)"
 					}
 				]
 			}`))
@@ -2137,21 +2156,34 @@ func TestPublisherModelsDiscovery(t *testing.T) {
 		t.Fatalf("failed to load refreshed models: %v", err)
 	}
 
-	var found *config.ModelConfig
+	var found, foundEmbedding *config.ModelConfig
 	for _, m := range refreshedModels {
+		mCopy := m
 		if m.ID == "gemini-3.5-flash@us-central1" {
-			mCopy := m
 			found = &mCopy
-			break
+		} else if m.ID == "text-embedding-005@us-central1" {
+			foundEmbedding = &mCopy
 		}
 	}
 
 	if found == nil {
-		t.Fatalf("expected gemini-3.5-flash to be dynamically discovered and cached in store")
+		t.Fatalf("expected gemini-3.5-flash@us-central1 to be dynamically discovered and cached in store")
 	}
-
 	if found.DisplayName != "Gemini 3.5 Flash (Mocked)" {
 		t.Errorf("expected display name 'Gemini 3.5 Flash (Mocked)', got %q", found.DisplayName)
+	}
+	if found.Location != "us-central1" {
+		t.Errorf("expected model location 'us-central1', got %q", found.Location)
+	}
+
+	if foundEmbedding == nil {
+		t.Fatalf("expected text-embedding-005@us-central1 to be dynamically discovered and cached in store")
+	}
+	if foundEmbedding.DisplayName != "Text Embedding 005 (Mocked)" {
+		t.Errorf("expected display name 'Text Embedding 005 (Mocked)', got %q", foundEmbedding.DisplayName)
+	}
+	if foundEmbedding.Location != "us-central1" {
+		t.Errorf("expected embedding model location 'us-central1', got %q", foundEmbedding.Location)
 	}
 
 	// The location should be resolved as compatible/coerced (in this case, matched)
@@ -2281,11 +2313,11 @@ func TestDiscoveryRegistryObsoleteDisabling(t *testing.T) {
 	}
 
 	// 1. Seed obsolete/placeholder foundation models to be soft-disabled
-	fake1 := config.ModelConfig{ID: "gemini-3.0-flash", DisplayName: "Gemini 3.0 Flash", Location: "global", Type: "foundation", Active: true}
-	fake2 := config.ModelConfig{ID: "gemini-3.1-pro", DisplayName: "Gemini 3.1 Pro", Location: "global", Type: "foundation", Active: true}
+	fake1 := config.ModelConfig{ID: "gemini-3.0-flash@global", DisplayName: "Gemini 3.0 Flash", Location: "global", Type: "foundation", Active: true}
+	fake2 := config.ModelConfig{ID: "gemini-3.1-pro@global", DisplayName: "Gemini 3.1 Pro", Location: "global", Type: "foundation", Active: true}
 	
 	// 2. Seed standard custom model that should NOT be altered
-	custom := config.ModelConfig{ID: "my-custom-endpoint", DisplayName: "My Custom Tuned Endpoint", Location: "us-central1", Type: "custom", Active: true}
+	custom := config.ModelConfig{ID: "my-custom-endpoint@us-central1", DisplayName: "My Custom Tuned Endpoint", Location: "us-central1", Type: "custom", Active: true}
 
 	_ = store.SaveModel(ctx, fake1)
 	_ = store.SaveModel(ctx, fake2)
@@ -2335,11 +2367,11 @@ func TestDiscoveryRegistryObsoleteDisabling(t *testing.T) {
 		switch m.ID {
 		case "gemini-2.5-flash@us-central1":
 			m25Flash = &mCopy
-		case "gemini-3.0-flash":
+		case "gemini-3.0-flash@global":
 			m30Flash = &mCopy
-		case "gemini-3.1-pro":
+		case "gemini-3.1-pro@global":
 			m31Pro = &mCopy
-		case "my-custom-endpoint":
+		case "my-custom-endpoint@us-central1":
 			mCustom = &mCopy
 		}
 	}
@@ -2349,23 +2381,23 @@ func TestDiscoveryRegistryObsoleteDisabling(t *testing.T) {
 		t.Errorf("expected gemini-2.5-flash@us-central1 to be dynamically discovered and added")
 	}
 	if mCustom == nil {
-		t.Errorf("expected custom model my-custom-endpoint to be preserved")
+		t.Errorf("expected custom model my-custom-endpoint@us-central1 to be preserved")
 	}
 
 	// Obsolete models must STILL EXIST in the database (soft-disabled, not deleted)
 	if m30Flash == nil {
-		t.Fatalf("expected obsolete model gemini-3.0-flash to remain in store, but it was deleted")
+		t.Fatalf("expected obsolete model gemini-3.0-flash@global to remain in store, but it was deleted")
 	}
 	if m31Pro == nil {
-		t.Fatalf("expected obsolete model gemini-3.1-pro to remain in store, but it was deleted")
+		t.Fatalf("expected obsolete model gemini-3.1-pro@global to remain in store, but it was deleted")
 	}
 
 	// They must be soft-disabled (Active = false)
 	if m30Flash.Active {
-		t.Errorf("expected obsolete gemini-3.0-flash to be disabled (Active=false), but it was active")
+		t.Errorf("expected obsolete gemini-3.0-flash@global to be disabled (Active=false), but it was active")
 	}
 	if m31Pro.Active {
-		t.Errorf("expected obsolete gemini-3.1-pro to be disabled (Active=false), but it was active")
+		t.Errorf("expected obsolete gemini-3.1-pro@global to be disabled (Active=false), but it was active")
 	}
 
 	// Their DisplayNames must be marked Obsolete
@@ -2534,12 +2566,8 @@ func TestModelRefreshLocationCorrectionAndDisabling(t *testing.T) {
 		t.Errorf("expected gemini-3.5-flash@us to remain active")
 	}
 
-	if resPro == nil {
-		t.Fatalf("expected gemini-3.5-pro@us-central1 to remain in registry")
-	}
-	// It should be disabled
-	if resPro.Active {
-		t.Errorf("expected gemini-3.5-pro@us-central1 to be disabled (Active=false) since it failed verification")
+	if resPro != nil {
+		t.Errorf("expected gemini-3.5-pro@us-central1 to be scrubbed/not registered since it failed all verifications")
 	}
 
 	os.RemoveAll("data/local_db.json")
@@ -2699,6 +2727,91 @@ func TestSimplifiedModelDiscoveryAndRoutingCompoundKey(t *testing.T) {
 
 	os.RemoveAll("data/local_db.json")
 }
+
+func TestProxyGlobalLocationRouting(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+
+	ctx := context.Background()
+	store, err := store.NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to initialize config store: %v", err)
+	}
+
+	// Seed App, Client, Key
+	app := config.App{ID: "app-tdd", ClientID: "client-tdd", RPM: 100, TPM: 10000}
+	client := config.Client{ID: "client-tdd", Tier: "premium"}
+	key := config.APIKey{KeyHash: config.HashKey("key-tdd"), AppID: "app-tdd", Status: "active"}
+	_ = store.SaveClient(ctx, client)
+	_ = store.SaveApp(ctx, app)
+	_ = store.SaveKey(ctx, key)
+	_ = store.DeleteHeader(ctx, "header-1")
+	_ = store.DeleteRule(ctx, "rule-1")
+
+	// Seed global location model option
+	model := config.ModelConfig{
+		ID:          "gemini-3.1-pro-preview@global",
+		DisplayName: "Gemini 3.1 Pro Preview",
+		Location:    "global",
+		Type:        "foundation",
+		Active:      true,
+	}
+	_ = store.SaveModel(ctx, model)
+
+	var receivedPath string
+	var mu sync.Mutex
+
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		receivedPath = r.URL.Path
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status": "success"}`))
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+
+	// Initialize RouterProxy in us-central1
+	rp, _ := NewRouterProxy(store, "test-project", "us-central1")
+	rp.TokenSource = &mockTokenSource{}
+	rp.Target = backendURL
+	capturer := &hostCapturingRoundTripper{Target: backendURL}
+	rp.Proxy.Transport = capturer
+
+	req := httptest.NewRequest("POST", "/v1/models/gemini-3.1-pro-preview:generateContent?key=key-tdd", strings.NewReader(`{}`))
+	req.Header.Set("x-goog-api-key", "key-tdd")
+	rr := httptest.NewRecorder()
+
+	rp.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d. Body: %s", rr.Code, rr.Body.String())
+	}
+
+	// Location must be global
+	routedLocation := rr.Header().Get("X-Routed-Model-Location")
+	if routedLocation != "global" {
+		t.Errorf("expected X-Routed-Model-Location to be 'global', got %q", routedLocation)
+	}
+
+	// Target host must be rewritten to global non-regional host: aiplatform.googleapis.com!
+	expectedHost := "aiplatform.googleapis.com"
+	if capturer.CapturedHost != expectedHost {
+		t.Errorf("expected host to be %q, got %q", expectedHost, capturer.CapturedHost)
+	}
+
+	mu.Lock()
+	path := receivedPath
+	mu.Unlock()
+
+	expectedPath := "/v1/projects/test-project/locations/global/publishers/google/models/gemini-3.1-pro-preview:generateContent"
+	if path != expectedPath {
+		t.Errorf("expected rewritten path to be %q, got %q", expectedPath, path)
+	}
+
+	os.RemoveAll("data/local_db.json")
+}
+
 
 
 

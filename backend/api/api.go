@@ -329,8 +329,20 @@ func (ac *APIController) HandleModels(w http.ResponseWriter, r *http.Request) {
 		}
 		respondWithJSON(w, http.StatusOK, m)
 
+	case http.MethodDelete:
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			respondWithError(w, http.StatusBadRequest, "Missing model id query parameter")
+			return
+		}
+		if err := ac.Store.DeleteModel(ctx, id); err != nil {
+			respondWithError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		respondWithJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+
 	default:
-		w.Header().Set("Allow", "GET, POST")
+		w.Header().Set("Allow", "GET, POST, DELETE")
 		respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed")
 	}
 }

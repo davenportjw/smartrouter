@@ -572,11 +572,6 @@ func (dc *DashboardController) aggregateModelStats(ctx context.Context, simulate
 func (dc *DashboardController) ServeModels(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	locations, err := dc.fetchLocations(ctx)
-	if err != nil {
-		log.Printf("[Dashboard] Error loading GCP locations: %v", err)
-	}
-
 	// Fetch all models stored in the config store
 	allModels, err := dc.Store.GetAllModels(ctx)
 	if err != nil {
@@ -592,8 +587,8 @@ func (dc *DashboardController) ServeModels(w http.ResponseWriter, r *http.Reques
 	// Fetch dynamic logs stats per model
 	modelStats := dc.aggregateModelStats(ctx, simulate)
 
-	var availableModels []templates.ModelInfo
-	var discoveredModels []templates.ModelInfo
+	var generativeModels []templates.ModelInfo
+	var embeddingModels []templates.ModelInfo
 
 	for _, m := range allModels {
 		// Only show models compatible with this router instance's serving location
@@ -618,13 +613,15 @@ func (dc *DashboardController) ServeModels(w http.ResponseWriter, r *http.Reques
 			Location:    m.Location,
 			Type:        m.Type,
 			Active:      m.Active,
+			Obsolete:    strings.Contains(m.DisplayName, "(Obsolete)"),
 			Stats:       stats,
 		}
 
-		if m.Active {
-			availableModels = append(availableModels, info)
+		baseModelID := config.StripLocationSuffix(m.ID)
+		if strings.Contains(strings.ToLower(baseModelID), "embedding") {
+			embeddingModels = append(embeddingModels, info)
 		} else {
-			discoveredModels = append(discoveredModels, info)
+			generativeModels = append(generativeModels, info)
 		}
 	}
 
@@ -632,9 +629,8 @@ func (dc *DashboardController) ServeModels(w http.ResponseWriter, r *http.Reques
 		ProjectID:        dc.ProjectID,
 		Location:         dc.Location,
 		ParentLocation:   config.GetMultiRegionParent(dc.Location),
-		AvailableModels:  availableModels,
-		DiscoveredModels: discoveredModels,
-		Locations:        locations,
+		GenerativeModels: generativeModels,
+		EmbeddingModels:  embeddingModels,
 	}
 
 	w.Header().Set("Content-Type", "text/html")
@@ -664,19 +660,21 @@ func (dc *DashboardController) verifyModel(ctx context.Context, model config.Mod
 	}
 
 	hostLoc := model.Location
-	if hostLoc == "global" || hostLoc == "" {
-		hostLoc = dc.Location
-		if hostLoc == "" {
-			hostLoc = "us-central1"
-		}
+	if hostLoc == "" {
+		hostLoc = "global"
 	}
+	targetHost := config.GetVertexEndpointHost(hostLoc)
 
 	var targetURL string
 	baseModelID := config.StripLocationSuffix(model.ID)
+	if strings.Contains(baseModelID, "embedding") {
+		log.Printf("[Discovery] Bypassing generateContent verification for embedding model %s.", model.ID)
+		return nil
+	}
 	if strings.HasPrefix(baseModelID, "projects/") {
-		targetURL = fmt.Sprintf("https://%s-aiplatform.googleapis.com/v1/%s:generateContent", hostLoc, baseModelID)
+		targetURL = fmt.Sprintf("https://%s/v1/%s:generateContent", targetHost, baseModelID)
 	} else {
-		targetURL = fmt.Sprintf("https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:generateContent", hostLoc, dc.ProjectID, model.Location, baseModelID)
+		targetURL = fmt.Sprintf("https://%s/v1/projects/%s/locations/%s/publishers/google/models/%s:generateContent", targetHost, dc.ProjectID, hostLoc, baseModelID)
 	}
 
 	reqJSON, err := json.Marshal(reqBody)
@@ -684,8 +682,8 @@ func (dc *DashboardController) verifyModel(ctx context.Context, model config.Mod
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	// 1.5-second quick verification timeout so discovery sync is not delayed
-	callCtx, cancel := context.WithTimeout(ctx, 1500*time.Millisecond)
+	// 30-second generous verification timeout to accommodate larger models and cold starts
+	callCtx, cancel := context.WithTimeout(ctx, 30000*time.Millisecond)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(callCtx, "POST", targetURL, bytes.NewReader(reqJSON))
@@ -891,6 +889,9 @@ func (dc *DashboardController) DiscoverAndCacheModels(ctx context.Context) error
 		}
 	}
 
+	// Track successfully verified compound IDs
+	verifiedIDs := make(map[string]bool)
+
 	// Save all resolved discovered models for each of their compatible locations separately
 	for _, modelToSave := range discoveredModelsMap {
 		var candidates []string
@@ -928,28 +929,45 @@ func (dc *DashboardController) DiscoverAndCacheModels(ctx context.Context) error
 			modelOption.Active = active
 
 			err := dc.verifyModel(ctx, modelOption)
-			if err != nil {
-				log.Printf("[Discovery] Verification failed for model %s at candidate location %s: %v. Soft-disabling.", modelToSave.ID, candidateLoc, err)
-				modelOption.Active = false
-			} else {
+			if err == nil {
 				log.Printf("[Discovery] Successfully verified model %s at location %s.", modelToSave.ID, candidateLoc)
+				_ = dc.Store.SaveModel(ctx, modelOption)
+				verifiedIDs[modelOption.ID] = true
+			} else {
+				log.Printf("[Discovery] Verification failed for model %s at candidate location %s: %v. Skipping registration.", modelToSave.ID, candidateLoc, err)
 			}
-
-			_ = dc.Store.SaveModel(ctx, modelOption)
 		}
 	}
 
-	// Soft-disable and mark obsolete for ALL models (foundation, custom, or endpoint) no longer returned by Vertex AI APIs
+	// Clean up legacy keys and obsolete/failed models
 	for _, m := range currentModels {
 		if m.ID == "gemini-dynamic" {
 			continue
 		}
+
+		// If it is a legacy key (does not contain '@'), we delete it to scrub duplicates
+		if !strings.Contains(m.ID, "@") {
+			log.Printf("[Discovery] Scrubbing legacy key model %s from registry...", m.ID)
+			_ = dc.Store.DeleteModel(ctx, m.ID)
+			continue
+		}
+
 		// Extract base model ID from compound key (part before '@')
 		baseID := m.ID
 		if idx := strings.Index(m.ID, "@"); idx != -1 {
 			baseID = m.ID[:idx]
 		}
-		if _, discovered := discoveredModelsMap[baseID]; !discovered {
+
+		// If the base model was returned by Vertex AI API but this specific location failed verification,
+		// we should delete this compound key option because it doesn't exist in this location!
+		if _, discovered := discoveredModelsMap[baseID]; discovered {
+			if !verifiedIDs[m.ID] {
+				log.Printf("[Discovery] Deleting unverified location option %s from registry...", m.ID)
+				_ = dc.Store.DeleteModel(ctx, m.ID)
+			}
+		} else {
+			// If the base model is completely obsolete (no longer returned by Vertex AI API at all),
+			// we keep it but soft-disable it and append "(Obsolete)" to its DisplayName as before!
 			log.Printf("[Discovery] Soft-disabling obsolete model %s...", m.ID)
 			m.Active = false
 			if !strings.Contains(m.DisplayName, " (Obsolete)") {
@@ -1029,6 +1047,31 @@ func (dc *DashboardController) ToggleModel(w http.ResponseWriter, r *http.Reques
 
 	// Redirect back to refresh UI list
 	http.Redirect(w, r, "/admin/models", http.StatusSeeOther)
+}
+
+// DeleteModel removes a model option from the database dynamically.
+func (dc *DashboardController) DeleteModel(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	ctx := r.Context()
+
+	modelID := strings.TrimSpace(r.URL.Query().Get("id"))
+	if modelID == "" {
+		http.Error(w, "Missing model ID parameter", http.StatusBadRequest)
+		return
+	}
+
+	err := dc.Store.DeleteModel(ctx, modelID)
+	if err != nil {
+		log.Printf("[Dashboard] Error deleting model: %v", err)
+		http.Error(w, "Failed to delete model config", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(""))
 }
 
 // gcpGet performs an authenticated GET request to a GCP Vertex AI REST endpoint.

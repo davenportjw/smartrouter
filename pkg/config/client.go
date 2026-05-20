@@ -199,6 +199,11 @@ func (ac *APIConfigStore) SaveModel(ctx context.Context, model ModelConfig) erro
 	return ac.makeRequest(ctx, "POST", "/api/models", model, nil)
 }
 
+func (ac *APIConfigStore) DeleteModel(ctx context.Context, id string) error {
+	path := fmt.Sprintf("/api/models?id=%s", url.QueryEscape(id))
+	return ac.makeRequest(ctx, "DELETE", path, nil, nil)
+}
+
 func (ac *APIConfigStore) SaveApp(ctx context.Context, app App) error {
 	return ac.makeRequest(ctx, "POST", "/api/apps", app, nil)
 }

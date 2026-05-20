@@ -144,15 +144,16 @@ func NewRouterProxy(store *store.ConfigStore, projectID, location string) (*Rout
 			modelLoc = rp.Location
 		}
 
-		// If modelLoc differs from router local region, dynamically rewrite the request target host
-		if modelLoc != rp.Location {
-			targetHost := modelLoc + "-aiplatform.googleapis.com"
-			req.URL.Scheme = "https"
-			req.URL.Host = targetHost
-			req.Host = targetHost
+		// Resolve target host using official GetVertexEndpointHost helper
+		var targetHost string
+		if modelLoc != rp.Location || config.IsMultiRegionOrGlobal(modelLoc) {
+			targetHost = config.GetVertexEndpointHost(modelLoc)
 		} else {
-			req.Host = target.Host
+			targetHost = target.Host
 		}
+		req.URL.Scheme = "https"
+		req.URL.Host = targetHost
+		req.Host = targetHost
 
 		// 1. Remove client-side credentials
 		query := req.URL.Query()

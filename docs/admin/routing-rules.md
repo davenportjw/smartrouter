@@ -23,7 +23,12 @@ Routing rules evaluate request variables (application ID, client tier, requested
 4. Click **Save Routing Rule**.
 
 ### GCP Models & Endpoints Viewer
-Go to `/admin/models` to inspect deployed Vertex AI foundation models, locations, and custom fine-tuned endpoints in real time. 
+Go to `/admin/models` to access the unified **Model Registry & Control Plane**. The single pane groups discovered models by category (**Generative Models** and **Embedding Models**), letting you:
+* **Enable or Disable** individual regional options or custom endpoints for router traffic.
+* **Track live metrics** (Request Count, Avg Latency, and Accum Spend) in real time when a model is enabled.
+* **Identify defunct or deprecated models** automatically marked as **Obsolete**.
+* **Delete obsolete configurations** directly from the database.
+* **Trigger dynamic discovery** using the **Refresh Discovered Models** action.
 
 ---
 

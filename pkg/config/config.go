@@ -3,6 +3,7 @@ package config
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"regexp"
 	"strings"
 )
@@ -181,8 +182,8 @@ func IsValidModelName(name string) bool {
 		return true
 	}
 
-	// Matches standard Embeddings or Virtual Dynamic Router
-	if name == "text-embedding-004" || name == "multimodal-embedding-001" || name == "gemini-dynamic" {
+	// Matches standard Embeddings, text-embeddings, or Virtual Dynamic Router
+	if strings.Contains(name, "embedding") || name == "gemini-dynamic" {
 		return true
 	}
 
@@ -207,5 +208,28 @@ func StripLocationSuffix(id string) string {
 		return id[:idx]
 	}
 	return id
+}
+
+// IsMultiRegionOrGlobal returns true if the location segment represents a multi-region (e.g., "us", "eu") or the global region.
+func IsMultiRegionOrGlobal(loc string) bool {
+	if loc == "" {
+		return true
+	}
+	return loc == "global" || !strings.Contains(loc, "-")
+}
+
+// GetVertexEndpointHost returns the official hostname for Google Cloud Vertex AI based on the location ID.
+func GetVertexEndpointHost(loc string) string {
+	if loc == "global" || loc == "" {
+		return "aiplatform.googleapis.com"
+	}
+	if loc == "us" || loc == "eu" {
+		return fmt.Sprintf("aiplatform.%s.rep.googleapis.com", loc)
+	}
+	if strings.Contains(loc, "-") {
+		return fmt.Sprintf("%s-aiplatform.googleapis.com", loc)
+	}
+	// Fallback for any other multiregion
+	return fmt.Sprintf("aiplatform.%s.rep.googleapis.com", loc)
 }
 

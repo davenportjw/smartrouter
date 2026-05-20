@@ -19,6 +19,7 @@ type AdminStore interface {
 	SaveHeader(ctx context.Context, header CustomHeader) error
 	DeleteHeader(ctx context.Context, id string) error
 	SaveModel(ctx context.Context, model ModelConfig) error
+	DeleteModel(ctx context.Context, id string) error
 	SaveApp(ctx context.Context, app App) error
 	DeleteApp(ctx context.Context, id string) error
 }
