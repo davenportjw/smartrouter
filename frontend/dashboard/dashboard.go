@@ -2540,9 +2540,9 @@ func generateModelCostPieSVG(breakdown []templates.ModelCostBreakdown) string {
 
 	colors := []string{"#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#6b7280"}
 	var sb strings.Builder
-	sb.WriteString(`<svg viewBox="0 0 360 220" class="w-full h-full" xmlns="http://www.w3.org/2000/svg">`)
+	sb.WriteString(`<svg viewBox="0 0 390 220" class="w-full h-full" xmlns="http://www.w3.org/2000/svg">`)
 	
-	cx, cy, r := 110, 110, 65
+	cx, cy, r := 100, 110, 65
 	circumference := 2 * math.Pi * float64(r)
 	offset := 0.0
 
@@ -2554,7 +2554,7 @@ func generateModelCostPieSVG(breakdown []templates.ModelCostBreakdown) string {
 		}
 		color := colors[i%len(colors)]
 		dashArray := (item.Percent / 100.0) * circumference
-		dashOffset := circumference - offset
+		dashOffset := -offset
 
 		sb.WriteString(fmt.Sprintf(`<circle cx="%d" cy="%d" r="%d" fill="none" stroke="%s" stroke-width="20" stroke-dasharray="%.2f %.2f" stroke-dashoffset="%.2f" transform="rotate(-90 %d %d)" class="transition-all duration-300">`, cx, cy, r, color, dashArray, circumference, dashOffset, cx, cy))
 		sb.WriteString(fmt.Sprintf(`<title>%s: $%.4f (%.1f%%)</title>`, item.ModelName, item.Cost, item.Percent))
@@ -2570,14 +2570,14 @@ func generateModelCostPieSVG(breakdown []templates.ModelCostBreakdown) string {
 		if y > 210 {
 			break
 		}
-		sb.WriteString(fmt.Sprintf(`<rect x="220" y="%d" width="12" height="12" rx="2" fill="%s" />`, y, color))
+		sb.WriteString(fmt.Sprintf(`<rect x="205" y="%d" width="12" height="12" rx="2" fill="%s" />`, y, color))
 		
 		displayName := item.ModelName
 		if len(displayName) > 14 {
 			displayName = displayName[:12] + ".."
 		}
-		sb.WriteString(fmt.Sprintf(`<text x="240" y="%d" fill="#374151" font-size="12" font-family="sans-serif" font-weight="500" alignment-baseline="middle">%s</text>`, y+6, displayName))
-		sb.WriteString(fmt.Sprintf(`<text x="340" y="%d" fill="#6b7280" font-size="11" font-family="sans-serif" text-anchor="end" alignment-baseline="middle">%.1f%%</text>`, y+6, item.Percent))
+		sb.WriteString(fmt.Sprintf(`<text x="225" y="%d" fill="#374151" font-size="12" font-family="sans-serif" font-weight="500" alignment-baseline="middle">%s</text>`, y+6, displayName))
+		sb.WriteString(fmt.Sprintf(`<text x="375" y="%d" fill="#6b7280" font-size="11" font-family="sans-serif" text-anchor="end" alignment-baseline="middle">%.1f%%</text>`, y+6, item.Percent))
 	}
 
 	sb.WriteString(`</svg>`)

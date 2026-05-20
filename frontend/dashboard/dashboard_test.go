@@ -391,6 +391,17 @@ func TestLocalLogsTelemetryAndDashboards(t *testing.T) {
 		if !foundTestClient {
 			t.Errorf("expected to find test-client cost breakdown")
 		}
+
+		// Regression test for Donut SVG segment offset calculation
+		if costsVM.ModelCostSVG == "" {
+			t.Errorf("expected non-empty ModelCostSVG")
+		}
+		if strings.Contains(costsVM.ModelCostSVG, `stroke-dashoffset="408.41"`) {
+			t.Errorf("detected legacy incorrect positive dashoffset wrapping in SVG donut chart")
+		}
+		if !strings.Contains(costsVM.ModelCostSVG, `stroke-dashoffset="0.00"`) && !strings.Contains(costsVM.ModelCostSVG, `stroke-dashoffset="-0.00"`) {
+			t.Errorf("expected initial SVG donut segment to start at 0.00 offset")
+		}
 	})
 
 	// 3. Test fetchLocalLogsMetrics
