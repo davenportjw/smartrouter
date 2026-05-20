@@ -40,4 +40,9 @@ Before you write any code or create configuration schemas, keep these rules in m
 - **CLI Utility Boundaries (`cmd/verify`)**: Post-deployment CLI verification scripts and standalone binaries must reside inside the root `cmd/` folder. Do not embed client tools inside runtime service directories.
 - **Docker Scoping**: Both `backend/Dockerfile` and `frontend/Dockerfile` run from the repository root build context (`.`) so they can securely compile with `pkg/`.
 
+### 6. IDE Zero-Warning Policy
+- **Unconditional Resolution**: You **MUST** check for, address, and fix any compiler errors, warnings, or linter information/style suggestions (e.g., gopls warnings, scanner error checking, unused variables/imports, or switch tag suggestions) identified by the IDE/compiler in the codebase before marking any task as done.
+- **Zero Warnings**: Never leave code warnings unresolved in files you touched.
+
 For detailed code examples and tutorials on how to implement these patterns via TDD, please open and execute the instructions in **[skills/agent_guidelines/SKILL.md](skills/agent_guidelines/SKILL.md)**.
+

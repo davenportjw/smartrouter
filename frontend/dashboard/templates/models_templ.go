@@ -201,17 +201,18 @@ func ModelTable(models []ModelInfo, title string, description string, emptyState
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				if model.Type == "foundation" {
+				switch model.Type {
+				case "foundation":
 					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<span class=\"inline-flex items-center rounded-md bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700\">Foundation</span>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-				} else if model.Type == "custom" {
+				case "custom":
 					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<span class=\"inline-flex items-center rounded-md bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-600/10\">Tuned weights</span>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-				} else {
+				default:
 					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<span class=\"inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-700/10\">Endpoint</span>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
@@ -221,12 +222,13 @@ func ModelTable(models []ModelInfo, title string, description string, emptyState
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				if model.Location == "global" {
+				switch model.Location {
+				case "global":
 					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<span class=\"inline-flex items-center rounded-md bg-purple-50 px-2.5 py-1 text-xs font-semibold text-purple-700 ring-1 ring-inset ring-purple-700/15\">global</span>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-				} else if model.Location == routerLoc {
+				case routerLoc:
 					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<span class=\"inline-flex items-center rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-600/15\">local (")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
@@ -234,7 +236,7 @@ func ModelTable(models []ModelInfo, title string, description string, emptyState
 					var templ_7745c5c3_Var8 string
 					templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(model.Location)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/models.templ`, Line: 128, Col: 177}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/models.templ`, Line: 130, Col: 177}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 					if templ_7745c5c3_Err != nil {
@@ -244,7 +246,7 @@ func ModelTable(models []ModelInfo, title string, description string, emptyState
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-				} else {
+				default:
 					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<span class=\"inline-flex items-center rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 ring-1 ring-inset ring-indigo-600/15\">multi (")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
@@ -252,7 +254,7 @@ func ModelTable(models []ModelInfo, title string, description string, emptyState
 					var templ_7745c5c3_Var9 string
 					templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(model.Location)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/models.templ`, Line: 130, Col: 183}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/models.templ`, Line: 132, Col: 183}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 					if templ_7745c5c3_Err != nil {
@@ -286,7 +288,7 @@ func ModelTable(models []ModelInfo, title string, description string, emptyState
 					var templ_7745c5c3_Var10 string
 					templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d requests", model.Stats.RequestCount))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/models.templ`, Line: 148, Col: 64}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/models.templ`, Line: 150, Col: 64}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 					if templ_7745c5c3_Err != nil {
@@ -311,7 +313,7 @@ func ModelTable(models []ModelInfo, title string, description string, emptyState
 						var templ_7745c5c3_Var11 string
 						templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d ms", model.Stats.AvgLatencyMs))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/models.templ`, Line: 158, Col: 60}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/models.templ`, Line: 160, Col: 60}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 						if templ_7745c5c3_Err != nil {
@@ -341,7 +343,7 @@ func ModelTable(models []ModelInfo, title string, description string, emptyState
 					var templ_7745c5c3_Var12 string
 					templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("$%.5f", model.Stats.TotalCost))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/models.templ`, Line: 169, Col: 55}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/models.templ`, Line: 171, Col: 55}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 					if templ_7745c5c3_Err != nil {
@@ -360,7 +362,7 @@ func ModelTable(models []ModelInfo, title string, description string, emptyState
 				var templ_7745c5c3_Var13 string
 				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.ResolveAttributeValue(model.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/models.templ`, Line: 176, Col: 63}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/models.templ`, Line: 178, Col: 63}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var13)
 				if templ_7745c5c3_Err != nil {
@@ -388,7 +390,7 @@ func ModelTable(models []ModelInfo, title string, description string, emptyState
 				var templ_7745c5c3_Var14 string
 				templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.ResolveAttributeValue("/admin/models/delete?id=" + model.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/models.templ`, Line: 190, Col: 59}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/models.templ`, Line: 192, Col: 59}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var14)
 				if templ_7745c5c3_Err != nil {
@@ -401,7 +403,7 @@ func ModelTable(models []ModelInfo, title string, description string, emptyState
 				var templ_7745c5c3_Var15 string
 				templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.ResolveAttributeValue("Are you sure you want to delete model " + config.StripLocationSuffix(model.ID) + " (" + model.Location + ") from the registry?")
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/models.templ`, Line: 191, Col: 151}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/models.templ`, Line: 193, Col: 151}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var15)
 				if templ_7745c5c3_Err != nil {
@@ -453,7 +455,7 @@ func ModelsTab(vm ModelsViewModel) templ.Component {
 		var templ_7745c5c3_Var17 string
 		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(vm.Location)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/models.templ`, Line: 247, Col: 79}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/models.templ`, Line: 249, Col: 79}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 		if templ_7745c5c3_Err != nil {
@@ -467,7 +469,7 @@ func ModelsTab(vm ModelsViewModel) templ.Component {
 			var templ_7745c5c3_Var18 string
 			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(vm.ParentLocation)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/models.templ`, Line: 262, Col: 27}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/models.templ`, Line: 264, Col: 27}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 			if templ_7745c5c3_Err != nil {

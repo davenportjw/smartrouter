@@ -113,20 +113,22 @@ templ ModelTable(models []ModelInfo, title string, description string, emptyStat
 									<div class="text-xs font-mono text-gray-400 mt-0.5">{ config.StripLocationSuffix(model.ID) }</div>
 								</td>
 								<td class="px-3 py-4 text-xs whitespace-nowrap">
-									if model.Type == "foundation" {
+									switch model.Type {
+									case "foundation":
 										<span class="inline-flex items-center rounded-md bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700">Foundation</span>
-									} else if model.Type == "custom" {
+									case "custom":
 										<span class="inline-flex items-center rounded-md bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-600/10">Tuned weights</span>
-									} else {
+									default:
 										<span class="inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-700/10">Endpoint</span>
 									}
 								</td>
 								<td class="px-3 py-4 text-xs whitespace-nowrap">
-									if model.Location == "global" {
+									switch model.Location {
+									case "global":
 										<span class="inline-flex items-center rounded-md bg-purple-50 px-2.5 py-1 text-xs font-semibold text-purple-700 ring-1 ring-inset ring-purple-700/15">global</span>
-									} else if model.Location == routerLoc {
+									case routerLoc:
 										<span class="inline-flex items-center rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-600/15">local ({ model.Location })</span>
-									} else {
+									default:
 										<span class="inline-flex items-center rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 ring-1 ring-inset ring-indigo-600/15">multi ({ model.Location })</span>
 									}
 								</td>

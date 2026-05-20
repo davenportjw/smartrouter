@@ -279,3 +279,12 @@ To avoid structural complexity, the codebase maintains a single Go module in a u
 ### C. Docker Build Context Strategy
 - All Docker builds must execute from the repository root directory (`.`) using `gcloud builds submit` or local engine commands.
 - The Dockerfiles (`backend/Dockerfile`, `frontend/Dockerfile`) copy the root `go.mod`/`go.sum` files and `/pkg` directory during the build stage before invoking `go build`.
+
+---
+
+## 8. IDE Zero-Warning Policy
+
+To maintain maximum code health and clean codebase, we enforce a zero-warning standard:
+* **Fix Before Done**: You **MUST** unconditionally check for, address, and fix any compiler errors, warnings, or linter style suggestions (e.g., `gopls` warnings, scanner checks, unused variables, or switch tag hints) identified by the IDE or compiler *before* declaring any task as complete.
+* **Prevent Regressions**: Never introduce or leave unresolved warnings in the codebase when editing or adding new templates, files, or logic components.
+
