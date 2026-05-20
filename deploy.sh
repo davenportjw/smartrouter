@@ -203,7 +203,8 @@ cd terraform
 terraform init
 
 if [ -z "$ALLOWED_EMAIL_DOMAINS" ]; then
-    ALLOWED_EMAIL_DOMAINS="google.com,cloudadvocacyorg.joonix.net"
+    log_error "ALLOWED_EMAIL_DOMAINS is missing or empty in .env. You must configure at least one authorized domain or specific email address for administrative dashboard sign-in."
+    exit 1
 fi
 
 log_info "Applying Terraform configuration with authorized domains: $ALLOWED_EMAIL_DOMAINS"

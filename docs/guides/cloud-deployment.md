@@ -37,7 +37,7 @@ gcloud auth application-default set-quota-project your-gcp-project-id
 2. Open `.env` and configure the variables:
    * **Required User-Provided Variable**: Ensure `GOOGLE_CLOUD_PROJECT` is set to your GCP project ID.
    * **Firebase Web SDK Configurations**: **Leave them as the default placeholders!** During the deployment, `deploy.sh` will programmatically register your application with Firebase and automatically write the resolved credentials back to this `.env` file.
-   * **Authorized Emails & Domains (Optional)**: Set `ALLOWED_EMAIL_DOMAINS` to restrict dashboard admin logins (defaults to `@google.com` and `@cloudadvocacyorg.joonix.net`):
+   * **Authorized Emails & Domains (Mandatory)**: Set `ALLOWED_EMAIL_DOMAINS` to configure dashboard admin logins (e.g., your domain or specific email address). There are no default authorized domains:
      ```ini
      ALLOWED_EMAIL_DOMAINS="mycompany.com,operator@gmail.com"
      ```

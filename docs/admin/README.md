@@ -9,13 +9,10 @@ The Smart Router dashboard is located at `/admin`. It is used to manage applicat
 Dashboard access is secured via Firebase **Google Sign-In OIDC Authentication**.
 
 ### Authorized Emails and Domains
-By default, access is restricted to emails ending in `@google.com` and `@cloudadvocacyorg.joonix.net`. 
-
-To configure authorized emails and/or domains:
-1. Set `ALLOWED_EMAIL_DOMAINS` in `.env`:
-   ```ini
-   ALLOWED_EMAIL_DOMAINS="mycompany.com,operator@gmail.com"
-   ```
+For safety and security, there are no default allowed domains or email addresses. You must explicitly configure the permitted domains and addresses using the `ALLOWED_EMAIL_DOMAINS` variable in your `.env` file before deployment:
+```ini
+ALLOWED_EMAIL_DOMAINS="mycompany.com,operator@gmail.com"
+```
 
 ### Logging In
 1. Open `/admin` in your browser.

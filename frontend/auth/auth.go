@@ -95,16 +95,25 @@ func (as *AuthStore) CreateSession(w http.ResponseWriter, r *http.Request) {
 
 		// Restrict authentication access to authorized domains or specific email addresses
 		allowedDomainsEnv := os.Getenv("ALLOWED_EMAIL_DOMAINS")
-		allowedDomains := []string{"google.com", "cloudadvocacyorg.joonix.net"}
-		if allowedDomainsEnv != "" {
-			parts := strings.Split(allowedDomainsEnv, ",")
-			var trimmed []string
-			for _, p := range parts {
-				trimmed = append(trimmed, strings.TrimSpace(p))
+		if allowedDomainsEnv == "" {
+			log.Printf("[Auth] Access denied because ALLOWED_EMAIL_DOMAINS environment variable is not set")
+			http.Error(w, "Authentication system is misconfigured: ALLOWED_EMAIL_DOMAINS must be explicitly set", http.StatusInternalServerError)
+			return
+		}
+
+		parts := strings.Split(allowedDomainsEnv, ",")
+		var allowedDomains []string
+		for _, p := range parts {
+			trimmed := strings.TrimSpace(p)
+			if trimmed != "" {
+				allowedDomains = append(allowedDomains, trimmed)
 			}
-			if len(trimmed) > 0 {
-				allowedDomains = trimmed
-			}
+		}
+
+		if len(allowedDomains) == 0 {
+			log.Printf("[Auth] Access denied because ALLOWED_EMAIL_DOMAINS has no valid entries")
+			http.Error(w, "Authentication system is misconfigured: ALLOWED_EMAIL_DOMAINS has no valid entries", http.StatusInternalServerError)
+			return
 		}
 
 		if !isEmailAuthorized(email, allowedDomains) {

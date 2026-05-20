@@ -82,12 +82,11 @@ gcloud auth application-default login
 gcloud auth application-default set-quota-project your-gcp-project-id
 ```
 
-### 3. (Optional) Set Authorized Domains & Email Addresses
-By default, administrative access is limited to `@google.com` and `@cloudadvocacyorg.joonix.net`. To modify this:
-1. Add the `ALLOWED_EMAIL_DOMAINS` variable to `.env`:
-   ```ini
-   ALLOWED_EMAIL_DOMAINS="mycompany.com,operator@gmail.com"
-   ```
+### 3. Set Authorized Domains & Email Addresses
+For security, there are no hardcoded default domains. You must explicitly set the allowed email domains or specific email addresses in your `.env` file before deployment:
+```ini
+ALLOWED_EMAIL_DOMAINS="yourcompany.com,operator@gmail.com"
+```
 
 ### 4. Run the Deployment
 ```bash
