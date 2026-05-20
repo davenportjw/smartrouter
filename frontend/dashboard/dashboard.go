@@ -1368,7 +1368,7 @@ type gcpEndpointsResponse struct {
 	Endpoints []gcpEndpoint `json:"endpoints"`
 }
 
-func (dc *DashboardController) fetchLocations(ctx context.Context) ([]templates.LocationInfo, error) {
+func (dc *DashboardController) fetchLocations(_ context.Context) ([]templates.LocationInfo, error) {
 	locService := dc.Location
 	if locService == "" {
 		locService = "us-central1"
@@ -1640,6 +1640,9 @@ func (dc *DashboardController) fetchLocalLogsCosts() (templates.CostsViewModel, 
 			entries = append(entries, entry)
 		}
 	}
+	if err := scanner.Err(); err != nil {
+		log.Printf("[Dashboard] Error scanning local logs for costs: %v", err)
+	}
 
 	// Reverse entries to show latest first
 	for i, j := 0, len(entries)-1; i < j; i, j = i+1, j-1 {
@@ -1766,6 +1769,9 @@ func (dc *DashboardController) fetchLocalLogsMetrics() (templates.MetricsViewMod
 		if err := json.Unmarshal(line, &entry); err == nil {
 			entries = append(entries, entry)
 		}
+	}
+	if err := scanner.Err(); err != nil {
+		log.Printf("[Dashboard] Error scanning local logs for metrics: %v", err)
 	}
 
 	counts := make([]int, 24)
