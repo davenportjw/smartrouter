@@ -61,3 +61,24 @@ type QueueSnapshotItem struct {
 	ArrivalTime string `json:"arrival_time"`
 	DurationMs  int64  `json:"duration_ms"`
 }
+
+// DocItem represents a single markdown documentation file.
+type DocItem struct {
+	Title string
+	Path  string
+}
+
+// DocCategory groups related DocItems.
+type DocCategory struct {
+	Name  string
+	Items []DocItem
+}
+
+// DocsViewModel represents the state for the docs screen.
+type DocsViewModel struct {
+	Categories   []DocCategory
+	ActivePath   string
+	ActiveTitle  string
+	RenderedHTML string
+}
+

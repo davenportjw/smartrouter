@@ -53,8 +53,8 @@ templ AppsTab(items []AppsViewModel) {
 							<span class="block text-emerald-800 mt-0.5">Priority value calculated as: <strong>App Priority Weight</strong> (High=300, Med=200, Low=100) + <strong>Parent Org Tier</strong> (Premium=3, Standard=2, Free=1).</span>
 						</div>
 						<div>
-							<span class="block font-bold text-emerald-950">Priority Queue Buffers</span>
-							<span class="block text-emerald-800 mt-0.5">High priority Apps wait up to <strong>5s</strong> during spikes, Medium up to <strong>2s</strong>, and Low priority requests are rejected immediately.</span>
+							<span class="block font-bold text-emerald-950">Spike Buffers & Overload Queue</span>
+							<span class="block text-emerald-800 mt-0.5">During rate limit spikes, High Apps wait up to <strong>5s</strong>, Med up to <strong>2s</strong>, and Low fail immediately. For model-level 429 overloads, requests remain queued indefinitely up to client-side timeouts.</span>
 						</div>
 					</div>
 				</div>
@@ -226,15 +226,15 @@ templ AppModal(clients []config.Client, app *config.App) {
 										<select name="priority" id="priority" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm">
 											if app != nil {
 												<option value="low" if app.Priority == "low" { selected }>Low (Non-critical, Fail Instantly)</option>
-												<option value="medium" if app.Priority == "medium" { selected }>Medium (Standard, Up to 2s Buffer)</option>
-												<option value="high" if app.Priority == "high" { selected }>High (Mission Critical, Up to 5s Buffer)</option>
+												<option value="medium" if app.Priority == "medium" { selected }>Medium (Standard, Up to 2s Rate Spike Buffer)</option>
+												<option value="high" if app.Priority == "high" { selected }>High (Mission Critical, Up to 5s Rate Spike Buffer)</option>
 											} else {
 												<option value="low">Low (Non-critical, Fail Instantly)</option>
-												<option value="medium" selected>Medium (Standard, Up to 2s Buffer)</option>
-												<option value="high">High (Mission Critical, Up to 5s Buffer)</option>
+												<option value="medium" selected>Medium (Standard, Up to 2s Rate Spike Buffer)</option>
+												<option value="high">High (Mission Critical, Up to 5s Rate Spike Buffer)</option>
 											}
 										</select>
-										<p class="text-[10px] text-gray-500 mt-0.5">💡 Primary sort weight (High=+300, Med=+200, Low=+100) and controls active spike queue buffer capacity.</p>
+										<p class="text-[10px] text-gray-500 mt-0.5">💡 Primary sort weight (High=+300, Med=+200, Low=+100). Upstream model overload queue duration is governed by the client's own HTTP timeout.</p>
 									</div>
 								</div>
 

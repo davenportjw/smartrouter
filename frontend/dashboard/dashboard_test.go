@@ -444,4 +444,48 @@ func TestLocalLogsTelemetryAndDashboards(t *testing.T) {
 			t.Errorf("expected metrics page to render 200, got %d", rrMetrics.Code)
 		}
 	})
+
+	// 5. Test Serving Local Markdown Documentation (Dynamic Reader)
+	t.Run("Docs page rendering and directory traversal protection", func(t *testing.T) {
+		// Test default README docs page
+		reqDefault := httptest.NewRequest("GET", "/admin/docs", nil)
+		rrDefault := httptest.NewRecorder()
+		dash.ServeDocs(rrDefault, reqDefault)
+		if rrDefault.Code != http.StatusOK {
+			t.Errorf("expected default docs page to render 200, got %d", rrDefault.Code)
+		}
+		bodyDefault := rrDefault.Body.String()
+		if !strings.Contains(bodyDefault, "Smart Router") || !strings.Contains(bodyDefault, "Getting Started") {
+			t.Errorf("default docs page did not render correctly or was missing contents")
+		}
+
+		// Test specific category path
+		reqSpecific := httptest.NewRequest("GET", "/admin/docs?path=admin/client-organizations.md", nil)
+		rrSpecific := httptest.NewRecorder()
+		dash.ServeDocs(rrSpecific, reqSpecific)
+		if rrSpecific.Code != http.StatusOK {
+			t.Errorf("expected admin/client-organizations docs to render 200, got %d", rrSpecific.Code)
+		}
+		bodySpecific := rrSpecific.Body.String()
+		if !strings.Contains(bodySpecific, "Client Organizations") {
+			t.Errorf("specific docs page did not render target title or headers")
+		}
+
+		// Test invalid traversal injection - absolute path
+		reqTraversalAbs := httptest.NewRequest("GET", "/admin/docs?path=/etc/passwd", nil)
+		rrTraversalAbs := httptest.NewRecorder()
+		dash.ServeDocs(rrTraversalAbs, reqTraversalAbs)
+		if rrTraversalAbs.Code != http.StatusForbidden {
+			t.Errorf("expected absolute path request to return 403 Forbidden, got %d", rrTraversalAbs.Code)
+		}
+
+		// Test invalid traversal injection - relative parent path
+		reqTraversalRel := httptest.NewRequest("GET", "/admin/docs?path=../../go.mod", nil)
+		rrTraversalRel := httptest.NewRecorder()
+		dash.ServeDocs(rrTraversalRel, reqTraversalRel)
+		if rrTraversalRel.Code != http.StatusForbidden {
+			t.Errorf("expected relative parent traversal request to return 403 Forbidden, got %d", rrTraversalRel.Code)
+		}
+	})
 }
+

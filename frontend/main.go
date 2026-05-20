@@ -91,6 +91,7 @@ func main() {
 	mux.Handle("/admin/metrics", authStore.Middleware(http.HandlerFunc(dashController.ServeMetrics)))
 	mux.Handle("/admin/costs", authStore.Middleware(http.HandlerFunc(dashController.ServeCosts)))
 	mux.Handle("/admin/queue", authStore.Middleware(http.HandlerFunc(dashController.ServeQueue)))
+	mux.Handle("/admin/docs", authStore.Middleware(http.HandlerFunc(dashController.ServeDocs)))
 	mux.Handle("/admin/toggle-simulation", authStore.Middleware(http.HandlerFunc(dashController.ToggleSimulation)))
 
 	// Authentication endpoints

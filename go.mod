@@ -7,6 +7,7 @@ require (
 	firebase.google.com/go/v4 v4.20.0
 	github.com/a-h/templ v0.3.1020
 	github.com/golang-jwt/jwt/v4 v4.5.2
+	github.com/yuin/goldmark v1.8.2
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/time v0.15.0
 	google.golang.org/api v0.279.0

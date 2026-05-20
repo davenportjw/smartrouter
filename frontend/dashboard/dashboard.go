@@ -15,15 +15,17 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
-	"geminirouter/pkg/config"
 	"geminirouter/frontend/dashboard/templates"
+	"geminirouter/pkg/config"
 
+	"github.com/yuin/goldmark"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
@@ -3184,3 +3186,120 @@ func (dc *DashboardController) ServeQueue(w http.ResponseWriter, r *http.Request
 
 	_ = templates.Layout("Request Queue", "queue", content).Render(ctx, w)
 }
+
+// ServeDocs handles rendering the markdown files in docs/
+func (dc *DashboardController) ServeDocs(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	docPath := r.URL.Query().Get("path")
+	if docPath == "" {
+		docPath = "README.md"
+	}
+
+	// 1. Clean and sanitize the docPath to prevent directory traversal
+	cleanedPath := filepath.Clean(docPath)
+	if strings.HasPrefix(cleanedPath, "..") || filepath.IsAbs(cleanedPath) {
+		http.Error(w, "Access Denied: Invalid path structure", http.StatusForbidden)
+		return
+	}
+
+	// Determine base directory dynamically (supports tests running in subfolders)
+	baseDir := "docs"
+	if _, err := os.Stat(baseDir); os.IsNotExist(err) {
+		if _, err := os.Stat("../../docs"); err == nil {
+			baseDir = "../../docs"
+		}
+	}
+
+	// Form the target file path relative to the base directory
+	targetFilePath := filepath.Join(baseDir, cleanedPath)
+
+	// Additional double check: ensure the joined path starts with the base directory prefix
+	if !strings.HasPrefix(filepath.Clean(targetFilePath), filepath.Clean(baseDir)) {
+		http.Error(w, "Access Denied: Out of bounds request", http.StatusForbidden)
+		return
+	}
+
+	// 2. Read the target markdown file
+	mdBytes, err := os.ReadFile(targetFilePath)
+	if err != nil {
+		log.Printf("[Docs] Error reading doc file %s: %v", targetFilePath, err)
+		http.Error(w, "Documentation file not found", http.StatusNotFound)
+		return
+	}
+
+	// 3. Parse the markdown to HTML using Goldmark
+	var buf bytes.Buffer
+	if err := goldmark.Convert(mdBytes, &buf); err != nil {
+		log.Printf("[Docs] Error converting markdown: %v", err)
+		http.Error(w, "Failed to render document contents", http.StatusInternalServerError)
+		return
+	}
+
+	// 4. Populate Categories list dynamically matching all existing documentation
+	categories := []templates.DocCategory{
+		{
+			Name: "General Information",
+			Items: []templates.DocItem{
+				{Title: "Welcome & Getting Started", Path: "README.md"},
+			},
+		},
+		{
+			Name: "Administrative Guides",
+			Items: []templates.DocItem{
+				{Title: "Overview", Path: "admin/README.md"},
+				{Title: "Client Organizations", Path: "admin/client-organizations.md"},
+				{Title: "Applications & Keys", Path: "admin/apps-and-keys.md"},
+				{Title: "Traffic Routing Rules", Path: "admin/routing-rules.md"},
+				{Title: "Declarative Custom Headers", Path: "admin/custom-headers.md"},
+				{Title: "Metrics & Expenditure Analytics", Path: "admin/metrics-and-costs.md"},
+			},
+		},
+		{
+			Name: "Architecture",
+			Items: []templates.DocItem{
+				{Title: "System Overview", Path: "architecture/overview.md"},
+			},
+		},
+		{
+			Name: "Development & Testing",
+			Items: []templates.DocItem{
+				{Title: "Test-Driven Development", Path: "approaches/tdd-feature-development.md"},
+				{Title: "Model Version Compliance", Path: "approaches/model-compliance.md"},
+			},
+		},
+		{
+			Name: "Integration Guides",
+			Items: []templates.DocItem{
+				{Title: "Local Workflows", Path: "guides/local-development.md"},
+				{Title: "Client API Integration", Path: "guides/client-integration.md"},
+				{Title: "Dynamic Traffic Routing", Path: "guides/dynamic-routing.md"},
+				{Title: "Google Cloud Deployment", Path: "guides/cloud-deployment.md"},
+				{Title: "Example Templates Directory", Path: "guides/using-examples.md"},
+			},
+		},
+	}
+
+	// 5. Determine active document title
+	activeTitle := "Documentation"
+	for _, cat := range categories {
+		for _, item := range cat.Items {
+			if item.Path == cleanedPath {
+				activeTitle = item.Title
+				break
+			}
+		}
+	}
+
+	// 6. Render using Templates Layout
+	w.Header().Set("Content-Type", "text/html")
+	vm := templates.DocsViewModel{
+		Categories:   categories,
+		ActivePath:   cleanedPath,
+		ActiveTitle:  activeTitle,
+		RenderedHTML: buf.String(),
+	}
+
+	content := templates.DocsTab(vm)
+	_ = templates.Layout(activeTitle, "docs", content).Render(ctx, w)
+}
+

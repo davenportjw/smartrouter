@@ -31,14 +31,14 @@ func QueueTab(items []QueueSnapshotItem) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"space-y-8 animate-fadeIn\"><!-- Header --><div class=\"flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-gray-200 pb-5\"><div><h1 class=\"text-2xl font-bold tracking-tight text-gray-950\">Active Request Routing Queue</h1><p class=\"mt-2 text-sm text-gray-500\">Real-time view of requests currently queued or processing. Under healthy load, requests bypass the queue.</p></div><div class=\"flex items-center gap-3 self-start md:self-center\"><span class=\"inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10\"><span class=\"h-1.5 w-1.5 mr-1.5 rounded-full bg-blue-500 animate-pulse\"></span> Auto-refreshing every 2s</span> <button hx-get=\"/admin/queue\" hx-select=\"#queue-container\" hx-target=\"#queue-container\" hx-swap=\"outerHTML\" class=\"rounded-lg bg-white px-3 py-2 text-xs font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition cursor-pointer\">Refresh Now</button></div></div><!-- Main Queue Container with Auto-polling --><div id=\"queue-container\" hx-get=\"/admin/queue\" hx-trigger=\"every 2s\" hx-select=\"#queue-container\" hx-target=\"#queue-container\" hx-swap=\"outerHTML\"><!-- KPI Cards: Active and Queued Request counts --><div class=\"grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 mb-6\"><div class=\"relative overflow-hidden rounded-2xl bg-white px-6 pb-6 pt-5 border border-gray-200/80 shadow-sm\"><dt><p class=\"text-sm font-medium text-gray-500\">Processing Requests</p></dt><dd class=\"flex items-baseline pb-0 mt-1\"><p class=\"text-3xl font-bold tracking-tight text-blue-600\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"space-y-8 animate-fadeIn\"><!-- Header --><div class=\"flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-gray-200 pb-5\"><div><h1 class=\"text-2xl font-bold tracking-tight text-gray-950\">Active Request Routing Queue</h1><p class=\"mt-2 text-sm text-gray-500\">Real-time view of requests currently queued or processing. Under healthy load, requests bypass the queue.</p></div><div class=\"flex items-center gap-3 self-start md:self-center\"><span class=\"inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10\"><span class=\"h-1.5 w-1.5 mr-1.5 rounded-full bg-blue-500 animate-pulse\"></span> Auto-refreshing every 2s</span> <button hx-get=\"/admin/queue\" hx-select=\"#queue-container\" hx-target=\"#queue-container\" hx-swap=\"outerHTML\" class=\"rounded-lg bg-white px-3 py-2 text-xs font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition cursor-pointer\">Refresh Now</button></div></div><!-- Queue Lifespan Info Banner --><div class=\"bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5 shadow-xs\"><div class=\"flex gap-4\"><div class=\"flex-shrink-0 p-2 bg-blue-500 text-white rounded-lg self-start\"><svg class=\"h-6 w-6\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z\"></path></svg></div><div class=\"space-y-1\"><h3 class=\"text-base font-bold text-blue-950\">How Queue Lifespans Work</h3><p class=\"text-sm text-blue-900 leading-relaxed\">Unlike the Rate Limiter's 2–5s reservation sleep window, <strong class=\"text-blue-950\">the Upstream Overload Queue has no arbitrary timeout limit</strong>.  Requests remain enqueued in memory for as long as the client's HTTP connection is kept open.  If a client cancels or times out, the router immediately evicts the request from the heap to prevent ghost processing.</p></div></div></div><!-- Main Queue Container with Auto-polling --><div id=\"queue-container\" hx-get=\"/admin/queue\" hx-trigger=\"every 2s\" hx-select=\"#queue-container\" hx-target=\"#queue-container\" hx-swap=\"outerHTML\"><!-- KPI Cards: Active and Queued Request counts --><div class=\"grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 mb-6\"><div class=\"relative overflow-hidden rounded-2xl bg-white px-6 pb-6 pt-5 border border-gray-200/80 shadow-sm\"><dt><p class=\"text-sm font-medium text-gray-500\">Processing Requests</p></dt><dd class=\"flex items-baseline pb-0 mt-1\"><p class=\"text-3xl font-bold tracking-tight text-blue-600\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", countByStatus(items, "processing")))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/queue.templ`, Line: 36, Col: 120}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/queue.templ`, Line: 55, Col: 120}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -51,7 +51,7 @@ func QueueTab(items []QueueSnapshotItem) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", countByStatus(items, "queued")))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/queue.templ`, Line: 46, Col: 117}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/queue.templ`, Line: 65, Col: 117}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
@@ -64,7 +64,7 @@ func QueueTab(items []QueueSnapshotItem) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", len(items)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/queue.templ`, Line: 56, Col: 96}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/queue.templ`, Line: 75, Col: 96}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -107,7 +107,7 @@ func QueueTab(items []QueueSnapshotItem) templ.Component {
 				var templ_7745c5c3_Var5 string
 				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(item.AppID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/queue.templ`, Line: 106, Col: 23}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/queue.templ`, Line: 125, Col: 23}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 				if templ_7745c5c3_Err != nil {
@@ -120,7 +120,7 @@ func QueueTab(items []QueueSnapshotItem) templ.Component {
 				var templ_7745c5c3_Var6 string
 				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(item.Model)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/queue.templ`, Line: 110, Col: 24}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/queue.templ`, Line: 129, Col: 24}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 				if templ_7745c5c3_Err != nil {
@@ -153,7 +153,7 @@ func QueueTab(items []QueueSnapshotItem) templ.Component {
 				var templ_7745c5c3_Var7 string
 				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(item.Tier)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/queue.templ`, Line: 129, Col: 47}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/queue.templ`, Line: 148, Col: 47}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 				if templ_7745c5c3_Err != nil {
@@ -181,7 +181,7 @@ func QueueTab(items []QueueSnapshotItem) templ.Component {
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(formatDuration(item.DurationMs))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/queue.templ`, Line: 145, Col: 44}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/queue.templ`, Line: 164, Col: 44}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 				if templ_7745c5c3_Err != nil {

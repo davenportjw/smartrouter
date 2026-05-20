@@ -1,0 +1,204 @@
+package templates
+
+import (
+	"fmt"
+)
+
+templ DocsTab(vm DocsViewModel) {
+	<style>
+		/* Custom Premium Markdown Reader Styles */
+		.markdown-content {
+			line-height: 1.75;
+			color: #374151; /* text-gray-700 */
+			font-size: 1.05rem;
+		}
+		.markdown-content h1 {
+			font-size: 2.25rem;
+			font-weight: 800;
+			color: #111827; /* text-gray-900 */
+			margin-top: 0;
+			margin-bottom: 1.5rem;
+			border-b: 1px solid #e5e7eb;
+			padding-bottom: 0.75rem;
+			letter-spacing: -0.025em;
+		}
+		.markdown-content h2 {
+			font-size: 1.65rem;
+			font-weight: 700;
+			color: #1f2937; /* text-gray-800 */
+			margin-top: 2.5rem;
+			margin-bottom: 1rem;
+			padding-bottom: 0.3rem;
+			border-b: 1px solid #f3f4f6;
+			letter-spacing: -0.02em;
+		}
+		.markdown-content h3 {
+			font-size: 1.25rem;
+			font-weight: 600;
+			color: #374151;
+			margin-top: 1.75rem;
+			margin-bottom: 0.75rem;
+		}
+		.markdown-content p {
+			margin-top: 0;
+			margin-bottom: 1.25rem;
+		}
+		.markdown-content ul {
+			list-style-type: disc;
+			margin-top: 0;
+			margin-bottom: 1.25rem;
+			padding-left: 1.625rem;
+		}
+		.markdown-content ol {
+			list-style-type: decimal;
+			margin-top: 0;
+			margin-bottom: 1.25rem;
+			padding-left: 1.625rem;
+		}
+		.markdown-content li {
+			margin-top: 0.375rem;
+			margin-bottom: 0.375rem;
+		}
+		.markdown-content a {
+			color: #2563eb; /* blue-600 */
+			text-decoration: none;
+			font-weight: 500;
+			border-bottom: 1px dashed #93c5fd;
+			transition: all 0.15s ease;
+		}
+		.markdown-content a:hover {
+			color: #1d4ed8; /* blue-700 */
+			border-bottom-style: solid;
+		}
+		.markdown-content blockquote {
+			font-style: italic;
+			color: #4b5563;
+			border-left: 4px solid #3b82f6; /* blue-500 */
+			padding-left: 1.25rem;
+			margin: 1.5rem 0;
+			background-color: #eff6ff;
+			padding-top: 0.75rem;
+			padding-bottom: 0.75rem;
+			padding-right: 0.75rem;
+			border-radius: 0 0.5rem 0.5rem 0;
+		}
+		.markdown-content code {
+			font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+			font-size: 0.875em;
+			color: #0f172a; /* slate-900 */
+			background-color: #f1f5f9; /* slate-100 */
+			padding: 0.2rem 0.4rem;
+			border-radius: 0.25rem;
+			border: 1px solid #e2e8f0;
+		}
+		.markdown-content pre {
+			background-color: #0f172a; /* slate-900 */
+			color: #f8fafc; /* slate-50 */
+			padding: 1.25rem;
+			border-radius: 0.75rem;
+			overflow-x: auto;
+			margin: 1.5rem 0;
+			border: 1px solid #1e293b;
+			box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+		}
+		.markdown-content pre code {
+			color: inherit;
+			background-color: transparent;
+			padding: 0;
+			border-radius: 0;
+			border: none;
+			font-size: 0.9em;
+			line-height: 1.5;
+		}
+		.markdown-content hr {
+			border: 0;
+			border-top: 1px solid #e5e7eb;
+			margin: 2.5rem 0;
+		}
+		.markdown-content table {
+			width: 100%;
+			border-collapse: collapse;
+			margin: 1.5rem 0;
+			font-size: 0.95rem;
+		}
+		.markdown-content th, .markdown-content td {
+			border: 1px solid #e5e7eb;
+			padding: 0.75rem 1rem;
+			text-align: left;
+		}
+		.markdown-content th {
+			background-color: #f9fafb;
+			font-weight: 600;
+			color: #111827;
+		}
+		.markdown-content tr:nth-child(even) td {
+			background-color: #f9fafb/50;
+		}
+	</style>
+
+	<div class="space-y-6 animate-fadeIn">
+		<!-- Top Breadcrumb and Navigation Header -->
+		<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-gray-200 pb-5">
+			<div>
+				<div class="flex items-center gap-2 text-xs font-medium text-gray-500 uppercase tracking-wider">
+					<a href="/admin/apps" class="hover:text-blue-600 transition">Dashboard</a>
+					<svg class="w-3 h-3 shrink-0 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+					</svg>
+					<span class="text-gray-700 font-semibold">Documentation</span>
+				</div>
+				<h1 class="text-2xl font-bold tracking-tight text-gray-950 mt-2">Smart Router Documentation</h1>
+				<p class="mt-1 text-sm text-gray-500">
+					Comprehensive system guides, architecture breakdowns, and integration specs for developers and administrators.
+				</p>
+			</div>
+			<div class="flex items-center gap-3">
+				<a href="/admin/apps" class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-sm font-semibold text-gray-700 shadow-xs hover:bg-gray-50 transition active:scale-[0.98]">
+					<svg class="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+					</svg>
+					Back to Dashboard
+				</a>
+			</div>
+		</div>
+
+		<!-- Dual-Pane Documentation Layout -->
+		<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+			
+			<!-- Left Side: Navigable Docs Sidebar Menu -->
+			<nav class="lg:col-span-3 space-y-6 bg-white border border-gray-200/85 rounded-2xl p-5 shadow-2xs sticky top-20 max-h-[calc(100vh-12rem)] overflow-y-auto">
+				for _, cat := range vm.Categories {
+					<div class="space-y-2">
+						<h3 class="text-[10px] font-bold uppercase tracking-widest text-gray-400 border-b border-gray-100 pb-1">
+							{ cat.Name }
+						</h3>
+						<div class="space-y-1">
+							for _, item := range cat.Items {
+								<a href={ templ.SafeURL(fmt.Sprintf("/admin/docs?path=%s", item.Path)) }
+								   class={ "group flex items-center justify-between rounded-lg px-3 py-2 text-xs font-medium transition-all duration-150",
+								           templ.KV("bg-blue-50 text-blue-700 font-semibold shadow-3xs", vm.ActivePath == item.Path),
+								           templ.KV("text-gray-600 hover:bg-gray-50 hover:text-gray-900", vm.ActivePath != item.Path) }>
+									<span class="truncate">{ item.Title }</span>
+									if vm.ActivePath == item.Path {
+										<span class="h-1.5 w-1.5 rounded-full bg-blue-600"></span>
+									} else {
+										<svg class="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-500 group-hover:translate-x-0.5 transition-all shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+										</svg>
+									}
+								</a>
+							}
+						</div>
+					</div>
+				}
+			</nav>
+
+			<!-- Right Side: Markdown Document Content Viewer -->
+			<article class="lg:col-span-9 bg-white border border-gray-200/85 rounded-2xl p-8 md:p-10 shadow-xs min-h-[500px]">
+				<div class="markdown-content prose max-w-none">
+					@templ.Raw(vm.RenderedHTML)
+				</div>
+			</article>
+		</div>
+	</div>
+}

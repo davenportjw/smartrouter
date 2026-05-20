@@ -23,6 +23,25 @@ templ QueueTab(items []QueueSnapshotItem) {
 			</div>
 		</div>
 
+		<!-- Queue Lifespan Info Banner -->
+		<div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5 shadow-xs">
+			<div class="flex gap-4">
+				<div class="flex-shrink-0 p-2 bg-blue-500 text-white rounded-lg self-start">
+					<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+					</svg>
+				</div>
+				<div class="space-y-1">
+					<h3 class="text-base font-bold text-blue-950">How Queue Lifespans Work</h3>
+					<p class="text-sm text-blue-900 leading-relaxed">
+						Unlike the Rate Limiter's 2–5s reservation sleep window, <strong class="text-blue-950">the Upstream Overload Queue has no arbitrary timeout limit</strong>. 
+						Requests remain enqueued in memory for as long as the client's HTTP connection is kept open. 
+						If a client cancels or times out, the router immediately evicts the request from the heap to prevent ghost processing.
+					</p>
+				</div>
+			</div>
+		</div>
+
 		<!-- Main Queue Container with Auto-polling -->
 		<div id="queue-container" hx-get="/admin/queue" hx-trigger="every 2s" hx-select="#queue-container" hx-target="#queue-container" hx-swap="outerHTML">
 			
