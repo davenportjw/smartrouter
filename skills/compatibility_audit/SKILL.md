@@ -1,3 +1,8 @@
+---
+name: compatibility_audit
+description: Verification guidelines and automated testing procedures to ensure enterprise API surface compatibility for Gemini Smart Router.
+---
+
 # Skill: Gemini Smart Router Enterprise Compatibility Audit
 
 This skill enables the agent to execute a scheduled or manual audit of the Gemini Smart Router to ensure it remains fully compatible with the Gemini Enterprise Agent Platform API surface.

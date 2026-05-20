@@ -1,3 +1,8 @@
+---
+name: agent_guidelines
+description: Guidelines for Gemini Smart Router Agent development, model compliance, TDD integration testing, design patterns, and documentation requirements.
+---
+
 # Skill: Gemini Smart Router Agent Development & Feature Addition
 
 This skill equips agentic software engineers with the precise guidelines, model selection criteria, core design patterns, and Test-Driven Development (TDD) workflows required to add features or modify the Gemini Smart Router codebase.
@@ -274,5 +279,3 @@ To avoid structural complexity, the codebase maintains a single Go module in a u
 ### C. Docker Build Context Strategy
 - All Docker builds must execute from the repository root directory (`.`) using `gcloud builds submit` or local engine commands.
 - The Dockerfiles (`backend/Dockerfile`, `frontend/Dockerfile`) copy the root `go.mod`/`go.sum` files and `/pkg` directory during the build stage before invoking `go build`.
-
-

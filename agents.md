@@ -6,7 +6,7 @@ Welcome! If you are an AI coding assistant or agent developing features or fixin
 
 All structured guidelines, repository design patterns, model parameters, and Test-Driven Development (TDD) tutorials are maintained in the dedicated skill file:
 
-👉 **[agent_guidelines.md](skills/agent_guidelines.md)**
+👉 **[SKILL.md](skills/agent_guidelines/SKILL.md)**
 
 ---
 
@@ -40,4 +40,4 @@ Before you write any code or create configuration schemas, keep these rules in m
 - **CLI Utility Boundaries (`cmd/verify`)**: Post-deployment CLI verification scripts and standalone binaries must reside inside the root `cmd/` folder. Do not embed client tools inside runtime service directories.
 - **Docker Scoping**: Both `backend/Dockerfile` and `frontend/Dockerfile` run from the repository root build context (`.`) so they can securely compile with `pkg/`.
 
-For detailed code examples and tutorials on how to implement these patterns via TDD, please open and execute the instructions in **[skills/agent_guidelines.md](skills/agent_guidelines.md)**.
+For detailed code examples and tutorials on how to implement these patterns via TDD, please open and execute the instructions in **[skills/agent_guidelines/SKILL.md](skills/agent_guidelines/SKILL.md)**.
