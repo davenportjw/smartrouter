@@ -330,7 +330,7 @@ func RuleModal(apps []config.App, activeModels []config.ModelConfig, rule *confi
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "</p></div><!-- Creation Form --><form hx-post=\"/admin/rules/create\" class=\"mt-6 space-y-4\" onsubmit=\"document.getElementById('create-rule-modal').remove()\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "</p></div><form hx-post=\"/admin/rules/create\" class=\"mt-6 space-y-4\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -342,7 +342,7 @@ func RuleModal(apps []config.App, activeModels []config.ModelConfig, rule *confi
 			var templ_7745c5c3_Var14 string
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.ResolveAttributeValue(rule.ID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 201, Col: 55}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 199, Col: 55}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var14)
 			if templ_7745c5c3_Err != nil {
@@ -365,7 +365,7 @@ func RuleModal(apps []config.App, activeModels []config.ModelConfig, rule *confi
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.ResolveAttributeValue(rule.ModelPattern)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 207, Col: 104}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 205, Col: 104}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var15)
 			if templ_7745c5c3_Err != nil {
@@ -405,7 +405,7 @@ func RuleModal(apps []config.App, activeModels []config.ModelConfig, rule *confi
 				var templ_7745c5c3_Var16 string
 				templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.ResolveAttributeValue(a.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 222, Col: 33}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 220, Col: 33}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var16)
 				if templ_7745c5c3_Err != nil {
@@ -418,7 +418,7 @@ func RuleModal(apps []config.App, activeModels []config.ModelConfig, rule *confi
 				var templ_7745c5c3_Var17 string
 				templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(a.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 222, Col: 53}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 220, Col: 53}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 				if templ_7745c5c3_Err != nil {
@@ -431,7 +431,7 @@ func RuleModal(apps []config.App, activeModels []config.ModelConfig, rule *confi
 				var templ_7745c5c3_Var18 string
 				templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(a.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 222, Col: 63}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 220, Col: 63}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 				if templ_7745c5c3_Err != nil {
@@ -449,7 +449,7 @@ func RuleModal(apps []config.App, activeModels []config.ModelConfig, rule *confi
 				var templ_7745c5c3_Var19 string
 				templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.ResolveAttributeValue(a.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 224, Col: 33}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 222, Col: 33}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var19)
 				if templ_7745c5c3_Err != nil {
@@ -462,7 +462,7 @@ func RuleModal(apps []config.App, activeModels []config.ModelConfig, rule *confi
 				var templ_7745c5c3_Var20 string
 				templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(a.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 224, Col: 44}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 222, Col: 44}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 				if templ_7745c5c3_Err != nil {
@@ -475,7 +475,7 @@ func RuleModal(apps []config.App, activeModels []config.ModelConfig, rule *confi
 				var templ_7745c5c3_Var21 string
 				templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(a.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 224, Col: 54}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 222, Col: 54}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 				if templ_7745c5c3_Err != nil {
@@ -554,7 +554,7 @@ func RuleModal(apps []config.App, activeModels []config.ModelConfig, rule *confi
 			var templ_7745c5c3_Var22 string
 			templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.ResolveAttributeValue(intToString(rule.PriorityWeight))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 251, Col: 133}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 249, Col: 133}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var22)
 			if templ_7745c5c3_Err != nil {
@@ -582,7 +582,7 @@ func RuleModal(apps []config.App, activeModels []config.ModelConfig, rule *confi
 			var templ_7745c5c3_Var23 string
 			templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.ResolveAttributeValue(rule.HeaderName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 264, Col: 90}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 262, Col: 90}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var23)
 			if templ_7745c5c3_Err != nil {
@@ -610,7 +610,7 @@ func RuleModal(apps []config.App, activeModels []config.ModelConfig, rule *confi
 			var templ_7745c5c3_Var24 string
 			templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.ResolveAttributeValue(rule.HeaderValue)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 272, Col: 93}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 270, Col: 93}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var24)
 			if templ_7745c5c3_Err != nil {
@@ -639,7 +639,7 @@ func RuleModal(apps []config.App, activeModels []config.ModelConfig, rule *confi
 				var templ_7745c5c3_Var25 string
 				templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.ResolveAttributeValue(m.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 289, Col: 33}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 287, Col: 33}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var25)
 				if templ_7745c5c3_Err != nil {
@@ -652,7 +652,7 @@ func RuleModal(apps []config.App, activeModels []config.ModelConfig, rule *confi
 				var templ_7745c5c3_Var26 string
 				templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(m.DisplayName)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 289, Col: 60}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 287, Col: 60}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 				if templ_7745c5c3_Err != nil {
@@ -670,7 +670,7 @@ func RuleModal(apps []config.App, activeModels []config.ModelConfig, rule *confi
 				var templ_7745c5c3_Var27 string
 				templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.ResolveAttributeValue(m.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 291, Col: 33}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 289, Col: 33}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var27)
 				if templ_7745c5c3_Err != nil {
@@ -683,7 +683,7 @@ func RuleModal(apps []config.App, activeModels []config.ModelConfig, rule *confi
 				var templ_7745c5c3_Var28 string
 				templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(m.DisplayName)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 291, Col: 51}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 289, Col: 51}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 				if templ_7745c5c3_Err != nil {
@@ -707,7 +707,7 @@ func RuleModal(apps []config.App, activeModels []config.ModelConfig, rule *confi
 			var templ_7745c5c3_Var29 string
 			templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.ResolveAttributeValue(rule.TargetLocation)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 299, Col: 110}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 297, Col: 110}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var29)
 			if templ_7745c5c3_Err != nil {
@@ -747,7 +747,7 @@ func RuleModal(apps []config.App, activeModels []config.ModelConfig, rule *confi
 				var templ_7745c5c3_Var30 string
 				templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.ResolveAttributeValue(m.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 317, Col: 33}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 315, Col: 33}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var30)
 				if templ_7745c5c3_Err != nil {
@@ -760,7 +760,7 @@ func RuleModal(apps []config.App, activeModels []config.ModelConfig, rule *confi
 				var templ_7745c5c3_Var31 string
 				templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(m.DisplayName)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 317, Col: 60}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 315, Col: 60}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 				if templ_7745c5c3_Err != nil {
@@ -778,7 +778,7 @@ func RuleModal(apps []config.App, activeModels []config.ModelConfig, rule *confi
 				var templ_7745c5c3_Var32 string
 				templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.ResolveAttributeValue(m.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 319, Col: 33}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 317, Col: 33}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var32)
 				if templ_7745c5c3_Err != nil {
@@ -791,7 +791,7 @@ func RuleModal(apps []config.App, activeModels []config.ModelConfig, rule *confi
 				var templ_7745c5c3_Var33 string
 				templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(m.DisplayName)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 319, Col: 51}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/rules.templ`, Line: 317, Col: 51}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 				if templ_7745c5c3_Err != nil {

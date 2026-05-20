@@ -24,5 +24,6 @@ FROM alpine:3.19
 RUN apk --no-cache add ca-certificates
 WORKDIR /
 COPY --from=builder /smart-router-frontend /smart-router-frontend
+COPY docs/ /docs
 EXPOSE 8081
 ENTRYPOINT ["/smart-router-frontend"]

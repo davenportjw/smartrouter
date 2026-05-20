@@ -346,8 +346,12 @@ func (dc *DashboardController) SaveKeyDetails(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(""))
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/admin/keys")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/admin/keys", http.StatusSeeOther)
 }
 
 // ServeRules renders the Routing Rules view tab.
@@ -522,6 +526,11 @@ func (dc *DashboardController) CreateRule(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/admin/rules")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	// Direct standard client browser redirect back to the rules view
 	http.Redirect(w, r, "/admin/rules", http.StatusSeeOther)
 }
@@ -685,6 +694,11 @@ func (dc *DashboardController) CreateHeader(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/admin/headers")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	// Direct standard client browser redirect back to the full headers view
 	http.Redirect(w, r, "/admin/headers", http.StatusSeeOther)
 }
@@ -2798,6 +2812,11 @@ func (dc *DashboardController) CreateApp(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/admin/apps")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	http.Redirect(w, r, "/admin/apps", http.StatusSeeOther)
 }
 
@@ -2941,6 +2960,11 @@ func (dc *DashboardController) CreateClient(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/admin/clients")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	http.Redirect(w, r, "/admin/clients", http.StatusSeeOther)
 }
 
@@ -3114,6 +3138,11 @@ func (dc *DashboardController) SaveComplexitySettings(w http.ResponseWriter, r *
 		return
 	}
 
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/admin/complexity")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	http.Redirect(w, r, "/admin/complexity", http.StatusSeeOther)
 }
 
@@ -3202,9 +3231,11 @@ func (dc *DashboardController) ServeDocs(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Determine base directory dynamically (supports tests running in subfolders)
+	// Determine base directory dynamically (supports absolute and relative paths)
 	baseDir := "docs"
-	if _, err := os.Stat(baseDir); os.IsNotExist(err) {
+	if _, err := os.Stat("/docs"); err == nil {
+		baseDir = "/docs"
+	} else if _, err := os.Stat(baseDir); os.IsNotExist(err) {
 		if _, err := os.Stat("../../docs"); err == nil {
 			baseDir = "../../docs"
 		}

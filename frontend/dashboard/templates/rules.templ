@@ -191,11 +191,9 @@ templ RuleModal(apps []config.App, activeModels []config.ModelConfig, rule *conf
 								</p>
 							</div>
 
-							<!-- Creation Form -->
 							<form
 								hx-post="/admin/rules/create"
 								class="mt-6 space-y-4"
-								onsubmit="document.getElementById('create-rule-modal').remove()"
 							>
 								if rule != nil {
 									<input type="hidden" name="id" value={ rule.ID } />

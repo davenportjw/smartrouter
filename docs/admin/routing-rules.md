@@ -26,7 +26,7 @@ Routing rules evaluate request variables (application ID, client tier, requested
 1. Go to `/admin/rules`.
 2. Click **Edit** next to the target rule row.
 3. Modify any fields in the modal (such as model pattern, scopes, target models, fallback target, or priority weights).
-4. Click **Save Routing Rule**.
+4. Click **Save Routing Rule**. The admin dashboard uses reactive HTMX redirection to save updates safely without page-reload race conditions and automatically refreshes the table.
 
 ### GCP Models & Endpoints Viewer
 Go to `/admin/models` to access the unified **Model Registry & Control Plane**. The single pane groups discovered models by category (**Generative Models** and **Embedding Models**), letting you:

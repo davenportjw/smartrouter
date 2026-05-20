@@ -186,7 +186,6 @@ templ AppModal(clients []config.Client, app *config.App) {
 							<form
 								hx-post="/admin/apps/create"
 								class="mt-6 space-y-4"
-								onsubmit="document.getElementById('create-app-modal').remove()"
 							>
 								<div class="grid grid-cols-2 gap-4">
 									<div>

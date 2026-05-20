@@ -301,7 +301,7 @@ func AppModal(clients []config.Client, app *config.App) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</p></div><!-- Creation Form --><form hx-post=\"/admin/apps/create\" class=\"mt-6 space-y-4\" onsubmit=\"document.getElementById('create-app-modal').remove()\"><div class=\"grid grid-cols-2 gap-4\"><div><label for=\"app_id\" class=\"block text-xs font-medium text-gray-700\">Application ID (Slug)</label> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</p></div><!-- Creation Form --><form hx-post=\"/admin/apps/create\" class=\"mt-6 space-y-4\"><div class=\"grid grid-cols-2 gap-4\"><div><label for=\"app_id\" class=\"block text-xs font-medium text-gray-700\">Application ID (Slug)</label> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -313,7 +313,7 @@ func AppModal(clients []config.Client, app *config.App) templ.Component {
 			var templ_7745c5c3_Var18 string
 			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.ResolveAttributeValue(app.ID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 195, Col: 88}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 194, Col: 88}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var18)
 			if templ_7745c5c3_Err != nil {
@@ -341,7 +341,7 @@ func AppModal(clients []config.Client, app *config.App) templ.Component {
 			var templ_7745c5c3_Var19 string
 			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.ResolveAttributeValue(app.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 203, Col: 85}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 202, Col: 85}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var19)
 			if templ_7745c5c3_Err != nil {
@@ -370,7 +370,7 @@ func AppModal(clients []config.Client, app *config.App) templ.Component {
 				var templ_7745c5c3_Var20 string
 				templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.ResolveAttributeValue(c.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 216, Col: 33}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 215, Col: 33}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var20)
 				if templ_7745c5c3_Err != nil {
@@ -383,7 +383,7 @@ func AppModal(clients []config.Client, app *config.App) templ.Component {
 				var templ_7745c5c3_Var21 string
 				templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(c.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 216, Col: 53}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 215, Col: 53}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 				if templ_7745c5c3_Err != nil {
@@ -396,7 +396,7 @@ func AppModal(clients []config.Client, app *config.App) templ.Component {
 				var templ_7745c5c3_Var22 string
 				templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(c.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 216, Col: 63}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 215, Col: 63}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 				if templ_7745c5c3_Err != nil {
@@ -414,7 +414,7 @@ func AppModal(clients []config.Client, app *config.App) templ.Component {
 				var templ_7745c5c3_Var23 string
 				templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.ResolveAttributeValue(c.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 218, Col: 33}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 217, Col: 33}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var23)
 				if templ_7745c5c3_Err != nil {
@@ -427,7 +427,7 @@ func AppModal(clients []config.Client, app *config.App) templ.Component {
 				var templ_7745c5c3_Var24 string
 				templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(c.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 218, Col: 44}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 217, Col: 44}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 				if templ_7745c5c3_Err != nil {
@@ -440,7 +440,7 @@ func AppModal(clients []config.Client, app *config.App) templ.Component {
 				var templ_7745c5c3_Var25 string
 				templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(c.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 218, Col: 54}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 217, Col: 54}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 				if templ_7745c5c3_Err != nil {
@@ -509,7 +509,7 @@ func AppModal(clients []config.Client, app *config.App) templ.Component {
 			var templ_7745c5c3_Var26 string
 			templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.ResolveAttributeValue(intToString(app.RPM))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 248, Col: 89}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 247, Col: 89}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var26)
 			if templ_7745c5c3_Err != nil {
@@ -537,7 +537,7 @@ func AppModal(clients []config.Client, app *config.App) templ.Component {
 			var templ_7745c5c3_Var27 string
 			templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.ResolveAttributeValue(intToString(app.TPM))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 256, Col: 89}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/apps.templ`, Line: 255, Col: 89}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var27)
 			if templ_7745c5c3_Err != nil {

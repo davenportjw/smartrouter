@@ -270,7 +270,7 @@ func ClientModal(client *config.Client) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</p></div><!-- Creation Form --><form hx-post=\"/admin/clients/create\" class=\"mt-6 space-y-4\" onsubmit=\"document.getElementById('create-client-modal').remove()\"><div class=\"grid grid-cols-2 gap-4\"><div><label for=\"client_id\" class=\"block text-xs font-medium text-gray-700\">Client ID (Slug)</label> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</p></div><!-- Creation Form --><form hx-post=\"/admin/clients/create\" class=\"mt-6 space-y-4\"><div class=\"grid grid-cols-2 gap-4\"><div><label for=\"client_id\" class=\"block text-xs font-medium text-gray-700\">Client ID (Slug)</label> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -282,7 +282,7 @@ func ClientModal(client *config.Client) templ.Component {
 			var templ_7745c5c3_Var16 string
 			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.ResolveAttributeValue(client.ID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/clients.templ`, Line: 188, Col: 97}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/clients.templ`, Line: 187, Col: 97}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var16)
 			if templ_7745c5c3_Err != nil {
@@ -310,7 +310,7 @@ func ClientModal(client *config.Client) templ.Component {
 			var templ_7745c5c3_Var17 string
 			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.ResolveAttributeValue(client.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/clients.templ`, Line: 196, Col: 94}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/clients.templ`, Line: 195, Col: 94}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var17)
 			if templ_7745c5c3_Err != nil {
@@ -428,7 +428,7 @@ func ClientModal(client *config.Client) templ.Component {
 			var templ_7745c5c3_Var18 string
 			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.ResolveAttributeValue(intToString(client.RPM))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/clients.templ`, Line: 243, Col: 92}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/clients.templ`, Line: 242, Col: 92}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var18)
 			if templ_7745c5c3_Err != nil {
@@ -456,7 +456,7 @@ func ClientModal(client *config.Client) templ.Component {
 			var templ_7745c5c3_Var19 string
 			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.ResolveAttributeValue(intToString(client.TPM))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/clients.templ`, Line: 251, Col: 92}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/clients.templ`, Line: 250, Col: 92}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var19)
 			if templ_7745c5c3_Err != nil {

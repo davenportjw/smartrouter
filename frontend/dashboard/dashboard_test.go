@@ -312,11 +312,15 @@ func TestDashboardUIAndRESTBackendIntegration(t *testing.T) {
 
 		reqKeySave := httptest.NewRequest("POST", "/admin/keys/save", strings.NewReader(keySaveForm.Encode()))
 		reqKeySave.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		reqKeySave.Header.Set("HX-Request", "true")
 		rrKeySave := httptest.NewRecorder()
 		dash.SaveKeyDetails(rrKeySave, reqKeySave)
 
 		if rrKeySave.Code != http.StatusOK {
 			t.Errorf("expected status 200 for Key Save, got %d", rrKeySave.Code)
+		}
+		if rrKeySave.Header().Get("HX-Redirect") != "/admin/keys" {
+			t.Errorf("expected HX-Redirect header to be /admin/keys, got %s", rrKeySave.Header().Get("HX-Redirect"))
 		}
 
 		keysUpdated, _ := dbStore.GetAllKeys(ctx)
@@ -332,6 +336,575 @@ func TestDashboardUIAndRESTBackendIntegration(t *testing.T) {
 		if !foundKey {
 			t.Errorf("edited key not found in database")
 		}
+	})
+
+	// --- TEST COMPREHENSIVE CRUD AND HTMX REDIRECT FLOWS ---
+	t.Run("UI Comprehensive CRUD and Modals Flow", func(t *testing.T) {
+		// Seed dynamic location models in the store first
+		_ = dbStore.SaveModel(ctx, config.ModelConfig{ID: "gemini-2.5-flash", DisplayName: "Gemini 2.5 Flash", Active: true, Location: "us-central1", Type: "foundation"})
+		_ = dbStore.SaveModel(ctx, config.ModelConfig{ID: "gemini-2.5-pro", DisplayName: "Gemini 2.5 Pro", Active: true, Location: "us-central1", Type: "foundation"})
+		_ = dbStore.SaveModel(ctx, config.ModelConfig{ID: "gemini-3.1-flash-lite", DisplayName: "Gemini 3.1 Flash Lite", Active: true, Location: "us-central1", Type: "foundation"})
+
+		// 1. CLIENT ORGANIZATIONS CRUD
+		t.Run("Client Organizations CRUD", func(t *testing.T) {
+			// A. Serve New Client Modal
+			reqNew := httptest.NewRequest("GET", "/admin/clients/new", nil)
+			rrNew := httptest.NewRecorder()
+			dash.ServeClientsNewModal(rrNew, reqNew)
+			if rrNew.Code != http.StatusOK {
+				t.Errorf("expected client new modal to return 200, got %d", rrNew.Code)
+			}
+
+			// B. Create Client - Standard Redirect Flow
+			form := url.Values{}
+			form.Add("client_id", "client-crud-test")
+			form.Add("client_name", "CRUD Test Organization")
+			form.Add("tier", "standard")
+			form.Add("priority", "medium")
+			form.Add("rpm", "150")
+			form.Add("tpm", "80000")
+
+			reqCreate := httptest.NewRequest("POST", "/admin/clients/create", strings.NewReader(form.Encode()))
+			reqCreate.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			rrCreate := httptest.NewRecorder()
+			dash.CreateClient(rrCreate, reqCreate)
+			if rrCreate.Code != http.StatusSeeOther {
+				t.Errorf("expected standard client create to return 303 redirect, got %d", rrCreate.Code)
+			}
+
+			// C. Create/Edit Client - HTMX HX-Redirect Flow
+			formEdit := url.Values{}
+			formEdit.Add("client_id", "client-crud-test")
+			formEdit.Add("client_name", "CRUD Test Organization Edited")
+			formEdit.Add("tier", "premium")
+			formEdit.Add("priority", "high")
+			formEdit.Add("rpm", "250")
+			formEdit.Add("tpm", "120000")
+
+			reqEdit := httptest.NewRequest("POST", "/admin/clients/create", strings.NewReader(formEdit.Encode()))
+			reqEdit.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			reqEdit.Header.Set("HX-Request", "true")
+			rrEdit := httptest.NewRecorder()
+			dash.CreateClient(rrEdit, reqEdit)
+
+			if rrEdit.Code != http.StatusOK {
+				t.Errorf("expected HTMX client edit to return 200, got %d", rrEdit.Code)
+			}
+			if rrEdit.Header().Get("HX-Redirect") != "/admin/clients" {
+				t.Errorf("expected HX-Redirect to /admin/clients, got %s", rrEdit.Header().Get("HX-Redirect"))
+			}
+
+			// Verify updated db state
+			client, ok := dbStore.LookupClient("client-crud-test")
+			if !ok {
+				t.Fatalf("client should exist in database")
+			}
+			if client.Name != "CRUD Test Organization Edited" || client.Tier != "premium" || client.RPM != 250 {
+				t.Errorf("client fields not saved properly: %+v", client)
+			}
+
+			// D. Serve Edit Client Modal
+			reqEditModal := httptest.NewRequest("GET", "/admin/clients/edit?id=client-crud-test", nil)
+			rrEditModal := httptest.NewRecorder()
+			dash.ServeClientsEditModal(rrEditModal, reqEditModal)
+			if rrEditModal.Code != http.StatusOK {
+				t.Errorf("expected client edit modal to return 200, got %d", rrEditModal.Code)
+			}
+
+			// E. Delete Client
+			reqDelete := httptest.NewRequest("DELETE", "/admin/clients/delete?id=client-crud-test", nil)
+			rrDelete := httptest.NewRecorder()
+			dash.DeleteClient(rrDelete, reqDelete)
+			if rrDelete.Code != http.StatusOK {
+				t.Errorf("expected delete client to return 200, got %d", rrDelete.Code)
+			}
+
+			_, ok = dbStore.LookupClient("client-crud-test")
+			if ok {
+				t.Errorf("client should have been deleted from database")
+			}
+		})
+
+		// Seed a client first for App tests
+		_ = dbStore.SaveClient(ctx, config.Client{ID: "client-for-apps", Name: "Apps Parent Client", Tier: "standard"})
+
+		// 2. APPLICATIONS CRUD
+		t.Run("Applications CRUD", func(t *testing.T) {
+			// A. Serve New App Modal
+			reqNew := httptest.NewRequest("GET", "/admin/apps/new", nil)
+			rrNew := httptest.NewRecorder()
+			dash.ServeAppsNewModal(rrNew, reqNew)
+			if rrNew.Code != http.StatusOK {
+				t.Errorf("expected apps new modal to return 200, got %d", rrNew.Code)
+			}
+
+			// B. Create App - Standard Redirect Flow
+			form := url.Values{}
+			form.Add("app_id", "app-crud-test")
+			form.Add("app_name", "CRUD Test App")
+			form.Add("client_id", "client-for-apps")
+			form.Add("rpm", "80")
+			form.Add("tpm", "35000")
+			form.Add("priority", "low")
+
+			reqCreate := httptest.NewRequest("POST", "/admin/apps/create", strings.NewReader(form.Encode()))
+			reqCreate.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			rrCreate := httptest.NewRecorder()
+			dash.CreateApp(rrCreate, reqCreate)
+			if rrCreate.Code != http.StatusSeeOther {
+				t.Errorf("expected standard app create to return 303 redirect, got %d", rrCreate.Code)
+			}
+
+			// C. Create/Edit App - HTMX HX-Redirect Flow
+			formEdit := url.Values{}
+			formEdit.Add("app_id", "app-crud-test")
+			formEdit.Add("app_name", "CRUD Test App Edited")
+			formEdit.Add("client_id", "client-for-apps")
+			formEdit.Add("rpm", "120")
+			formEdit.Add("tpm", "55000")
+			formEdit.Add("priority", "high")
+
+			reqEdit := httptest.NewRequest("POST", "/admin/apps/create", strings.NewReader(formEdit.Encode()))
+			reqEdit.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			reqEdit.Header.Set("HX-Request", "true")
+			rrEdit := httptest.NewRecorder()
+			dash.CreateApp(rrEdit, reqEdit)
+
+			if rrEdit.Code != http.StatusOK {
+				t.Errorf("expected HTMX app edit to return 200, got %d", rrEdit.Code)
+			}
+			if rrEdit.Header().Get("HX-Redirect") != "/admin/apps" {
+				t.Errorf("expected HX-Redirect to /admin/apps, got %s", rrEdit.Header().Get("HX-Redirect"))
+			}
+
+			// Verify updated db state
+			app, ok := dbStore.LookupApp("app-crud-test")
+			if !ok {
+				t.Fatalf("app should exist in database")
+			}
+			if app.Name != "CRUD Test App Edited" || app.RPM != 120 || app.Priority != "high" {
+				t.Errorf("app fields not saved properly: %+v", app)
+			}
+
+			// D. Serve Edit App Modal
+			reqEditModal := httptest.NewRequest("GET", "/admin/apps/edit?id=app-crud-test", nil)
+			rrEditModal := httptest.NewRecorder()
+			dash.ServeAppsEditModal(rrEditModal, reqEditModal)
+			if rrEditModal.Code != http.StatusOK {
+				t.Errorf("expected app edit modal to return 200, got %d", rrEditModal.Code)
+			}
+
+			// E. Delete App
+			reqDelete := httptest.NewRequest("DELETE", "/admin/apps/delete?id=app-crud-test", nil)
+			rrDelete := httptest.NewRecorder()
+			dash.DeleteApp(rrDelete, reqDelete)
+			if rrDelete.Code != http.StatusOK {
+				t.Errorf("expected delete app to return 200, got %d", rrDelete.Code)
+			}
+
+			_, ok = dbStore.LookupApp("app-crud-test")
+			if ok {
+				t.Errorf("app should have been deleted from database")
+			}
+		})
+
+		// Seed a client and app for subsequent tests
+		_ = dbStore.SaveClient(ctx, config.Client{ID: "client-seed", Name: "Seeded Client", Tier: "premium"})
+		_ = dbStore.SaveApp(ctx, config.App{ID: "app-seed", ClientID: "client-seed", Name: "Seeded App", RPM: 100, TPM: 50000, Priority: "high"})
+
+		// 3. DYNAMIC ROUTING RULES CRUD
+		t.Run("Dynamic Routing Rules CRUD", func(t *testing.T) {
+			// A. Serve New Rule Modal
+			reqNew := httptest.NewRequest("GET", "/admin/rules/new", nil)
+			rrNew := httptest.NewRecorder()
+			dash.ServeRulesNewModal(rrNew, reqNew)
+			if rrNew.Code != http.StatusOK {
+				t.Errorf("expected rules new modal to return 200, got %d", rrNew.Code)
+			}
+
+			// B. Create Rule - Standard Redirect Flow
+			form := url.Values{}
+			form.Add("model_pattern", "gemini-*")
+			form.Add("app_id", "app-seed")
+			form.Add("client_tier", "all")
+			form.Add("target_model", "gemini-2.5-flash")
+			form.Add("target_location", "us-central1")
+			form.Add("priority_weight", "2")
+
+			reqCreate := httptest.NewRequest("POST", "/admin/rules/create", strings.NewReader(form.Encode()))
+			reqCreate.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			rrCreate := httptest.NewRecorder()
+			dash.CreateRule(rrCreate, reqCreate)
+			if rrCreate.Code != http.StatusSeeOther {
+				t.Errorf("expected standard rule create to return 303 redirect, got %d", rrCreate.Code)
+			}
+
+			rules, _ := dbStore.GetAllRules(ctx)
+			var ruleID string
+			for _, r := range rules {
+				if r.ModelPattern == "gemini-*" && r.AppID == "app-seed" {
+					ruleID = r.ID
+					break
+				}
+			}
+			if ruleID == "" {
+				t.Fatalf("failed to retrieve rule ID for newly created rule")
+			}
+
+			// C. Create/Edit Rule - HTMX HX-Redirect Flow
+			formEdit := url.Values{}
+			formEdit.Add("id", ruleID)
+			formEdit.Add("model_pattern", "gemini-*")
+			formEdit.Add("app_id", "app-seed")
+			formEdit.Add("client_tier", "premium")
+			formEdit.Add("target_model", "gemini-2.5-pro")
+			formEdit.Add("target_location", "us-central1")
+			formEdit.Add("priority_weight", "7")
+
+			reqEdit := httptest.NewRequest("POST", "/admin/rules/create", strings.NewReader(formEdit.Encode()))
+			reqEdit.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			reqEdit.Header.Set("HX-Request", "true")
+			rrEdit := httptest.NewRecorder()
+			dash.CreateRule(rrEdit, reqEdit)
+
+			if rrEdit.Code != http.StatusOK {
+				t.Errorf("expected HTMX rule edit to return 200, got %d", rrEdit.Code)
+			}
+			if rrEdit.Header().Get("HX-Redirect") != "/admin/rules" {
+				t.Errorf("expected HX-Redirect to /admin/rules, got %s", rrEdit.Header().Get("HX-Redirect"))
+			}
+
+			// Verify updated db state
+			rulesUpdated, _ := dbStore.GetAllRules(ctx)
+			var updatedRule *config.RoutingRule
+			for _, r := range rulesUpdated {
+				if r.ID == ruleID {
+					updatedRule = &r
+					break
+				}
+			}
+			if updatedRule == nil {
+				t.Fatalf("rule should exist in database")
+			}
+			if updatedRule.ClientTier != "premium" || updatedRule.TargetModel != "gemini-2.5-pro" || updatedRule.PriorityWeight != 7 {
+				t.Errorf("rule fields not saved properly: %+v", updatedRule)
+			}
+
+			// D. Serve Edit Rule Modal
+			reqEditModal := httptest.NewRequest("GET", "/admin/rules/edit?id="+ruleID, nil)
+			rrEditModal := httptest.NewRecorder()
+			dash.ServeRulesEditModal(rrEditModal, reqEditModal)
+			if rrEditModal.Code != http.StatusOK {
+				t.Errorf("expected rule edit modal to return 200, got %d", rrEditModal.Code)
+			}
+
+			// E. Delete Rule
+			reqDelete := httptest.NewRequest("DELETE", "/admin/rules/delete?id="+ruleID, nil)
+			rrDelete := httptest.NewRecorder()
+			dash.DeleteRule(rrDelete, reqDelete)
+			if rrDelete.Code != http.StatusOK {
+				t.Errorf("expected delete rule to return 200, got %d", rrDelete.Code)
+			}
+
+			rulesPostDelete, _ := dbStore.GetAllRules(ctx)
+			found := false
+			for _, r := range rulesPostDelete {
+				if r.ID == ruleID {
+					found = true
+				}
+			}
+			if found {
+				t.Errorf("rule should have been deleted from database")
+			}
+		})
+
+		// 4. CUSTOM HEADERS CRUD
+		t.Run("Custom Headers CRUD", func(t *testing.T) {
+			// A. Serve New Header Modal
+			reqNew := httptest.NewRequest("GET", "/admin/headers/new", nil)
+			rrNew := httptest.NewRecorder()
+			dash.ServeHeadersNewModal(rrNew, reqNew)
+			if rrNew.Code != http.StatusOK {
+				t.Errorf("expected headers new modal to return 200, got %d", rrNew.Code)
+			}
+
+			// B. Create Header - Standard Redirect Flow
+			form := url.Values{}
+			form.Add("name", "X-Header-Test")
+			form.Add("app_id", "app-seed")
+			form.Add("description", "Test Custom Header Description")
+			form.Add("required", "true")
+			form.Add("validation", "non-empty")
+
+			reqCreate := httptest.NewRequest("POST", "/admin/headers/create", strings.NewReader(form.Encode()))
+			reqCreate.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			rrCreate := httptest.NewRecorder()
+			dash.CreateHeader(rrCreate, reqCreate)
+			if rrCreate.Code != http.StatusSeeOther {
+				t.Errorf("expected standard header create to return 303 redirect, got %d", rrCreate.Code)
+			}
+
+			headers, _ := dbStore.GetAllHeaders(ctx)
+			var headerID string
+			for _, h := range headers {
+				if h.Name == "X-Header-Test" && h.AppID == "app-seed" {
+					headerID = h.ID
+					break
+				}
+			}
+			if headerID == "" {
+				t.Fatalf("failed to retrieve header ID for newly created header")
+			}
+
+			// C. Create/Edit Header - HTMX HX-Redirect Flow
+			formEdit := url.Values{}
+			formEdit.Add("id", headerID)
+			formEdit.Add("name", "X-Header-Test")
+			formEdit.Add("app_id", "app-seed")
+			formEdit.Add("description", "Test Custom Header Description Edited")
+			formEdit.Add("required", "false")
+			formEdit.Add("validation", "regex")
+			formEdit.Add("value_pattern", "^[A-Za-z]+$")
+
+			reqEdit := httptest.NewRequest("POST", "/admin/headers/create", strings.NewReader(formEdit.Encode()))
+			reqEdit.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			reqEdit.Header.Set("HX-Request", "true")
+			rrEdit := httptest.NewRecorder()
+			dash.CreateHeader(rrEdit, reqEdit)
+
+			if rrEdit.Code != http.StatusOK {
+				t.Errorf("expected HTMX header edit to return 200, got %d", rrEdit.Code)
+			}
+			if rrEdit.Header().Get("HX-Redirect") != "/admin/headers" {
+				t.Errorf("expected HX-Redirect to /admin/headers, got %s", rrEdit.Header().Get("HX-Redirect"))
+			}
+
+			// Verify updated db state
+			headersUpdated, _ := dbStore.GetAllHeaders(ctx)
+			var updatedHeader *config.CustomHeader
+			for _, h := range headersUpdated {
+				if h.ID == headerID {
+					updatedHeader = &h
+					break
+				}
+			}
+			if updatedHeader == nil {
+				t.Fatalf("header should exist in database")
+			}
+			if updatedHeader.Description != "Test Custom Header Description Edited" || updatedHeader.Required || updatedHeader.Validation != "regex" {
+				t.Errorf("header fields not saved properly: %+v", updatedHeader)
+			}
+
+			// D. Serve Edit Header Modal
+			reqEditModal := httptest.NewRequest("GET", "/admin/headers/edit?id="+headerID, nil)
+			rrEditModal := httptest.NewRecorder()
+			dash.ServeHeadersEditModal(rrEditModal, reqEditModal)
+			if rrEditModal.Code != http.StatusOK {
+				t.Errorf("expected header edit modal to return 200, got %d", rrEditModal.Code)
+			}
+
+			// E. Delete Header
+			reqDelete := httptest.NewRequest("DELETE", "/admin/headers/delete?id="+headerID, nil)
+			rrDelete := httptest.NewRecorder()
+			dash.DeleteHeader(rrDelete, reqDelete)
+			if rrDelete.Code != http.StatusOK {
+				t.Errorf("expected delete header to return 200, got %d", rrDelete.Code)
+			}
+
+			headersPostDelete, _ := dbStore.GetAllHeaders(ctx)
+			found := false
+			for _, h := range headersPostDelete {
+				if h.ID == headerID {
+					found = true
+				}
+			}
+			if found {
+				t.Errorf("header should have been deleted from database")
+			}
+		})
+
+		// 5. API KEYS CRUD
+		t.Run("API Keys CRUD", func(t *testing.T) {
+			// A. Serve New Key Modal
+			reqNew := httptest.NewRequest("GET", "/admin/keys/new", nil)
+			rrNew := httptest.NewRecorder()
+			dash.ServeKeysNewModal(rrNew, reqNew)
+			if rrNew.Code != http.StatusOK {
+				t.Errorf("expected keys new modal to return 200, got %d", rrNew.Code)
+			}
+
+			// B. Generate a New Key
+			formCreate := url.Values{}
+			formCreate.Add("app_id", "app-seed")
+
+			reqCreate := httptest.NewRequest("POST", "/admin/keys/create", strings.NewReader(formCreate.Encode()))
+			reqCreate.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			rrCreate := httptest.NewRecorder()
+			dash.CreateKey(rrCreate, reqCreate)
+			if rrCreate.Code != http.StatusOK {
+				t.Errorf("expected key creation to return 200, got %d", rrCreate.Code)
+			}
+
+			keys, _ := dbStore.GetAllKeys(ctx)
+			var keyHash string
+			for _, k := range keys {
+				if k.AppID == "app-seed" && k.Status == "active" {
+					keyHash = k.KeyHash
+					break
+				}
+			}
+			if keyHash == "" {
+				t.Fatalf("failed to locate newly generated key in database")
+			}
+
+			// C. Serve Edit Key Modal
+			reqEditModal := httptest.NewRequest("GET", "/admin/keys/edit?hash="+keyHash, nil)
+			rrEditModal := httptest.NewRecorder()
+			dash.ServeKeysEditModal(rrEditModal, reqEditModal)
+			if rrEditModal.Code != http.StatusOK {
+				t.Errorf("expected key edit modal to return 200, got %d", rrEditModal.Code)
+			}
+
+			// D. Save Key Details - Standard Redirect Flow
+			formSave := url.Values{}
+			formSave.Add("hash", keyHash)
+			formSave.Add("app_id", "app-seed")
+			formSave.Add("status", "revoked")
+
+			reqSave := httptest.NewRequest("POST", "/admin/keys/save", strings.NewReader(formSave.Encode()))
+			reqSave.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			rrSave := httptest.NewRecorder()
+			dash.SaveKeyDetails(rrSave, reqSave)
+			if rrSave.Code != http.StatusSeeOther {
+				t.Errorf("expected standard key details save to return 303 redirect, got %d", rrSave.Code)
+			}
+
+			// E. Save Key Details - HTMX HX-Redirect Flow
+			formSaveEdit := url.Values{}
+			formSaveEdit.Add("hash", keyHash)
+			formSaveEdit.Add("app_id", "app-seed")
+			formSaveEdit.Add("status", "active")
+
+			reqSaveEdit := httptest.NewRequest("POST", "/admin/keys/save", strings.NewReader(formSaveEdit.Encode()))
+			reqSaveEdit.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			reqSaveEdit.Header.Set("HX-Request", "true")
+			rrSaveEdit := httptest.NewRecorder()
+			dash.SaveKeyDetails(rrSaveEdit, reqSaveEdit)
+
+			if rrSaveEdit.Code != http.StatusOK {
+				t.Errorf("expected HTMX key details save to return 200, got %d", rrSaveEdit.Code)
+			}
+			if rrSaveEdit.Header().Get("HX-Redirect") != "/admin/keys" {
+				t.Errorf("expected HX-Redirect to /admin/keys, got %s", rrSaveEdit.Header().Get("HX-Redirect"))
+			}
+
+			// Verify key state
+			keysCheck, _ := dbStore.GetAllKeys(ctx)
+			var checkKey *config.APIKey
+			for _, k := range keysCheck {
+				if k.KeyHash == keyHash {
+					checkKey = &k
+					break
+				}
+			}
+			if checkKey == nil {
+				t.Fatalf("key should exist")
+			}
+			if checkKey.Status != "active" {
+				t.Errorf("key status should be active")
+			}
+
+			// F. Revoke Key (HTMX Delete Helper)
+			reqRevoke := httptest.NewRequest("POST", "/admin/keys/revoke?hash="+keyHash, nil)
+			rrRevoke := httptest.NewRecorder()
+			dash.RevokeKey(rrRevoke, reqRevoke)
+			if rrRevoke.Code != http.StatusOK {
+				t.Errorf("expected revoke key to return 200, got %d", rrRevoke.Code)
+			}
+
+			keysPostRevoke, _ := dbStore.GetAllKeys(ctx)
+			var revokedKey *config.APIKey
+			for _, k := range keysPostRevoke {
+				if k.KeyHash == keyHash {
+					revokedKey = &k
+					break
+				}
+			}
+			if revokedKey == nil || revokedKey.Status != "revoked" {
+				t.Errorf("key should have been marked as revoked, got: %+v", revokedKey)
+			}
+		})
+
+		// 6. DYNAMIC COMPLEXITY ROUTING SETTINGS
+		t.Run("Dynamic Complexity Routing CRUD", func(t *testing.T) {
+			// A. Serve Complexity Settings Edit Modal
+			reqEditModal := httptest.NewRequest("GET", "/admin/complexity/edit?app_id=app-seed", nil)
+			rrEditModal := httptest.NewRecorder()
+			dash.ServeComplexityEditModal(rrEditModal, reqEditModal)
+			if rrEditModal.Code != http.StatusOK {
+				t.Errorf("expected complexity settings edit modal to return 200, got %d", rrEditModal.Code)
+			}
+
+			// B. Save Complexity Settings - Standard Redirect Flow
+			form := url.Values{}
+			form.Add("app_id", "app-seed")
+			form.Add("enabled", "true")
+			form.Add("always_override", "true")
+			form.Add("simple_model", "gemini-3.1-flash-lite")
+			form.Add("medium_model", "gemini-2.5-flash")
+			form.Add("complex_model", "gemini-2.5-pro")
+			form.Add("simple_char_limit", "100")
+			form.Add("medium_char_limit", "500")
+			form.Add("force_complex_multimodal", "true")
+			form.Add("force_complex_tools", "true")
+			form.Add("use_llm_classifier", "false")
+
+			reqSave := httptest.NewRequest("POST", "/admin/complexity/save", strings.NewReader(form.Encode()))
+			reqSave.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			rrSave := httptest.NewRecorder()
+			dash.SaveComplexitySettings(rrSave, reqSave)
+			if rrSave.Code != http.StatusSeeOther {
+				t.Errorf("expected standard complexity save to return 303 redirect, got %d", rrSave.Code)
+			}
+
+			// C. Save Complexity Settings - HTMX HX-Redirect Flow
+			formEdit := url.Values{}
+			formEdit.Add("app_id", "app-seed")
+			formEdit.Add("enabled", "true")
+			formEdit.Add("always_override", "false")
+			formEdit.Add("simple_model", "gemini-3.1-flash-lite")
+			formEdit.Add("medium_model", "gemini-2.5-flash")
+			formEdit.Add("complex_model", "gemini-2.5-pro")
+			formEdit.Add("simple_char_limit", "200")
+			formEdit.Add("medium_char_limit", "800")
+			formEdit.Add("force_complex_multimodal", "false")
+			formEdit.Add("force_complex_tools", "false")
+			formEdit.Add("use_llm_classifier", "true")
+			formEdit.Add("classifier_model", "gemini-3.1-flash-lite")
+
+			reqEdit := httptest.NewRequest("POST", "/admin/complexity/save", strings.NewReader(formEdit.Encode()))
+			reqEdit.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			reqEdit.Header.Set("HX-Request", "true")
+			rrEdit := httptest.NewRecorder()
+			dash.SaveComplexitySettings(rrEdit, reqEdit)
+
+			if rrEdit.Code != http.StatusOK {
+				t.Errorf("expected HTMX complexity edit to return 200, got %d", rrEdit.Code)
+			}
+			if rrEdit.Header().Get("HX-Redirect") != "/admin/complexity" {
+				t.Errorf("expected HX-Redirect to /admin/complexity, got %s", rrEdit.Header().Get("HX-Redirect"))
+			}
+
+			// Verify updated app complexity state
+			app, ok := dbStore.LookupApp("app-seed")
+			if !ok {
+				t.Fatalf("app-seed should exist in database")
+			}
+			comp := app.Complexity
+			if !comp.Enabled || comp.AlwaysOverride || comp.SimpleCharLimit != 200 || comp.MediumCharLimit != 800 || !comp.UseLLMClassifier {
+				t.Errorf("complexity fields not saved properly: %+v", comp)
+			}
+		})
 	})
 
 	os.RemoveAll("data/local_db.json")

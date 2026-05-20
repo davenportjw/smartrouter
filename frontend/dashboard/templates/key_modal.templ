@@ -51,7 +51,6 @@ templ KeyModal(apps []config.App, key *config.APIKey) {
 								<form
 									hx-post="/admin/keys/save"
 									class="mt-6 space-y-4"
-									onsubmit="document.getElementById('create-key-modal').remove(); window.location.reload();"
 								>
 									<input type="hidden" name="hash" value={ key.KeyHash } />
 									

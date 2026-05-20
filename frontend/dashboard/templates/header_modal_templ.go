@@ -64,7 +64,7 @@ func HeaderModal(apps []config.App, header *config.CustomHeader) templ.Component
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</p></div><!-- Creation Form --><form hx-post=\"/admin/headers/create\" class=\"mt-6 space-y-4\" onsubmit=\"document.getElementById('create-header-modal').remove()\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</p></div><!-- Creation Form --><form hx-post=\"/admin/headers/create\" class=\"mt-6 space-y-4\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -76,7 +76,7 @@ func HeaderModal(apps []config.App, header *config.CustomHeader) templ.Component
 			var templ_7745c5c3_Var2 string
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.ResolveAttributeValue(header.ID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/header_modal.templ`, Line: 57, Col: 57}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/header_modal.templ`, Line: 56, Col: 57}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 			if templ_7745c5c3_Err != nil {
@@ -99,7 +99,7 @@ func HeaderModal(apps []config.App, header *config.CustomHeader) templ.Component
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(header.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/header_modal.templ`, Line: 63, Col: 80}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/header_modal.templ`, Line: 62, Col: 80}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 			if templ_7745c5c3_Err != nil {
@@ -139,7 +139,7 @@ func HeaderModal(apps []config.App, header *config.CustomHeader) templ.Component
 				var templ_7745c5c3_Var4 string
 				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(a.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/header_modal.templ`, Line: 78, Col: 33}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/header_modal.templ`, Line: 77, Col: 33}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 				if templ_7745c5c3_Err != nil {
@@ -152,7 +152,7 @@ func HeaderModal(apps []config.App, header *config.CustomHeader) templ.Component
 				var templ_7745c5c3_Var5 string
 				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(a.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/header_modal.templ`, Line: 78, Col: 53}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/header_modal.templ`, Line: 77, Col: 53}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 				if templ_7745c5c3_Err != nil {
@@ -165,7 +165,7 @@ func HeaderModal(apps []config.App, header *config.CustomHeader) templ.Component
 				var templ_7745c5c3_Var6 string
 				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(a.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/header_modal.templ`, Line: 78, Col: 63}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/header_modal.templ`, Line: 77, Col: 63}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 				if templ_7745c5c3_Err != nil {
@@ -183,7 +183,7 @@ func HeaderModal(apps []config.App, header *config.CustomHeader) templ.Component
 				var templ_7745c5c3_Var7 string
 				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(a.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/header_modal.templ`, Line: 80, Col: 33}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/header_modal.templ`, Line: 79, Col: 33}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 				if templ_7745c5c3_Err != nil {
@@ -196,7 +196,7 @@ func HeaderModal(apps []config.App, header *config.CustomHeader) templ.Component
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(a.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/header_modal.templ`, Line: 80, Col: 44}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/header_modal.templ`, Line: 79, Col: 44}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 				if templ_7745c5c3_Err != nil {
@@ -209,7 +209,7 @@ func HeaderModal(apps []config.App, header *config.CustomHeader) templ.Component
 				var templ_7745c5c3_Var9 string
 				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(a.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/header_modal.templ`, Line: 80, Col: 54}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/header_modal.templ`, Line: 79, Col: 54}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 				if templ_7745c5c3_Err != nil {
@@ -233,7 +233,7 @@ func HeaderModal(apps []config.App, header *config.CustomHeader) templ.Component
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue(header.Description)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/header_modal.templ`, Line: 90, Col: 100}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/header_modal.templ`, Line: 89, Col: 100}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 			if templ_7745c5c3_Err != nil {
@@ -321,7 +321,7 @@ func HeaderModal(apps []config.App, header *config.CustomHeader) templ.Component
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.ResolveAttributeValue(header.ValuePattern)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/header_modal.templ`, Line: 123, Col: 97}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/header_modal.templ`, Line: 122, Col: 97}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
 			if templ_7745c5c3_Err != nil {

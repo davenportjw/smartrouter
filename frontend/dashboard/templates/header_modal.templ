@@ -51,7 +51,6 @@ templ HeaderModal(apps []config.App, header *config.CustomHeader) {
 							<form
 								hx-post="/admin/headers/create"
 								class="mt-6 space-y-4"
-								onsubmit="document.getElementById('create-header-modal').remove()"
 							>
 								if header != nil {
 									<input type="hidden" name="id" value={ header.ID } />

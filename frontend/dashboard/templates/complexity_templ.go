@@ -292,14 +292,14 @@ func ComplexityModal(app config.App, activeModels []config.ModelConfig) templ.Co
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</p></div><!-- Settings Form --><form hx-post=\"/admin/complexity/save\" class=\"mt-6 space-y-5\" onsubmit=\"document.getElementById('edit-complexity-modal').remove()\"><input type=\"hidden\" name=\"app_id\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</p></div><!-- Settings Form --><form hx-post=\"/admin/complexity/save\" class=\"mt-6 space-y-5\"><input type=\"hidden\" name=\"app_id\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.ResolveAttributeValue(app.ID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 160, Col: 57}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 159, Col: 57}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var14)
 		if templ_7745c5c3_Err != nil {
@@ -337,7 +337,7 @@ func ComplexityModal(app config.App, activeModels []config.ModelConfig) templ.Co
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.ResolveAttributeValue(m.ID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 203, Col: 33}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 202, Col: 33}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var15)
 			if templ_7745c5c3_Err != nil {
@@ -360,7 +360,7 @@ func ComplexityModal(app config.App, activeModels []config.ModelConfig) templ.Co
 			var templ_7745c5c3_Var16 string
 			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(m.DisplayName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 203, Col: 102}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 202, Col: 102}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 			if templ_7745c5c3_Err != nil {
@@ -383,7 +383,7 @@ func ComplexityModal(app config.App, activeModels []config.ModelConfig) templ.Co
 			var templ_7745c5c3_Var17 string
 			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.ResolveAttributeValue(m.ID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 211, Col: 33}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 210, Col: 33}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var17)
 			if templ_7745c5c3_Err != nil {
@@ -406,7 +406,7 @@ func ComplexityModal(app config.App, activeModels []config.ModelConfig) templ.Co
 			var templ_7745c5c3_Var18 string
 			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(m.DisplayName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 211, Col: 102}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 210, Col: 102}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 			if templ_7745c5c3_Err != nil {
@@ -429,7 +429,7 @@ func ComplexityModal(app config.App, activeModels []config.ModelConfig) templ.Co
 			var templ_7745c5c3_Var19 string
 			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.ResolveAttributeValue(m.ID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 219, Col: 33}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 218, Col: 33}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var19)
 			if templ_7745c5c3_Err != nil {
@@ -452,7 +452,7 @@ func ComplexityModal(app config.App, activeModels []config.ModelConfig) templ.Co
 			var templ_7745c5c3_Var20 string
 			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(m.DisplayName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 219, Col: 103}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 218, Col: 103}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 			if templ_7745c5c3_Err != nil {
@@ -486,7 +486,7 @@ func ComplexityModal(app config.App, activeModels []config.ModelConfig) templ.Co
 				var templ_7745c5c3_Var21 string
 				templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.ResolveAttributeValue(m.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 253, Col: 35}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 252, Col: 35}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var21)
 				if templ_7745c5c3_Err != nil {
@@ -509,7 +509,7 @@ func ComplexityModal(app config.App, activeModels []config.ModelConfig) templ.Co
 				var templ_7745c5c3_Var22 string
 				templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(m.DisplayName)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 253, Col: 185}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 252, Col: 185}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 				if templ_7745c5c3_Err != nil {
@@ -548,7 +548,7 @@ func ComplexityModal(app config.App, activeModels []config.ModelConfig) templ.Co
 		var templ_7745c5c3_Var23 string
 		templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.ResolveAttributeValue(intToString(app.Complexity.SimpleCharLimit))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 296, Col: 64}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 295, Col: 64}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var23)
 		if templ_7745c5c3_Err != nil {
@@ -561,7 +561,7 @@ func ComplexityModal(app config.App, activeModels []config.ModelConfig) templ.Co
 		var templ_7745c5c3_Var24 string
 		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.ResolveAttributeValue(intToString(app.Complexity.MediumCharLimit))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 307, Col: 64}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 306, Col: 64}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var24)
 		if templ_7745c5c3_Err != nil {
