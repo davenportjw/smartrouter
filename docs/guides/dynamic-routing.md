@@ -67,9 +67,18 @@ The Smart Router steers traffic using regional levels:
 * Incompatible routes (e.g., EU router to a strictly US model) are blocked unless overridden.
 
 ### Verification & Model Disabling
-Discovered models (via `/admin/models/refresh`) are checked via content generation pings. 
-* The most specific verified location is saved as the model's operational location.
-* Models failing verification at all candidate locations are set to `Active = false`.
+Discovered models (via `/admin/models/refresh`) are checked using rapid content generation pings across all compatible candidate locations:
+* Every verified compatible location option is registered in the registry database as a separate `ModelConfig` using the compound primary key format `modelID@location` (e.g. `gemini-2.5-flash@us-central1`, `gemini-2.5-flash@us`, `gemini-2.5-flash@global`).
+* This allows administrators to explicitly choose and toggle model availability per location under the Models dashboard screen.
+* If a model option fails verification at a specific location, its status is automatically set to `Active = false`.
+
+### Smart Location Resolution
+When a model is requested or dynamic complexity selects a base model (e.g., `gemini-2.5-flash`):
+* The router automatically looks up the enabled/active option in order of regional specificity relative to the router's location:
+  1. **Local region** (e.g., `gemini-2.5-flash@us-central1`)
+  2. **Parent multi-region** (e.g., `gemini-2.5-flash@us`)
+  3. **Global** (e.g., `gemini-2.5-flash@global`)
+* If a legacy model registry name is requested without location, it will fall back to searching exact matches.
 
 ### Host and Path Rewriting
 * Intercepts and rewrites the request host to: `{location}-aiplatform.googleapis.com`

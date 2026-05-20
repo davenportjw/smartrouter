@@ -381,8 +381,10 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 				// Resolve and set the routed model's location
 				modelLoc := rp.Location // default to router's location
-				if activeModel, exists := rp.Store.LookupActiveModel(targetModel); exists {
-					modelLoc = config.GetSmallestCompatibleLocation(rp.Location, activeModel.Location)
+				if activeModel, exists := rp.Store.LookupActiveModel(targetModel, rp.Location); exists {
+					modelLoc = activeModel.Location
+					targetModel = config.StripLocationSuffix(activeModel.ID)
+					r.Header.Set("X-Routed-Model", targetModel)
 				}
 				r.Header.Set("X-Routed-Model-Location", modelLoc)
 			}

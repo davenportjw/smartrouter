@@ -110,11 +110,44 @@ func (cs *ConfigStore) LookupApp(appID string) (config.App, bool) {
 	return app, ok
 }
 
-func (cs *ConfigStore) LookupActiveModel(modelID string) (config.ModelConfig, bool) {
+func (cs *ConfigStore) LookupActiveModel(modelID string, routerLoc string) (config.ModelConfig, bool) {
 	cs.mu.RLock()
 	defer cs.mu.RUnlock()
-	model, ok := cs.models[modelID]
-	return model, ok
+
+	if routerLoc == "" {
+		routerLoc = "us-central1"
+	}
+
+	checkActive := func(key string) (config.ModelConfig, bool) {
+		if m, ok := cs.models[key]; ok && m.Active {
+			return m, true
+		}
+		return config.ModelConfig{}, false
+	}
+
+	// 1. Check specific region
+	if m, ok := checkActive(modelID + "@" + routerLoc); ok {
+		return m, true
+	}
+
+	// 2. Check parent multi-region
+	if parent := config.GetMultiRegionParent(routerLoc); parent != "" {
+		if m, ok := checkActive(modelID + "@" + parent); ok {
+			return m, true
+		}
+	}
+
+	// 3. Check global
+	if m, ok := checkActive(modelID + "@" + "global"); ok {
+		return m, true
+	}
+
+	// 4. Check exact match (fallback for exact custom resource names or legacy keys)
+	if m, ok := checkActive(modelID); ok {
+		return m, true
+	}
+
+	return config.ModelConfig{}, false
 }
 
 func (cs *ConfigStore) sortRulesLocked() {

@@ -200,3 +200,12 @@ func IsValidModelName(name string) bool {
 
 	return false
 }
+
+// StripLocationSuffix returns the base model ID by removing any "@location" suffix.
+func StripLocationSuffix(id string) string {
+	if idx := strings.Index(id, "@"); idx != -1 {
+		return id[:idx]
+	}
+	return id
+}
+

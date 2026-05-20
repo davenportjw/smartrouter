@@ -672,10 +672,11 @@ func (dc *DashboardController) verifyModel(ctx context.Context, model config.Mod
 	}
 
 	var targetURL string
-	if strings.HasPrefix(model.ID, "projects/") {
-		targetURL = fmt.Sprintf("https://%s-aiplatform.googleapis.com/v1/%s:generateContent", hostLoc, model.ID)
+	baseModelID := config.StripLocationSuffix(model.ID)
+	if strings.HasPrefix(baseModelID, "projects/") {
+		targetURL = fmt.Sprintf("https://%s-aiplatform.googleapis.com/v1/%s:generateContent", hostLoc, baseModelID)
 	} else {
-		targetURL = fmt.Sprintf("https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:generateContent", hostLoc, dc.ProjectID, model.Location, model.ID)
+		targetURL = fmt.Sprintf("https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:generateContent", hostLoc, dc.ProjectID, model.Location, baseModelID)
 	}
 
 	reqJSON, err := json.Marshal(reqBody)
@@ -890,7 +891,7 @@ func (dc *DashboardController) DiscoverAndCacheModels(ctx context.Context) error
 		}
 	}
 
-	// Save all final resolved discovered models to the database
+	// Save all resolved discovered models for each of their compatible locations separately
 	for _, modelToSave := range discoveredModelsMap {
 		var candidates []string
 		// 1. If custom model/endpoint has fixed location embedded in ID, test only that
@@ -899,7 +900,7 @@ func (dc *DashboardController) DiscoverAndCacheModels(ctx context.Context) error
 				candidates = []string{extLoc}
 			}
 		}
-		// 2. Otherwise, try compatible locations in order of specificity
+		// 2. Otherwise, test all compatible locations (local, parent multi-region, and global)
 		if len(candidates) == 0 {
 			routerLoc := dc.Location
 			if routerLoc == "" {
@@ -912,26 +913,30 @@ func (dc *DashboardController) DiscoverAndCacheModels(ctx context.Context) error
 			candidates = append(candidates, "global")
 		}
 
-		success := false
-		var lastErr error
 		for _, candidateLoc := range candidates {
-			modelToSave.Location = candidateLoc
-			err := dc.verifyModel(ctx, modelToSave)
-			if err == nil {
-				success = true
-				log.Printf("[Discovery] Successfully verified model %s at location %s.", modelToSave.ID, candidateLoc)
-				break
+			modelOption := modelToSave
+			modelOption.Location = candidateLoc
+			modelOption.ID = modelToSave.ID + "@" + candidateLoc
+
+			// Check if this specific compound model was already registered and active
+			active := false
+			if exists, present := activeStatus[modelOption.ID]; present {
+				active = exists
+			} else if exists, present := activeStatus[modelToSave.ID]; present {
+				active = exists
 			}
-			lastErr = err
-			log.Printf("[Discovery] Verification failed for model %s at candidate location %s: %v", modelToSave.ID, candidateLoc, err)
-		}
+			modelOption.Active = active
 
-		if !success {
-			log.Printf("[Discovery] Model %s failed verification at all candidate locations. Soft-disabling model. Last error: %v", modelToSave.ID, lastErr)
-			modelToSave.Active = false
-		}
+			err := dc.verifyModel(ctx, modelOption)
+			if err != nil {
+				log.Printf("[Discovery] Verification failed for model %s at candidate location %s: %v. Soft-disabling.", modelToSave.ID, candidateLoc, err)
+				modelOption.Active = false
+			} else {
+				log.Printf("[Discovery] Successfully verified model %s at location %s.", modelToSave.ID, candidateLoc)
+			}
 
-		_ = dc.Store.SaveModel(ctx, modelToSave)
+			_ = dc.Store.SaveModel(ctx, modelOption)
+		}
 	}
 
 	// Soft-disable and mark obsolete for ALL models (foundation, custom, or endpoint) no longer returned by Vertex AI APIs
@@ -939,7 +944,12 @@ func (dc *DashboardController) DiscoverAndCacheModels(ctx context.Context) error
 		if m.ID == "gemini-dynamic" {
 			continue
 		}
-		if _, discovered := discoveredModelsMap[m.ID]; !discovered {
+		// Extract base model ID from compound key (part before '@')
+		baseID := m.ID
+		if idx := strings.Index(m.ID, "@"); idx != -1 {
+			baseID = m.ID[:idx]
+		}
+		if _, discovered := discoveredModelsMap[baseID]; !discovered {
 			log.Printf("[Discovery] Soft-disabling obsolete model %s...", m.ID)
 			m.Active = false
 			if !strings.Contains(m.DisplayName, " (Obsolete)") {

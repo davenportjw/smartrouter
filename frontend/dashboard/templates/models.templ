@@ -2,6 +2,7 @@ package templates
 
 import (
 	"fmt"
+	"geminirouter/pkg/config"
 )
 
 type LocationInfo struct {
@@ -180,7 +181,7 @@ templ ModelsTab(vm ModelsViewModel) {
 								<tr class="hover:bg-gray-50/40 transition">
 									<td class="py-4 pl-6 pr-3 text-sm">
 										<div class="font-semibold text-gray-900">{ model.DisplayName }</div>
-										<div class="text-xs font-mono text-gray-400 mt-0.5">{ model.ID }</div>
+										<div class="text-xs font-mono text-gray-400 mt-0.5">{ config.StripLocationSuffix(model.ID) }</div>
 									</td>
 									<td class="px-3 py-4 text-xs whitespace-nowrap">
 										if model.Location == "global" {
@@ -276,7 +277,7 @@ templ ModelsTab(vm ModelsViewModel) {
 										<span class="inline-flex items-center rounded bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 ring-1 ring-inset ring-blue-700/10">Endpoint</span>
 									}
 								</div>
-								<div class="text-xs font-mono text-gray-500 truncate max-w-xl">{ model.ID }</div>
+								<div class="text-xs font-mono text-gray-500 truncate max-w-xl">{ config.StripLocationSuffix(model.ID) }</div>
 							</div>
 							<div class="flex-none">
 								<form action="/admin/models/toggle" method="POST">

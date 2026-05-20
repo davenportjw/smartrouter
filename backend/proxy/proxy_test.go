@@ -1725,11 +1725,11 @@ func TestProxyModelDiscoveryAndRoutingWorkflow(t *testing.T) {
 	targetModelID := "projects/test-project/locations/us-central1/models/gemini-custom-us"
 	targetEndpointID := "projects/test-project/locations/us-central1/endpoints/ep-custom-us"
 
-	_, ok := store.LookupActiveModel(targetModelID)
+	_, ok := store.LookupActiveModel(targetModelID, "us-central1")
 	if ok {
 		t.Fatalf("gemini-custom-us should not be active before discovery")
 	}
-	_, ok = store.LookupActiveModel(targetEndpointID)
+	_, ok = store.LookupActiveModel(targetEndpointID, "us-central1")
 	if ok {
 		t.Fatalf("ep-custom-us should not be active before discovery")
 	}
@@ -1751,21 +1751,21 @@ func TestProxyModelDiscoveryAndRoutingWorkflow(t *testing.T) {
 
 	var foundModel, foundEndpoint *config.ModelConfig
 	for _, m := range models {
-		if m.ID == targetModelID {
+		if m.ID == targetModelID+"@us-central1" {
 			mCopy := m
 			foundModel = &mCopy
 		}
-		if m.ID == targetEndpointID {
+		if m.ID == targetEndpointID+"@us-central1" {
 			mCopy := m
 			foundEndpoint = &mCopy
 		}
 	}
 
 	if foundModel == nil {
-		t.Fatalf("expected to find discovered model %q", targetModelID)
+		t.Fatalf("expected to find discovered model %q", targetModelID+"@us-central1")
 	}
 	if foundEndpoint == nil {
-		t.Fatalf("expected to find discovered endpoint %q", targetEndpointID)
+		t.Fatalf("expected to find discovered endpoint %q", targetEndpointID+"@us-central1")
 	}
 
 	if foundModel.Active || foundEndpoint.Active {
@@ -1775,7 +1775,7 @@ func TestProxyModelDiscoveryAndRoutingWorkflow(t *testing.T) {
 	// 4. Toggle/Activate the custom model and endpoint
 	wRecToggle1 := httptest.NewRecorder()
 	form1 := url.Values{}
-	form1.Add("model_id", targetModelID)
+	form1.Add("model_id", targetModelID+"@us-central1")
 	form1.Add("active", "true")
 	reqToggle1 := httptest.NewRequest("POST", "/admin/models/toggle", strings.NewReader(form1.Encode()))
 	reqToggle1.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -1783,18 +1783,18 @@ func TestProxyModelDiscoveryAndRoutingWorkflow(t *testing.T) {
 
 	wRecToggle2 := httptest.NewRecorder()
 	form2 := url.Values{}
-	form2.Add("model_id", targetEndpointID)
+	form2.Add("model_id", targetEndpointID+"@us-central1")
 	form2.Add("active", "true")
 	reqToggle2 := httptest.NewRequest("POST", "/admin/models/toggle", strings.NewReader(form2.Encode()))
 	reqToggle2.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	dash.ToggleModel(wRecToggle2, reqToggle2)
 
 	// Verify active status
-	activeModel, ok := store.LookupActiveModel(targetModelID)
+	activeModel, ok := store.LookupActiveModel(targetModelID, "us-central1")
 	if !ok || !activeModel.Active {
 		t.Fatalf("expected model %q to be active", targetModelID)
 	}
-	activeEndpoint, ok := store.LookupActiveModel(targetEndpointID)
+	activeEndpoint, ok := store.LookupActiveModel(targetEndpointID, "us-central1")
 	if !ok || !activeEndpoint.Active {
 		t.Fatalf("expected endpoint %q to be active", targetEndpointID)
 	}
@@ -2139,7 +2139,7 @@ func TestPublisherModelsDiscovery(t *testing.T) {
 
 	var found *config.ModelConfig
 	for _, m := range refreshedModels {
-		if m.ID == "gemini-3.5-flash" {
+		if m.ID == "gemini-3.5-flash@us-central1" {
 			mCopy := m
 			found = &mCopy
 			break
@@ -2179,8 +2179,14 @@ func TestFirstStartDiscoveryBootstrap(t *testing.T) {
 		t.Fatalf("failed to initialize config store: %v", err)
 	}
 
+	// Remove default models in local dev so we start clean
+	models, _ := store.GetAllModels(ctx)
+	for _, m := range models {
+		_ = store.DeleteModel(ctx, m.ID)
+	}
+
 	// Verify that the pre-seeded models list starts as empty under our new logic
-	models, err := store.GetAllModels(ctx)
+	models, err = store.GetAllModels(ctx)
 	if err != nil {
 		t.Fatalf("failed to fetch models: %v", err)
 	}
@@ -2233,7 +2239,7 @@ func TestFirstStartDiscoveryBootstrap(t *testing.T) {
 
 	var found *config.ModelConfig
 	for _, m := range bootstrappedModels {
-		if m.ID == "gemini-2.5-pro" {
+		if m.ID == "gemini-2.5-pro@us-central1" {
 			mCopy := m
 			found = &mCopy
 			break
@@ -2241,7 +2247,7 @@ func TestFirstStartDiscoveryBootstrap(t *testing.T) {
 	}
 
 	if found == nil {
-		t.Fatalf("expected gemini-2.5-pro to be bootstrapped in registry")
+		t.Fatalf("expected gemini-2.5-pro@us-central1 to be bootstrapped in registry")
 	}
 
 	if found.Location != "us-central1" {
@@ -2266,6 +2272,12 @@ func TestDiscoveryRegistryObsoleteDisabling(t *testing.T) {
 	store, err := store.NewConfigStore(ctx, "test-project")
 	if err != nil {
 		t.Fatalf("failed to initialize config store: %v", err)
+	}
+
+	// Remove default models in local dev so we start clean
+	models, _ := store.GetAllModels(ctx)
+	for _, m := range models {
+		_ = store.DeleteModel(ctx, m.ID)
 	}
 
 	// 1. Seed obsolete/placeholder foundation models to be soft-disabled
@@ -2312,7 +2324,7 @@ func TestDiscoveryRegistryObsoleteDisabling(t *testing.T) {
 	}
 
 	// Load all models present in the store after discovery completes
-	models, err := store.GetAllModels(ctx)
+	models, err = store.GetAllModels(ctx)
 	if err != nil {
 		t.Fatalf("failed to fetch models: %v", err)
 	}
@@ -2321,7 +2333,7 @@ func TestDiscoveryRegistryObsoleteDisabling(t *testing.T) {
 	for _, m := range models {
 		mCopy := m
 		switch m.ID {
-		case "gemini-2.5-flash":
+		case "gemini-2.5-flash@us-central1":
 			m25Flash = &mCopy
 		case "gemini-3.0-flash":
 			m30Flash = &mCopy
@@ -2334,7 +2346,7 @@ func TestDiscoveryRegistryObsoleteDisabling(t *testing.T) {
 
 	// Assertions:
 	if m25Flash == nil {
-		t.Errorf("expected gemini-2.5-flash to be dynamically discovered and added")
+		t.Errorf("expected gemini-2.5-flash@us-central1 to be dynamically discovered and added")
 	}
 	if mCustom == nil {
 		t.Errorf("expected custom model my-custom-endpoint to be preserved")
@@ -2503,35 +2515,191 @@ func TestModelRefreshLocationCorrectionAndDisabling(t *testing.T) {
 	var resFlash, resPro *config.ModelConfig
 	for _, m := range updatedModels {
 		mCopy := m
-		if m.ID == "gemini-3.5-flash" {
+		if m.ID == "gemini-3.5-flash@us" {
 			resFlash = &mCopy
-		} else if m.ID == "gemini-3.5-pro" {
+		} else if m.ID == "gemini-3.5-pro@us-central1" {
 			resPro = &mCopy
 		}
 	}
 
 	if resFlash == nil {
-		t.Fatalf("expected gemini-3.5-flash to remain in registry")
+		t.Fatalf("expected gemini-3.5-flash@us to remain in registry")
 	}
 	// Location should be corrected to "us"
 	if resFlash.Location != "us" {
-		t.Errorf("expected gemini-3.5-flash location to be corrected to 'us', got %q", resFlash.Location)
+		t.Errorf("expected gemini-3.5-flash@us location to be 'us', got %q", resFlash.Location)
 	}
 	// It should still be active
 	if !resFlash.Active {
-		t.Errorf("expected gemini-3.5-flash to remain active")
+		t.Errorf("expected gemini-3.5-flash@us to remain active")
 	}
 
 	if resPro == nil {
-		t.Fatalf("expected gemini-3.5-pro to remain in registry")
+		t.Fatalf("expected gemini-3.5-pro@us-central1 to remain in registry")
 	}
 	// It should be disabled
 	if resPro.Active {
-		t.Errorf("expected gemini-3.5-pro to be disabled (Active=false) since it failed all verifications")
+		t.Errorf("expected gemini-3.5-pro@us-central1 to be disabled (Active=false) since it failed verification")
 	}
 
 	os.RemoveAll("data/local_db.json")
 }
+
+func TestSimplifiedModelDiscoveryAndRoutingCompoundKey(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+
+	ctx := context.Background()
+	store, err := store.NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to initialize config store: %v", err)
+	}
+
+	// Pre-seed Client, App, Key
+	app := config.App{ID: "app-tdd", ClientID: "client-tdd", RPM: 100, TPM: 10000}
+	client := config.Client{ID: "client-tdd", Tier: "premium"}
+	key := config.APIKey{KeyHash: config.HashKey("key-tdd"), AppID: "app-tdd", Status: "active"}
+	_ = store.SaveClient(ctx, client)
+	_ = store.SaveApp(ctx, app)
+	_ = store.SaveKey(ctx, key)
+	_ = store.DeleteHeader(ctx, "header-1")
+	_ = store.DeleteRule(ctx, "rule-1")
+
+	// Remove default models
+	models, _ := store.GetAllModels(ctx)
+	for _, m := range models {
+		_ = store.DeleteModel(ctx, m.ID)
+	}
+
+	dash := dashboard.NewDashboardController(store, "test-project", "us-central1")
+
+	// We mock Vertex AI responses
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if strings.Contains(r.URL.Path, "/publishers/google/models") {
+			w.Write([]byte(`{
+				"publisherModels": [
+					{
+						"name": "publishers/google/models/gemini-2.5-flash",
+						"displayName": "Gemini 2.5 Flash (TDD)"
+					}
+				]
+			}`))
+			return
+		}
+
+		// Verification query check
+		if strings.Contains(r.URL.Path, "/locations/us/") {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"status": "verified"}`))
+		} else if strings.Contains(r.URL.Path, "/locations/us-central1/") {
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(`{"error": {"message": "Model not found in us-central1"}}`))
+		} else if strings.Contains(r.URL.Path, "/locations/global/") {
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(`{"error": {"message": "Model not found in global"}}`))
+		} else {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{}`))
+		}
+	}))
+	defer mockServer.Close()
+
+	mockServerURL, _ := url.Parse(mockServer.URL)
+	dash.HTTPClient = &http.Client{
+		Transport: &mockGCPRoundTripper{Target: mockServerURL},
+	}
+
+	// Trigger discovery / refresh
+	wRec := httptest.NewRecorder()
+	reqRefresh := httptest.NewRequest("POST", "/admin/models/refresh", nil)
+	dash.RefreshModels(wRec, reqRefresh)
+
+	// Verify that us-central1, us, and global models are registered as separate options!
+	refreshedModels, err := store.GetAllModels(ctx)
+	if err != nil {
+		t.Fatalf("failed to load refreshed models: %v", err)
+	}
+
+	var mCentral, mUs, mGlobal *config.ModelConfig
+	for _, m := range refreshedModels {
+		mCopy := m
+		if m.ID == "gemini-2.5-flash@us-central1" {
+			mCentral = &mCopy
+		} else if m.ID == "gemini-2.5-flash@us" {
+			mUs = &mCopy
+		} else if m.ID == "gemini-2.5-flash@global" {
+			mGlobal = &mCopy
+		}
+	}
+
+	if mCentral == nil || mUs == nil || mGlobal == nil {
+		t.Fatalf("expected all 3 locations of gemini-2.5-flash to be registered in DB under simplified discovery")
+	}
+
+	// Central and global failed verification, so their Active status should be false
+	if mCentral.Active {
+		t.Errorf("expected gemini-2.5-flash@us-central1 to be inactive due to verification failure")
+	}
+	if mGlobal.Active {
+		t.Errorf("expected gemini-2.5-flash@global to be inactive due to verification failure")
+	}
+	// "us" succeeded verification, but since it's newly discovered it's inactive by default
+	if mUs.Active {
+		t.Errorf("newly discovered gemini-2.5-flash@us should be inactive by default")
+	}
+
+	// Let's enable the "us" model option
+	mUs.Active = true
+	_ = store.SaveModel(ctx, *mUs)
+
+	// Set up the reverse proxy pointing to mock backend to verify routing
+	lastRoutedModel := ""
+	lastRoutedLocation := ""
+	proxyBackend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		parts := strings.Split(r.URL.Path, "/locations/")
+		if len(parts) >= 2 {
+			locAndRest := parts[1]
+			locParts := strings.Split(locAndRest, "/")
+			lastRoutedLocation = locParts[0]
+			modelParts := strings.Split(locAndRest, "/models/")
+			if len(modelParts) >= 2 {
+				lastRoutedModel = strings.Split(modelParts[1], ":")[0]
+			}
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status": "ok"}`))
+	}))
+	defer proxyBackend.Close()
+
+	proxyBackendURL, _ := url.Parse(proxyBackend.URL)
+	rp, err := NewRouterProxy(store, "test-project", "us-central1")
+	if err != nil {
+		t.Fatalf("failed to create RouterProxy: %v", err)
+	}
+	rp.TokenSource = &mockTokenSource{}
+	rp.Target = proxyBackendURL
+	rp.Proxy.Transport = &mockRoundTripper{Target: proxyBackendURL}
+
+	// Construct request targeting base model "gemini-2.5-flash"
+	req := httptest.NewRequest("POST", "/v1/models/gemini-2.5-flash:generateContent?key=key-tdd", nil)
+	rr := httptest.NewRecorder()
+	rp.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Since "us" is the only active model option for gemini-2.5-flash, the proxy should route to "us"!
+	if lastRoutedLocation != "us" {
+		t.Errorf("expected routed location to be 'us', got %q", lastRoutedLocation)
+	}
+	if lastRoutedModel != "gemini-2.5-flash" {
+		t.Errorf("expected routed model to be 'gemini-2.5-flash', got %q", lastRoutedModel)
+	}
+
+	os.RemoveAll("data/local_db.json")
+}
+
 
 
 
