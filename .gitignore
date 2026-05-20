@@ -48,4 +48,3 @@ env/
 .mypy_cache/
 
 backend/proxy/data/local_logs.jsonl
-backend/proxy/data/local_logs.jsonl
