@@ -1,6 +1,6 @@
 # 🌌 Smart Router
 
-[![Go Version](https://img.shields.io/github/go-mod/go-version/davenportjw/geminirouter?color=00ADD8)](https://go.dev)
+[![Go Version](https://img.shields.io/badge/go-1.25.7-00ADD8?logo=go)](https://go.dev)
 [![Terraform](https://img.shields.io/badge/terraform-%235835CC.svg?logo=terraform)](https://www.terraform.io/)
 [![Google Cloud](https://img.shields.io/badge/GCP-%234285F4.svg?logo=google-cloud&logoColor=white)](https://cloud.google.com/)
 [![Firebase](https://img.shields.io/badge/Firebase-%23FFCA28.svg?logo=firebase)](https://firebase.google.com/)
