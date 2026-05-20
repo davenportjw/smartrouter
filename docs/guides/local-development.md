@@ -26,19 +26,22 @@ go run github.com/a-h/templ/cmd/templ generate
 ```
 
 ### 3. Configure Local Environment
-Copy the environment template:
+
+Copy the environment template to `.env`:
 ```bash
 cp .env.sample .env
 ```
 
-Set `LOCAL_DEV=true` in `.env` to run without connecting to live GCP Firestore. This uses a local JSON database stored at `/data/local_db.json`.
+Open `.env` and configure the variables. For local development:
+* **`GOOGLE_CLOUD_PROJECT`**: Set to your GCP project ID.
+* **`LOCAL_DEV`**: Typically set automatically by `./run_local.sh`, but you can set it to `true` here to run without connecting to a live Cloud Firestore instance (this stores data locally at `data/local_db.json`).
+* **Firebase Configurations**: **You can leave these as the default placeholders!** When running locally with `LOCAL_DEV=true`, the UI displays a **"Bypass Auth (Local Developer)"** button, which completely bypasses Firebase authentication on the backend, allowing you to access the admin portal without configuring Firebase.
 
-Ensure the following are set in `.env`:
+Example `.env` for local development:
 ```ini
 PORT=8080
-LOCAL_DEV=true
 GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
-GEMINI_API_KEY="your-gemini-api-key"
+GEMINI_LOCATION="us-central1"
 ```
 
 ### 4. Start Services

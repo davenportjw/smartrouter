@@ -27,14 +27,20 @@ gcloud auth application-default set-quota-project your-gcp-project-id
 
 ---
 
-## 🔑 Step 2: Set Authorized Emails and Domains (Optional)
+## 🔑 Step 2: Prepare the Environment File (`.env`)
 
-To authorize your own email addresses or domains for dashboard login:
-1. Open `.env`.
-2. Set `ALLOWED_EMAIL_DOMAINS`:
-   ```ini
-   ALLOWED_EMAIL_DOMAINS="mycompany.com,operator@gmail.com"
+1. Copy the sample environment template to `.env` if you haven't already:
+   ```bash
+   cp .env.sample .env
    ```
+
+2. Open `.env` and configure the variables:
+   * **Required User-Provided Variable**: Ensure `GOOGLE_CLOUD_PROJECT` is set to your GCP project ID.
+   * **Firebase Web SDK Configurations**: **Leave them as the default placeholders!** During the deployment, `deploy.sh` will programmatically register your application with Firebase and automatically write the resolved credentials back to this `.env` file.
+   * **Authorized Emails & Domains (Optional)**: Set `ALLOWED_EMAIL_DOMAINS` to restrict dashboard admin logins (defaults to `@google.com` and `@cloudadvocacyorg.joonix.net`):
+     ```ini
+     ALLOWED_EMAIL_DOMAINS="mycompany.com,operator@gmail.com"
+     ```
 
 ---
 
@@ -52,12 +58,12 @@ chmod +x deploy.sh
 ## 🔍 Deployment Steps Executed by `deploy.sh`
 
 1. **Environment Checks**: Validates `.env` file variables.
-2. **Firebase Provisioning**: Programmatically checks and configures the Firebase Web App registration.
+2. **Firebase Provisioning**: Programmatically checks, links Firebase if necessary, registers the Web App, and updates `.env` with client SDK details.
 3. **Infrastructure Setup (Terraform)**:
    * Enables APIs (Cloud Run, Firestore, Secret Manager, Cloud Build, Identity Toolkit).
    * Provisions Firestore in Native mode.
    * Configures IAM Roles.
-4. **Secrets Upload**: Saves the local `GEMINI_API_KEY` to Secret Manager.
+4. **Upstream Authentication Setup**: Governed dynamically by Google Cloud Application Default Credentials (ADC), meaning no manual API keys are stored or uploaded to Secret Manager.
 5. **Compilation & Deployment**:
    * Compiles HTML templates with `templ`.
    * Triggers Cloud Build to deploy Backend and Frontend services to Cloud Run.

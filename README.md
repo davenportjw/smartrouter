@@ -43,22 +43,26 @@ flowchart TD
    ```
 
 2. Populate `.env`:
-   ```ini
-   PORT=8080
-   GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
-   GEMINI_API_KEY="your-gemini-api-key"
-
-   # Firebase Configurations (For Admin Login)
-   FIREBASE_API_KEY="your-firebase-api-key"
-   FIREBASE_AUTH_DOMAIN="your-project-id.firebaseapp.com"
-   FIREBASE_PROJECT_ID="your-gcp-project-id"
-   FIREBASE_STORAGE_BUCKET="your-project-id.appspot.com"
-   FIREBASE_MESSAGING_SENDER_ID="your-sender-id"
-   FIREBASE_APP_ID="your-app-id"
-   ```
+   * **Required User-Provided Variables**:
+     ```ini
+     PORT=8080
+     GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
+     GEMINI_LOCATION="us-central1"
+     ```
+   * **Firebase Web SDK Configurations** (Keep default placeholders if planning to run automated deployment):
+     ```ini
+     FIREBASE_API_KEY="AIzaSyYourFirebaseWebApiKey"
+     FIREBASE_AUTH_DOMAIN="your-project-id.firebaseapp.com"
+     FIREBASE_PROJECT_ID="your-gcp-project-id"
+     FIREBASE_STORAGE_BUCKET="your-project-id.appspot.com"
+     FIREBASE_MESSAGING_SENDER_ID="123456789"
+     FIREBASE_APP_ID="1:1234:web:abcd"
+     ```
 
 > [!TIP]
-> Running `deploy.sh` automatically registers and retrieves the Firebase configurations, saving them to `.env`.
+> **Don't fill out the Firebase configuration fields manually!** 
+> Running the automated `./deploy.sh` script will automatically link Firebase, register a Web App, fetch these configuration values, and write them directly back into your local `.env` file. You only need to configure them manually if you are running local-only developer setups without GCP access.
+
 
 ---
 
