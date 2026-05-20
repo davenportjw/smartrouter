@@ -17,6 +17,7 @@ app = FastAPI(
 # Load configurations from environment variables
 ROUTER_URL = os.getenv("ROUTER_URL", "http://localhost:8080").rstrip("/")
 ROUTER_API_KEY = os.getenv("ROUTER_API_KEY")
+CLIENT_APP_ID = os.getenv("CLIENT_APP_ID")
 
 class GenerateRequest(BaseModel):
     prompt: str
@@ -62,11 +63,14 @@ async def generate_content(payload: GenerateRequest):
         "Content-Type": "application/json",
         "x-goog-api-key": ROUTER_API_KEY
     }
+    if CLIENT_APP_ID:
+        headers["X-Client-App-ID"] = CLIENT_APP_ID
 
     # Construct official Gemini API JSON body
     data = {
         "contents": [
             {
+                "role": "user",
                 "parts": [
                     {"text": payload.prompt}
                 ]

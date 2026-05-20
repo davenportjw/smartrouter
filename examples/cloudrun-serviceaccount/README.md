@@ -61,6 +61,48 @@ No API Keys are needed! The service account's secure identity is now authorized.
 
 ---
 
+### 💻 Running and Testing Locally
+
+To test the Service Account microservice locally using your active developer account (Zero-Key IAM):
+
+1. **Ensure the Smart Router is running locally**:
+   ```bash
+   ./run_local.sh
+   ```
+2. **Register your local developer gcloud account email as an App ID**:
+   - Determine your active account email:
+     ```bash
+     gcloud config get-value account
+     ```
+     *(E.g., `your-developer-name@google.com`)*
+   - In the local Smart Router dashboard (or by editing `/data/local_db.json`), create a new Application with the **Application ID (Slug)** set to your exact email address (e.g., `your-developer-name@google.com`).
+3. **Setup your Python environment**:
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   pip install requests
+   ```
+4. **Configure environment variables**:
+   Specify the local router port and your developer email address as the client App ID:
+   ```bash
+   export ROUTER_URL="http://localhost:8080"
+   export CLIENT_APP_ID="your-developer-name@google.com"
+   ```
+5. **Start the client microservice**:
+   ```bash
+   uvicorn main:app --host 127.0.0.1 --port 8083
+   ```
+6. **Submit a test prompt**:
+   The client microservice will automatically fall back to querying your local active gcloud OIDC credentials to verify authentication:
+   ```bash
+   curl -X POST "http://localhost:8083/generate" \
+     -H "Content-Type: application/json" \
+     -d '{"prompt": "What are the benefits of a microservices architecture over a monolith?"}'
+   ```
+
+---
+
 ### 3. Build and Deploy to Cloud Run
 
 To simplify setup and ensure secure isolation, we provide an automated deployment script `deploy.sh` that:

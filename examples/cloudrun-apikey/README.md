@@ -36,13 +36,48 @@ Before calling the router, you must configure access credentials in the router's
 2. Select the **Clients** tab and click **Create Client** (or ensure a client already exists, e.g., `Premium Client` with Tier set to `premium`).
 3. Select the **Applications** tab:
    - Click **New Application**.
-   - Give the Application an ID (slug), such as `customer-facing-chatbot`.
+   - Give the Application an ID (slug), such as `customer-facing-chatbot` (or `prod-app-main` for local testing).
    - Bind it to the Client created above.
    - Configure capacity restrictions: Set the desired maximum **RPM** (Requests Per Minute), **TPM** (Tokens Per Minute), and **Queueing Priority** (High, Medium, or Low).
 4. Select the **Access Control** (Keys) tab:
    - Click **Generate API Key**.
    - Bind the key to your Application (`customer-facing-chatbot`).
    - **IMPORTANT**: Copy the generated key instantly. The router stores only cryptographic hashes of the key (`sha256`) for security, meaning you cannot retrieve this key again.
+
+---
+
+### 💻 Running and Testing Locally
+
+Before deploying to Cloud Run, you can easily run and validate the API Key client service locally:
+
+1. **Ensure the Smart Router is running locally**:
+   ```bash
+   ./run_local.sh
+   ```
+2. **Setup your Python environment**:
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   ```
+3. **Configure environment variables**:
+   Specify the local router port and your generated API Key (or the pre-seeded `gr_key_enterprise_123456789` key):
+   ```bash
+   export ROUTER_URL="http://localhost:8080"
+   export ROUTER_API_KEY="gr_key_enterprise_123456789"
+   # If your router has mandatory custom headers (e.g. X-Client-App-ID), specify it:
+   export CLIENT_APP_ID="prod-app-main"
+   ```
+4. **Start the client microservice**:
+   ```bash
+   uvicorn main:app --host 127.0.0.1 --port 8082
+   ```
+5. **Submit a test prompt**:
+   ```bash
+   curl -X POST "http://localhost:8082/generate" \
+     -H "Content-Type: application/json" \
+     -d '{"prompt": "Explain the significance of the expansion of the universe in simple terms."}'
+   ```
 
 ---
 

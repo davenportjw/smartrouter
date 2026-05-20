@@ -37,6 +37,7 @@ def send_rules_request(requested_model: str, custom_headers: dict, description: 
     data = {
         "contents": [
             {
+                "role": "user",
                 "parts": [
                     {"text": "Give me a 1-sentence tagline for an eco-friendly water bottle."}
                 ]
@@ -46,7 +47,7 @@ def send_rules_request(requested_model: str, custom_headers: dict, description: 
 
     try:
         with httpx.Client() as client:
-            response = client.post(url, json=data, headers=headers, timeout=15.0)
+            response = client.post(url, json=data, headers=headers, timeout=45.0)
             
             if response.status_code != 200:
                 print(f"❌ Error (Status {response.status_code}): {response.text}")

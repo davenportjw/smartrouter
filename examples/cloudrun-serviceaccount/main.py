@@ -19,6 +19,7 @@ app = FastAPI(
 
 # Load configurations from environment variables
 ROUTER_URL = os.getenv("ROUTER_URL", "http://localhost:8080").rstrip("/")
+CLIENT_APP_ID = os.getenv("CLIENT_APP_ID")
 
 class GenerateRequest(BaseModel):
     prompt: str
@@ -40,7 +41,8 @@ def get_oidc_token(audience: str) -> str:
     """
     Fetches a Google OpenID Connect (OIDC) ID Token.
     On Google Cloud (Cloud Run, GKE, GCE), this queries the local Metadata Server.
-    Locally, it uses the active Application Default Credentials (ADC).
+    Locally, it uses the active Application Default Credentials (ADC), with a fallback
+    to the active gcloud developer identity token for seamless local testing.
     """
     try:
         # We need to pass a Request object to fetch the token
@@ -49,6 +51,16 @@ def get_oidc_token(audience: str) -> str:
         token = google.oauth2.id_token.fetch_id_token(auth_request, audience)
         return token
     except Exception as exc:
+        # Local dev fallback using active gcloud credentials
+        if "localhost" in audience or "127.0.0.1" in audience:
+            import subprocess
+            try:
+                logger.info("Attempting fallback OIDC token generation via gcloud CLI...")
+                token = subprocess.check_output(["gcloud", "auth", "print-identity-token"], text=True).strip()
+                return token
+            except Exception as sub_err:
+                logger.warning(f"gcloud fallback failed: {sub_err}")
+        
         logger.error(f"Failed to retrieve Google OIDC identity token: {exc}")
         raise RuntimeError(
             f"Authentication failure: Unable to obtain Google ID token. Ensure service account permissions are correct. Detail: {exc}"
@@ -75,11 +87,14 @@ async def generate_content(payload: GenerateRequest):
         "Content-Type": "application/json",
         "Authorization": f"Bearer {token}"
     }
+    if CLIENT_APP_ID:
+        headers["X-Client-App-ID"] = CLIENT_APP_ID
 
     # Construct official Gemini API JSON body
     data = {
         "contents": [
             {
+                "role": "user",
                 "parts": [
                     {"text": payload.prompt}
                 ]

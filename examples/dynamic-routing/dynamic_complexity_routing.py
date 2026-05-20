@@ -35,6 +35,7 @@ def send_dynamic_request(prompt: str, description: str):
     data = {
         "contents": [
             {
+                "role": "user",
                 "parts": [
                     {"text": prompt}
                 ]
@@ -44,7 +45,7 @@ def send_dynamic_request(prompt: str, description: str):
 
     try:
         with httpx.Client() as client:
-            response = client.post(url, json=data, headers=headers, timeout=15.0)
+            response = client.post(url, json=data, headers=headers, timeout=45.0)
             
             if response.status_code == 400 and "dynamic complexity routing is not enabled" in response.text:
                 print("❌ Error: Dynamic complexity routing is not enabled for this application.")
@@ -99,12 +100,11 @@ def main():
     )
     send_dynamic_request(medium_prompt, "Medium / Summarization task")
 
-    # 3. Complex prompt - should route to gemini-2.5-pro
     complex_prompt = (
         "Solve this algorithmic problem and optimize it for O(N) time complexity. "
-        "Explain each step thoroughly, drawing on deep software engineering principles. "
+        "Return only a 1-sentence explanation and complete clean Go code. "
         "Problem: Given an array of integers, find the contiguous subarray which has "
-        "the largest sum and return its sum. Provide complete, clean, and idiomatic Go code."
+        "the largest sum and return its sum."
     )
     send_dynamic_request(complex_prompt, "Complex / Algorithmic reasoning task")
 
