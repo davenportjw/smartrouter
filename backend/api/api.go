@@ -30,17 +30,25 @@ func NewAPIController(store *store.ConfigStore, scheduler *proxy.RequestSchedule
 // AuthMiddleware validates incoming API requests.
 func (ac *APIController) AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// In local development or if a shared secret is configured, enforce it
+		// Wrap state-changing requests in MaxBytesReader (1MB limit) to prevent memory exhaustion attacks
+		if r.Body != nil && r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions {
+			r.Body = http.MaxBytesReader(w, r.Body, 1024*1024)
+		}
+
+		isLocalDev := os.Getenv("LOCAL_DEV") == "true"
+
+		// In production (LOCAL_DEV != true), we MUST enforce API authentication
+		if !isLocalDev && ac.SharedSecret == "" {
+			http.Error(w, "Unauthorized: Administrative API is not configured securely", http.StatusUnauthorized)
+			return
+		}
+
 		if ac.SharedSecret != "" {
 			authHeader := r.Header.Get("Authorization")
 			expected := "Bearer " + ac.SharedSecret
 			if authHeader != expected {
-				// In GCP production, Cloud Run IAM handles OIDC validation.
-				// However, if a shared secret is explicitly set in production, we still enforce it.
-				if os.Getenv("LOCAL_DEV") == "true" || authHeader != "" {
-					http.Error(w, "Unauthorized: Invalid API shared secret", http.StatusUnauthorized)
-					return
-				}
+				http.Error(w, "Unauthorized: Invalid API shared secret", http.StatusUnauthorized)
+				return
 			}
 		}
 		next.ServeHTTP(w, r)

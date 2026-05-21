@@ -189,6 +189,13 @@ fi
 # Invoke automated Firebase configuration
 setup_firebase_config
 
+# Generate secure BACKEND_SHARED_SECRET if it is missing
+if [ -z "$BACKEND_SHARED_SECRET" ]; then
+    log_info "Generating a secure BACKEND_SHARED_SECRET..."
+    RAND_SECRET=$(LC_ALL=C tr -dc 'a-zA-Z0-9' < /dev/urandom | fold -w 32 | head -n 1)
+    update_env_var "BACKEND_SHARED_SECRET" "$RAND_SECRET"
+fi
+
 # Validate Firebase configurations are loaded
 if [ -z "$FIREBASE_API_KEY" ] || [ "$FIREBASE_API_KEY" = "AIzaSyYourFirebaseWebApiKey" ] || \
    [ -z "$FIREBASE_APP_ID" ] || [ "$FIREBASE_APP_ID" = "1:1234:web:abcd" ]; then
@@ -215,7 +222,8 @@ terraform apply -auto-approve \
   -var="firebase_storage_bucket=$FIREBASE_STORAGE_BUCKET" \
   -var="firebase_messaging_sender_id=$FIREBASE_MESSAGING_SENDER_ID" \
   -var="firebase_app_id=$FIREBASE_APP_ID" \
-  -var="allowed_email_domains=$ALLOWED_EMAIL_DOMAINS"
+  -var="allowed_email_domains=$ALLOWED_EMAIL_DOMAINS" \
+  -var="backend_shared_secret=$BACKEND_SHARED_SECRET"
 
 cd ..
 
@@ -230,13 +238,13 @@ log_info "Building Smart Router Backend Container via Cloud Build..."
 gcloud builds submit --config cloudbuild-backend.yaml --project "$GOOGLE_CLOUD_PROJECT" .
 
 log_info "Deploying Smart Router Backend to Cloud Run..."
-gcloud run deploy gemini-smart-router --image "gcr.io/$GOOGLE_CLOUD_PROJECT/smart-router-backend" --region us-central1 --service-account "gemini-router-runner@$GOOGLE_CLOUD_PROJECT.iam.gserviceaccount.com" --project "$GOOGLE_CLOUD_PROJECT" --quiet
+gcloud run deploy gemini-smart-router --image "gcr.io/$GOOGLE_CLOUD_PROJECT/smart-router-backend" --region us-central1 --service-account "gemini-router-runner@$GOOGLE_CLOUD_PROJECT.iam.gserviceaccount.com" --project "$GOOGLE_CLOUD_PROJECT" --update-env-vars="BACKEND_SHARED_SECRET=$BACKEND_SHARED_SECRET" --quiet
 
 log_info "Building Smart Router Frontend UI Container via Cloud Build..."
 gcloud builds submit --config cloudbuild-frontend.yaml --project "$GOOGLE_CLOUD_PROJECT" .
 
 log_info "Deploying Smart Router Frontend UI to Cloud Run..."
-gcloud run deploy gemini-smart-router-ui --image "gcr.io/$GOOGLE_CLOUD_PROJECT/smart-router-frontend" --region us-central1 --service-account "gemini-router-runner@$GOOGLE_CLOUD_PROJECT.iam.gserviceaccount.com" --project "$GOOGLE_CLOUD_PROJECT" --quiet
+gcloud run deploy gemini-smart-router-ui --image "gcr.io/$GOOGLE_CLOUD_PROJECT/smart-router-frontend" --region us-central1 --service-account "gemini-router-runner@$GOOGLE_CLOUD_PROJECT.iam.gserviceaccount.com" --project "$GOOGLE_CLOUD_PROJECT" --update-env-vars="BACKEND_SHARED_SECRET=$BACKEND_SHARED_SECRET" --quiet
 
 log_info "Triggering Google Cloud Build and Deploying active Go traffic generator to Cloud Run..."
 gcloud run deploy gemini-traffic-generator --source ./generator --region us-central1 --service-account "gemini-router-runner@$GOOGLE_CLOUD_PROJECT.iam.gserviceaccount.com" --project "$GOOGLE_CLOUD_PROJECT" --quiet

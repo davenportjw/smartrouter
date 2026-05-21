@@ -14,7 +14,7 @@ COPY pkg/ ./pkg
 COPY frontend/ ./frontend
 
 # Generate Compiled Templ Components
-RUN templ generate -path ./pkg/dashboard/templates
+RUN templ generate -path ./frontend/dashboard/templates
 
 # Build the frontend binary
 RUN CGO_ENABLED=0 GOOS=linux go build -o /smart-router-frontend ./frontend/main.go

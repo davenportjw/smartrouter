@@ -45,3 +45,8 @@ variable "allowed_email_domains" {
   type        = string
   description = "Comma-separated list of email domains or specific email addresses authorized to sign in to the admin dashboard."
 }
+
+variable "backend_shared_secret" {
+  type        = string
+  description = "The shared secret key for internal administrative backend REST API calls."
+}

@@ -81,18 +81,14 @@ func (ac *APIConfigStore) makeRequest(ctx context.Context, method, path string, 
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	// 1. Try to attach OIDC token if running in cloud environments
-	if os.Getenv("LOCAL_DEV") != "true" {
+	// 1. Attach authorization token (prefer SharedSecret if configured)
+	if ac.SharedSecret != "" {
+		req.Header.Set("Authorization", "Bearer "+ac.SharedSecret)
+	} else if os.Getenv("LOCAL_DEV") != "true" {
 		token, err := ac.fetchOIDCToken(ctx)
 		if err == nil && token != "" {
 			req.Header.Set("Authorization", "Bearer "+token)
-		} else if ac.SharedSecret != "" {
-			// Fallback to shared secret
-			req.Header.Set("Authorization", "Bearer "+ac.SharedSecret)
 		}
-	} else if ac.SharedSecret != "" {
-		// Local dev: use shared secret
-		req.Header.Set("Authorization", "Bearer "+ac.SharedSecret)
 	}
 
 	resp, err := ac.HTTPClient.Do(req)

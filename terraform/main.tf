@@ -109,6 +109,11 @@ resource "google_cloud_run_v2_service" "router_service" {
         value = var.region
       }
 
+      env {
+        name  = "BACKEND_SHARED_SECRET"
+        value = var.backend_shared_secret
+      }
+
       resources {
         limits = {
           cpu    = "1"
@@ -174,6 +179,11 @@ resource "google_cloud_run_v2_service" "frontend_service" {
       env {
         name  = "GEMINI_LOCATION"
         value = var.region
+      }
+
+      env {
+        name  = "BACKEND_SHARED_SECRET"
+        value = var.backend_shared_secret
       }
 
       # Inject Firebase Web SDK credentials

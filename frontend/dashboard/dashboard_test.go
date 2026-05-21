@@ -2,12 +2,14 @@ package dashboard
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"geminirouter/backend/api"
 	store "geminirouter/backend/config"
@@ -947,11 +949,17 @@ func TestLocalLogsTelemetryAndDashboards(t *testing.T) {
 	// Create data folder if not exists
 	_ = os.MkdirAll("data", 0755)
 
-	// Write mock log entries to data/local_logs.jsonl
-	logsContent := `{"severity":"INFO","time":"2026-05-20T12:00:00Z","method":"POST","path":"/v1beta/models/gemini-2.5-flash:generateContent","client_id":"test-client","app_id":"test-app","tier":"premium","model_requested":"gemini-2.5-flash","model_routed":"gemini-2.5-flash","status":200,"latency_ms":120,"bytes_sent":600}
-{"severity":"INFO","time":"2026-05-20T12:05:00Z","method":"POST","path":"/v1beta/models/gemini-2.5-pro:generateContent","client_id":"test-client","app_id":"test-app","tier":"premium","model_requested":"gemini-2.5-pro","model_routed":"gemini-2.5-pro","status":200,"latency_ms":550,"bytes_sent":1500}
-{"severity":"WARNING","time":"2026-05-20T12:10:00Z","method":"POST","path":"/v1beta/models/gemini-2.5-flash:generateContent","client_id":"other-client","app_id":"other-app","tier":"standard","model_requested":"gemini-2.5-flash","model_routed":"gemini-2.5-flash","status":429,"latency_ms":10,"bytes_sent":0}
-`
+	// Write mock log entries to data/local_logs.jsonl using dynamic timestamps within the 24h window
+	now := time.Now().UTC()
+	t1 := now.Add(-10 * time.Minute).Format(time.RFC3339)
+	t2 := now.Add(-5 * time.Minute).Format(time.RFC3339)
+	t3 := now.Add(-1 * time.Minute).Format(time.RFC3339)
+
+	logsContent := fmt.Sprintf(`{"severity":"INFO","time":"%s","method":"POST","path":"/v1beta/models/gemini-2.5-flash:generateContent","client_id":"test-client","app_id":"test-app","tier":"premium","model_requested":"gemini-2.5-flash","model_routed":"gemini-2.5-flash","status":200,"latency_ms":120,"bytes_sent":600}
+{"severity":"INFO","time":"%s","method":"POST","path":"/v1beta/models/gemini-2.5-pro:generateContent","client_id":"test-client","app_id":"test-app","tier":"premium","model_requested":"gemini-2.5-pro","model_routed":"gemini-2.5-pro","status":200,"latency_ms":550,"bytes_sent":1500}
+{"severity":"WARNING","time":"%s","method":"POST","path":"/v1beta/models/gemini-2.5-flash:generateContent","client_id":"other-client","app_id":"other-app","tier":"standard","model_requested":"gemini-2.5-flash","model_routed":"gemini-2.5-flash","status":429,"latency_ms":10,"bytes_sent":0}
+`, t1, t2, t3)
+
 	err := os.WriteFile("data/local_logs.jsonl", []byte(logsContent), 0644)
 	if err != nil {
 		t.Fatalf("failed to write mock local logs: %v", err)

@@ -2362,9 +2362,10 @@ func TestPublisherModelsDiscovery(t *testing.T) {
 	var found, foundEmbedding *config.ModelConfig
 	for _, m := range refreshedModels {
 		mCopy := m
-		if m.ID == "gemini-3.5-flash@us-central1" {
+		switch m.ID {
+		case "gemini-3.5-flash@us-central1":
 			found = &mCopy
-		} else if m.ID == "text-embedding-005@us-central1" {
+		case "text-embedding-005@us-central1":
 			foundEmbedding = &mCopy
 		}
 	}
@@ -2750,9 +2751,10 @@ func TestModelRefreshLocationCorrectionAndDisabling(t *testing.T) {
 	var resFlash, resPro *config.ModelConfig
 	for _, m := range updatedModels {
 		mCopy := m
-		if m.ID == "gemini-3.5-flash@us" {
+		switch m.ID {
+		case "gemini-3.5-flash@us":
 			resFlash = &mCopy
-		} else if m.ID == "gemini-3.5-pro@us-central1" {
+		case "gemini-3.5-pro@us-central1":
 			resPro = &mCopy
 		}
 	}
@@ -2854,11 +2856,12 @@ func TestSimplifiedModelDiscoveryAndRoutingCompoundKey(t *testing.T) {
 	var mCentral, mUs, mGlobal *config.ModelConfig
 	for _, m := range refreshedModels {
 		mCopy := m
-		if m.ID == "gemini-2.5-flash@us-central1" {
+		switch m.ID {
+		case "gemini-2.5-flash@us-central1":
 			mCentral = &mCopy
-		} else if m.ID == "gemini-2.5-flash@us" {
+		case "gemini-2.5-flash@us":
 			mUs = &mCopy
-		} else if m.ID == "gemini-2.5-flash@global" {
+		case "gemini-2.5-flash@global":
 			mGlobal = &mCopy
 		}
 	}

@@ -106,8 +106,10 @@ func main() {
 	apiController.RegisterRoutes(mux)
 
 	srv := &http.Server{
-		Addr:    ":" + port,
-		Handler: injectSimulationContext(mux),
+		Addr:              ":" + port,
+		Handler:           injectSimulationContext(mux),
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	// Listen for system signals to shut down gracefully

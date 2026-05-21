@@ -117,6 +117,21 @@ func GetMultiRegionParent(loc string) string {
 	if loc == "asia" || strings.HasPrefix(loc, "asia-") {
 		return "asia"
 	}
+	if loc == "me" || strings.HasPrefix(loc, "me-") {
+		return "me"
+	}
+	if loc == "africa" || strings.HasPrefix(loc, "africa-") {
+		return "africa"
+	}
+	if loc == "northamerica" || strings.HasPrefix(loc, "northamerica-") {
+		return "northamerica"
+	}
+	if loc == "southamerica" || strings.HasPrefix(loc, "southamerica-") {
+		return "southamerica"
+	}
+	if loc == "australia" || strings.HasPrefix(loc, "australia-") {
+		return "australia"
+	}
 	return ""
 }
 
@@ -171,17 +186,11 @@ func ExtractLocationFromResourceName(name string) string {
 
 // IsValidModelName validates standard and custom Vertex AI model names.
 func IsValidModelName(name string) bool {
-	// Matches standard and preview Gemini model formats (supporting optional minor versions and preview suffixes)
-	reGemini := regexp.MustCompile(`^gemini-([2-9])(?:\.([0-9]))?-(flash|pro|flash-lite)(?:-preview(?:-\d{2}-\d{4})?)?$`)
-	matches := reGemini.FindStringSubmatch(name)
-	if matches != nil {
-		majorStr := matches[1]
-		minorStr := matches[2]
-		if majorStr == "2" {
-			// For Gemini 2.x, it must be 2.5 or higher
-			if minorStr == "" || minorStr < "5" {
-				return false
-			}
+	if strings.HasPrefix(name, "gemini-") {
+		// Reject legacy Gemini versions below 2.5 (e.g., gemini-1.5, gemini-2.0 up to gemini-2.4)
+		reLegacy := regexp.MustCompile(`^gemini-(1\.[0-9]|2\.[0-4])(?:-|$)`)
+		if reLegacy.MatchString(name) {
+			return false
 		}
 		return true
 	}
@@ -227,7 +236,7 @@ func GetVertexEndpointHost(loc string) string {
 	if loc == "global" || loc == "" {
 		return "aiplatform.googleapis.com"
 	}
-	if loc == "us" || loc == "eu" {
+	if loc == "us" || loc == "eu" || loc == "asia" {
 		return fmt.Sprintf("aiplatform.%s.rep.googleapis.com", loc)
 	}
 	if strings.Contains(loc, "-") {

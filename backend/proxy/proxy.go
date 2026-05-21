@@ -13,6 +13,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	store "geminirouter/backend/config"
@@ -41,6 +42,7 @@ type RouterProxy struct {
 	TokenSource oauth2.TokenSource
 	ProjectID   string
 	Location    string
+	transportMu sync.Mutex
 }
 
 // responseWriterWrapper intercepts writes to capture status code and response body size.
@@ -175,7 +177,8 @@ func NewRouterProxy(store *store.ConfigStore, projectID, location string) (*Rout
 		version := pathParts[1]
 		resource := pathParts[2]
 
-		if resource == "models" {
+		switch resource {
+		case "models":
 			targetModel := req.Header.Get("X-Routed-Model")
 			if targetModel == "" {
 				targetModel = req.Header.Get("X-Requested-Model")
@@ -200,7 +203,7 @@ func NewRouterProxy(store *store.ConfigStore, projectID, location string) (*Rout
 					rp.ProjectID, modelLoc, targetModel, action)
 				req.URL.Path = newPath
 			}
-		} else if resource == "reasoningEngines" || resource == "ragCorpora" {
+		case "reasoningEngines", "ragCorpora":
 			remainingPath := strings.Join(pathParts[2:], "/")
 			newPath := fmt.Sprintf("/%s/projects/%s/locations/%s/%s",
 				version, rp.ProjectID, modelLoc, remainingPath)
@@ -238,6 +241,7 @@ func NewRouterProxy(store *store.ConfigStore, projectID, location string) (*Rout
 		return nil
 	}
 
+	proxy.Transport = &retryTransport{base: http.DefaultTransport}
 	rp.Proxy = proxy
 	return rp, nil
 }
@@ -263,6 +267,10 @@ func extractAPIKey(req *http.Request) string {
 func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
 	wrapped := newResponseWriterWrapper(w)
+
+	if r.Body != nil {
+		r.Body = http.MaxBytesReader(w, r.Body, 50*1024*1024)
+	}
 
 	var bodyBytes []byte
 	if r.Body != nil && r.Method == http.MethodPost {
@@ -571,7 +579,8 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Header.Set("Authorization", "Bearer "+token.AccessToken)
 
-	// Wrap the transport dynamically with the retry transport wrapper
+	// Thread-safe dynamic transport wrapping to support unit tests overriding rp.Proxy.Transport
+	rp.transportMu.Lock()
 	if rp.Proxy.Transport != nil {
 		if _, ok := rp.Proxy.Transport.(*retryTransport); !ok {
 			rp.Proxy.Transport = &retryTransport{base: rp.Proxy.Transport}
@@ -579,6 +588,7 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	} else {
 		rp.Proxy.Transport = &retryTransport{base: http.DefaultTransport}
 	}
+	rp.transportMu.Unlock()
 
 	// Set custom audit headers in ResponseWriter for client programmatic visibility
 	w.Header().Set("X-Routed-Model", r.Header.Get("X-Routed-Model"))

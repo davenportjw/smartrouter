@@ -178,6 +178,15 @@ func (as *AuthStore) Logout(w http.ResponseWriter, r *http.Request) {
 // Middleware verifies the session cookie and intercepts unauthorized requests to `/admin/*`.
 func (as *AuthStore) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Stateless CSRF protection: verify origin/referer on state-changing requests
+		if r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions {
+			if !verifyOrigin(r) {
+				log.Printf("[Auth Middleware] CSRF verification failed for %s %s: Origin/Referer does not match Host %q", r.Method, r.URL.Path, r.Host)
+				http.Error(w, "Forbidden: CSRF verification failed", http.StatusForbidden)
+				return
+			}
+		}
+
 		cookie, err := r.Cookie("session")
 		if err != nil {
 			// No session cookie, redirect to login
@@ -238,4 +247,36 @@ func isEmailAuthorized(email string, allowedList []string) bool {
 		}
 	}
 	return false
+}
+
+// verifyOrigin validates that the Origin or Referer matches the current Host for CSRF protection.
+func verifyOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		referer := r.Header.Get("Referer")
+		if referer == "" {
+			return false
+		}
+		// Parse referer and extract host
+		idx := strings.Index(referer, "://")
+		if idx == -1 {
+			return false
+		}
+		refHost := referer[idx+3:]
+		if end := strings.IndexByte(refHost, '/'); end != -1 {
+			refHost = refHost[:end]
+		}
+		return refHost == r.Host
+	}
+
+	// Parse origin and extract host
+	idx := strings.Index(origin, "://")
+	if idx == -1 {
+		return false
+	}
+	origHost := origin[idx+3:]
+	if end := strings.IndexByte(origHost, '/'); end != -1 {
+		origHost = origHost[:end]
+	}
+	return origHost == r.Host
 }
