@@ -32,17 +32,19 @@ type ComplexityRouting struct {
 	ForceComplexTools      bool   `firestore:"force_complex_tools" json:"force_complex_tools"`
 	UseLLMClassifier       bool   `firestore:"use_llm_classifier" json:"use_llm_classifier"`
 	ClassifierModel        string `firestore:"classifier_model" json:"classifier_model"`
+	AdditionalInstructions string `firestore:"additional_instructions" json:"additional_instructions"`
 }
 
 // App represents an explicit application belonging to a client.
 type App struct {
-	ID         string            `firestore:"id" json:"id"`
-	ClientID   string            `firestore:"client_id" json:"client_id"`
-	Name       string            `firestore:"name" json:"name"`
-	RPM        int               `firestore:"rpm" json:"rpm"`
-	TPM        int               `firestore:"tpm" json:"tpm"`
-	Priority   string            `firestore:"priority" json:"priority"` // "high", "medium", "low"
-	Complexity ComplexityRouting `firestore:"complexity" json:"complexity"`
+	ID                   string            `firestore:"id" json:"id"`
+	ClientID             string            `firestore:"client_id" json:"client_id"`
+	Name                 string            `firestore:"name" json:"name"`
+	RPM                  int               `firestore:"rpm" json:"rpm"`
+	TPM                  int               `firestore:"tpm" json:"tpm"`
+	Priority             string            `firestore:"priority" json:"priority"` // "high", "medium", "low"
+	Complexity           ComplexityRouting `firestore:"complexity" json:"complexity"`
+	OptOutDynamicRouting bool              `firestore:"opt_out_dynamic_routing" json:"opt_out_dynamic_routing"`
 }
 
 // APIKey represents an authorized router API key mapping to a client and app.

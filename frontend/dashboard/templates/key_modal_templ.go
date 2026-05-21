@@ -68,14 +68,14 @@ func KeyModal(apps []config.App, key *config.APIKey) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if key != nil {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<!-- Edit Form --> <form hx-post=\"/admin/keys/save\" class=\"mt-6 space-y-4\"><input type=\"hidden\" name=\"hash\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<!-- Edit Form --> <form hx-post=\"/admin/keys/save\" class=\"mt-6 space-y-4\"><div id=\"error-alert-container\"></div><input type=\"hidden\" name=\"hash\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var2 string
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.ResolveAttributeValue(key.KeyHash)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/key_modal.templ`, Line: 55, Col: 61}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/key_modal.templ`, Line: 56, Col: 61}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 			if templ_7745c5c3_Err != nil {
@@ -88,7 +88,7 @@ func KeyModal(apps []config.App, key *config.APIKey) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(key.KeyHash)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/key_modal.templ`, Line: 60, Col: 24}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/key_modal.templ`, Line: 61, Col: 24}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -107,7 +107,7 @@ func KeyModal(apps []config.App, key *config.APIKey) templ.Component {
 					var templ_7745c5c3_Var4 string
 					templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(a.ID)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/key_modal.templ`, Line: 69, Col: 33}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/key_modal.templ`, Line: 70, Col: 33}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 					if templ_7745c5c3_Err != nil {
@@ -120,7 +120,7 @@ func KeyModal(apps []config.App, key *config.APIKey) templ.Component {
 					var templ_7745c5c3_Var5 string
 					templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(a.Name)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/key_modal.templ`, Line: 69, Col: 53}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/key_modal.templ`, Line: 70, Col: 53}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 					if templ_7745c5c3_Err != nil {
@@ -133,7 +133,7 @@ func KeyModal(apps []config.App, key *config.APIKey) templ.Component {
 					var templ_7745c5c3_Var6 string
 					templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(a.ID)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/key_modal.templ`, Line: 69, Col: 63}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/key_modal.templ`, Line: 70, Col: 63}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 					if templ_7745c5c3_Err != nil {
@@ -151,7 +151,7 @@ func KeyModal(apps []config.App, key *config.APIKey) templ.Component {
 					var templ_7745c5c3_Var7 string
 					templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(a.ID)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/key_modal.templ`, Line: 71, Col: 33}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/key_modal.templ`, Line: 72, Col: 33}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 					if templ_7745c5c3_Err != nil {
@@ -164,7 +164,7 @@ func KeyModal(apps []config.App, key *config.APIKey) templ.Component {
 					var templ_7745c5c3_Var8 string
 					templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(a.Name)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/key_modal.templ`, Line: 71, Col: 44}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/key_modal.templ`, Line: 72, Col: 44}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 					if templ_7745c5c3_Err != nil {
@@ -177,7 +177,7 @@ func KeyModal(apps []config.App, key *config.APIKey) templ.Component {
 					var templ_7745c5c3_Var9 string
 					templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(a.ID)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/key_modal.templ`, Line: 71, Col: 54}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/key_modal.templ`, Line: 72, Col: 54}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 					if templ_7745c5c3_Err != nil {
@@ -221,7 +221,7 @@ func KeyModal(apps []config.App, key *config.APIKey) templ.Component {
 				var templ_7745c5c3_Var10 string
 				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue(a.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/key_modal.templ`, Line: 116, Col: 32}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/key_modal.templ`, Line: 117, Col: 32}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 				if templ_7745c5c3_Err != nil {
@@ -234,7 +234,7 @@ func KeyModal(apps []config.App, key *config.APIKey) templ.Component {
 				var templ_7745c5c3_Var11 string
 				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(a.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/key_modal.templ`, Line: 116, Col: 43}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/key_modal.templ`, Line: 117, Col: 43}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 				if templ_7745c5c3_Err != nil {
@@ -247,7 +247,7 @@ func KeyModal(apps []config.App, key *config.APIKey) templ.Component {
 				var templ_7745c5c3_Var12 string
 				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(a.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/key_modal.templ`, Line: 116, Col: 53}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/key_modal.templ`, Line: 117, Col: 53}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 				if templ_7745c5c3_Err != nil {
@@ -299,7 +299,7 @@ func KeyCreatedAlert(rawKey string, appName string) templ.Component {
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(appName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/key_modal.templ`, Line: 156, Col: 90}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/key_modal.templ`, Line: 157, Col: 90}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 		if templ_7745c5c3_Err != nil {
@@ -312,7 +312,7 @@ func KeyCreatedAlert(rawKey string, appName string) templ.Component {
 		var templ_7745c5c3_Var15 string
 		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(rawKey)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/key_modal.templ`, Line: 160, Col: 14}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/key_modal.templ`, Line: 161, Col: 14}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 		if templ_7745c5c3_Err != nil {

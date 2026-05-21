@@ -52,6 +52,7 @@ templ HeaderModal(apps []config.App, header *config.CustomHeader) {
 								hx-post="/admin/headers/create"
 								class="mt-6 space-y-4"
 							>
+								<div id="error-alert-container"></div>
 								if header != nil {
 									<input type="hidden" name="id" value={ header.ID } />
 								}

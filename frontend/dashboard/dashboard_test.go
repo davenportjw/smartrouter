@@ -539,6 +539,33 @@ func TestDashboardUIAndRESTBackendIntegration(t *testing.T) {
 				t.Errorf("expected standard rule create to return 303 redirect, got %d", rrCreate.Code)
 			}
 
+			// B2. Create Rule - HTMX Validation Error Swap Flow
+			formErr := url.Values{}
+			formErr.Add("model_pattern", "") // Invalid empty pattern!
+			formErr.Add("app_id", "app-seed")
+			formErr.Add("target_model", "gemini-2.5-pro")
+			formErr.Add("target_location", "us-central1")
+
+			reqErr := httptest.NewRequest("POST", "/admin/rules/create", strings.NewReader(formErr.Encode()))
+			reqErr.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			reqErr.Header.Set("HX-Request", "true")
+			rrErr := httptest.NewRecorder()
+			dash.CreateRule(rrErr, reqErr)
+
+			if rrErr.Code != http.StatusOK {
+				t.Errorf("expected HTMX validation error to return 200 status for swap, got %d", rrErr.Code)
+			}
+			if rrErr.Header().Get("HX-Retarget") != "#error-alert-container" {
+				t.Errorf("expected HX-Retarget to be '#error-alert-container', got %q", rrErr.Header().Get("HX-Retarget"))
+			}
+			if rrErr.Header().Get("HX-Reswap") != "innerHTML" {
+				t.Errorf("expected HX-Reswap to be 'innerHTML', got %q", rrErr.Header().Get("HX-Reswap"))
+			}
+			bodyErr := rrErr.Body.String()
+			if !strings.Contains(bodyErr, "Operation Failed") || !strings.Contains(bodyErr, "Requested Model Pattern cannot be empty") {
+				t.Errorf("expected error message in body, got: %s", bodyErr)
+			}
+
 			rules, _ := dbStore.GetAllRules(ctx)
 			var ruleID string
 			for _, r := range rules {

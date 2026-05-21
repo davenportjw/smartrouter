@@ -187,6 +187,7 @@ templ AppModal(clients []config.Client, app *config.App) {
 								hx-post="/admin/apps/create"
 								class="mt-6 space-y-4"
 							>
+								<div id="error-alert-container"></div>
 								<div class="grid grid-cols-2 gap-4">
 									<div>
 										<label for="app_id" class="block text-xs font-medium text-gray-700">Application ID (Slug)</label>
@@ -235,6 +236,22 @@ templ AppModal(clients []config.Client, app *config.App) {
 										</select>
 										<p class="text-[10px] text-gray-500 mt-0.5">💡 Primary sort weight (High=+300, Med=+200, Low=+100). Upstream model overload queue duration is governed by the client's own HTTP timeout.</p>
 									</div>
+								</div>
+
+								<!-- Dynamic Routing Opt-Out -->
+								<div class="bg-yellow-50/50 border border-yellow-200 rounded-md p-3 flex items-center justify-between">
+									<div class="flex flex-col">
+										<label for="opt_out_dynamic_routing" class="text-xs font-bold text-yellow-950">Opt Out of Dynamic Routing</label>
+										<span class="text-[10px] text-yellow-800 font-medium leading-tight">Bypass all dynamic complexity routing and custom declarative routing rules for this app.</span>
+									</div>
+									<input
+										type="checkbox"
+										name="opt_out_dynamic_routing"
+										id="opt_out_dynamic_routing"
+										value="true"
+										class="h-4 w-4 rounded border-yellow-300 text-yellow-600 focus:ring-yellow-500"
+										if app != nil && app.OptOutDynamicRouting { checked }
+									/>
 								</div>
 
 								<div class="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded-md border border-gray-150">

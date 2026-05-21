@@ -180,6 +180,7 @@ templ ClientModal(client *config.Client) {
 								hx-post="/admin/clients/create"
 								class="mt-6 space-y-4"
 							>
+								<div id="error-alert-container"></div>
 								<div class="grid grid-cols-2 gap-4">
 									<div>
 										<label for="client_id" class="block text-xs font-medium text-gray-700">Client ID (Slug)</label>

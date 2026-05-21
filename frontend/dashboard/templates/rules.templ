@@ -25,6 +25,22 @@ templ RulesTab(rules []config.RoutingRule) {
 			</div>
 		</div>
 
+		<!-- Pipeline Explanation Card -->
+		<div class="bg-purple-50/60 border border-purple-200/80 rounded-lg p-4 text-xs text-purple-800 leading-relaxed max-w-4xl flex items-start gap-3 shadow-sm">
+			<div class="bg-purple-100 text-purple-600 rounded-full p-1 mt-0.5">
+				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12a7.5 7.5 0 0015 0m-15 0a7.5 7.5 0 1115 0m-15 0H3m16.5 0H21m-1.5 0H12m-8.4 0l1.2-1.2m0 2.4l-1.2-1.2m12.9-1.2l-1.2 1.2m0-2.4l1.2 1.2" />
+				</svg>
+			</div>
+			<div>
+				<span class="font-semibold text-purple-950 block mb-1">🔄 Dynamic Routing Rules in the Execution Pipeline:</span>
+				<ul class="list-disc pl-4 space-y-1">
+					<li><strong>Stage 1 (Complexity Routing)</strong>: The proxy first processes app-scoped dynamic complexity configuration (if enabled) to map prompt scale to a base model.</li>
+					<li><strong>Stage 2 (Declarative Override rules)</strong>: These rules run <strong>on top of</strong> the complexity-resolved model or standard requested model. They provide cross-app and global segmentation policies using client tiers, HTTP headers, and custom priority weights, giving you absolute programmatic control over final target endpoints and location routing.</li>
+				</ul>
+			</div>
+		</div>
+
 		<!-- Rules Table -->
 		<div class="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
 			<div class="inline-block min-w-full align-middle">
@@ -195,6 +211,7 @@ templ RuleModal(apps []config.App, activeModels []config.ModelConfig, rule *conf
 								hx-post="/admin/rules/create"
 								class="mt-6 space-y-4"
 							>
+								<div id="error-alert-container"></div>
 								if rule != nil {
 									<input type="hidden" name="id" value={ rule.ID } />
 								}

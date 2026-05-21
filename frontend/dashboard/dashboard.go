@@ -464,16 +464,28 @@ func (dc *DashboardController) CreateRule(w http.ResponseWriter, r *http.Request
 	fallbackModel := strings.TrimSpace(r.FormValue("fallback_model"))
 	priorityWeightStr := strings.TrimSpace(r.FormValue("priority_weight"))
 
+	showError := func(msg string, code int) {
+		if r.Header.Get("HX-Request") == "true" {
+			w.Header().Set("HX-Retarget", "#error-alert-container")
+			w.Header().Set("HX-Reswap", "innerHTML")
+			w.Header().Set("Content-Type", "text/html")
+			w.WriteHeader(http.StatusOK)
+			_ = templates.FormErrorAlert(msg).Render(ctx, w)
+			return
+		}
+		http.Error(w, msg, code)
+	}
+
 	if modelPattern == "" {
-		http.Error(w, "Requested Model Pattern cannot be empty.", http.StatusBadRequest)
+		showError("Requested Model Pattern cannot be empty.", http.StatusBadRequest)
 		return
 	}
 	if targetModel == "" {
-		http.Error(w, "Target Routed Model cannot be empty.", http.StatusBadRequest)
+		showError("Target Routed Model cannot be empty.", http.StatusBadRequest)
 		return
 	}
 	if targetLocation == "" {
-		http.Error(w, "Target Location cannot be empty.", http.StatusBadRequest)
+		showError("Target Location cannot be empty.", http.StatusBadRequest)
 		return
 	}
 
@@ -483,7 +495,7 @@ func (dc *DashboardController) CreateRule(w http.ResponseWriter, r *http.Request
 			pattern := headerValue[1 : len(headerValue)-1]
 			_, err := regexp.Compile(pattern)
 			if err != nil {
-				http.Error(w, fmt.Sprintf("Invalid Header Value regex pattern: %v", err), http.StatusBadRequest)
+				showError(fmt.Sprintf("Invalid Header Value regex pattern: %v", err), http.StatusBadRequest)
 				return
 			}
 		}
@@ -493,7 +505,7 @@ func (dc *DashboardController) CreateRule(w http.ResponseWriter, r *http.Request
 	if priorityWeightStr != "" {
 		pw, err := strconv.Atoi(priorityWeightStr)
 		if err != nil || pw <= 0 {
-			http.Error(w, "Priority Weight must be a positive integer.", http.StatusBadRequest)
+			showError("Priority Weight must be a positive integer.", http.StatusBadRequest)
 			return
 		}
 		priorityWeight = pw
@@ -522,7 +534,7 @@ func (dc *DashboardController) CreateRule(w http.ResponseWriter, r *http.Request
 	})
 	if err != nil {
 		log.Printf("[Dashboard] Error saving routing rule: %v", err)
-		http.Error(w, "Failed to save routing rule", http.StatusInternalServerError)
+		showError("Failed to save routing rule config to database", http.StatusInternalServerError)
 		return
 	}
 
@@ -2777,6 +2789,8 @@ func (dc *DashboardController) CreateApp(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	optOutDynamicRouting := r.FormValue("opt_out_dynamic_routing") == "true"
+
 	existingApp, exists := dc.Store.LookupApp(appID)
 	var complexity config.ComplexityRouting
 	if exists {
@@ -2798,13 +2812,14 @@ func (dc *DashboardController) CreateApp(w http.ResponseWriter, r *http.Request)
 	}
 
 	err = dc.Store.SaveApp(ctx, config.App{
-		ID:         appID,
-		ClientID:   clientID,
-		Name:       appName,
-		RPM:        rpm,
-		TPM:        tpm,
-		Priority:   priority,
-		Complexity: complexity,
+		ID:                   appID,
+		ClientID:             clientID,
+		Name:                 appName,
+		RPM:                  rpm,
+		TPM:                  tpm,
+		Priority:             priority,
+		Complexity:           complexity,
+		OptOutDynamicRouting: optOutDynamicRouting,
 	})
 	if err != nil {
 		log.Printf("[Dashboard] Error saving application profile: %v", err)
@@ -3098,6 +3113,7 @@ func (dc *DashboardController) SaveComplexitySettings(w http.ResponseWriter, r *
 	forceComplexTools := r.FormValue("force_complex_tools") == "true"
 	useLLMClassifier := r.FormValue("use_llm_classifier") == "true"
 	classifierModel := strings.TrimSpace(r.FormValue("classifier_model"))
+	additionalInstructions := strings.TrimSpace(r.FormValue("additional_instructions"))
 
 	simpleCharLimit, err := strconv.Atoi(simpleCharLimitStr)
 	if err != nil || simpleCharLimit < 0 {
@@ -3129,6 +3145,7 @@ func (dc *DashboardController) SaveComplexitySettings(w http.ResponseWriter, r *
 		ForceComplexTools:      forceComplexTools,
 		UseLLMClassifier:       useLLMClassifier,
 		ClassifierModel:        classifierModel,
+		AdditionalInstructions: additionalInstructions,
 	}
 
 	err = dc.Store.SaveApp(ctx, app)

@@ -52,6 +52,7 @@ templ KeyModal(apps []config.App, key *config.APIKey) {
 									hx-post="/admin/keys/save"
 									class="mt-6 space-y-4"
 								>
+									<div id="error-alert-container"></div>
 									<input type="hidden" name="hash" value={ key.KeyHash } />
 									
 									<div>

@@ -51,10 +51,32 @@ Clients can request the virtual model **`gemini-dynamic`**. The proxy evaluates 
 
 ### Customizing Complexity Thresholds
 1. Go to `/admin/complexity`.
-2. Click **Edit Complexity Settings**.
+2. Click **Configure Settings** next to the target application.
 3. Set the boundaries:
    * **Simple Limit (Characters)**: Prompts below this character limit route to the **Simple Model** (default: `gemini-2.5-flash-lite`).
    * **Medium Limit (Characters)**: Prompts above the Simple limit but below this count route to the **Medium Model** (default: `gemini-2.5-flash`).
    * **Complex Prompts**: Prompts exceeding the Medium limit, or containing tools, images, or video files, route to the **Complex Model** (default: `gemini-2.5-pro`).
-4. Map each bucket to your choice of physical model or custom Vertex endpoint.
+4. **Tuning Semantic Criteria**: If **Use LLM Semantic Classifier** is active, you can specify **Additional Classification Guidelines** (e.g., `"always classify coding requests as complex"`) to append custom logic to the system instruction of the semantic classifier.
 5. Click **Save Settings**.
+
+---
+
+## 🔄 Pipeline Interoperation: Complexity Routing vs. Declarative Rules
+
+The Smart Router evaluates routing in two sequential stages:
+
+1. **Stage 1: Dynamic Complexity Routing (App-Scoped)**
+   * Evaluates prompt size, tools, multimodal content, and semantic classification instructions on the application boundary.
+   * Resolves the base target model (Simple, Medium, or Complex).
+
+2. **Stage 2: Declarative Routing Rules (Cross-App / Global)**
+   * Evaluates match conditions (matching tier, application scopes, and HTTP headers) on top of the model resolved by Stage 1.
+   * Performs the final target model rewrite and GCP location routing.
+
+### 🚫 Complete Application Opt-Out
+To completely bypass the routing pipeline for a particular application:
+1. Go to `/admin/apps` and click **Edit** next to the target application.
+2. Check **Opt Out of Dynamic Routing**.
+3. Click **Save Changes**.
+* This will completely bypass Stage 1 and Stage 2 routing loops for all requests using that application's API keys, directly targeting the requested model.
+

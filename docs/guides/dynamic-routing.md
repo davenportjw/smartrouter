@@ -55,6 +55,45 @@ If a `premium` client sends a request to `gemini-2.5-flash` with the header `X-R
 
 ---
 
+## 🔄 3. The Dynamic Routing Pipeline & Execution Order
+
+The Smart Router manages request routing in a strict two-stage pipeline, maintaining clear separation between **App-Scoped Dynamic Routing** (Complexity Routing) and **Cross-App/Global Declarative Rules**:
+
+```mermaid
+graph TD
+    A[Client Request] --> B{App Opted Out?}
+    B -- Yes --> C[Direct Active Location Resolution]
+    B -- No --> D[Stage 1: Complexity Routing]
+    D --> E{gemini-dynamic or Always Override?}
+    E -- Yes --> F[LLM Semantic Classifier / Static Limits]
+    E -- No --> G[Use Original Requested Model]
+    F --> H[Resolved Base Model]
+    G --> H
+    H --> I[Stage 2: Declarative Routing Rules]
+    I --> J{Any Rule Match?}
+    J -- Yes --> K[Rewrite Target Model & Location]
+    J -- No --> L[Keep Base Model]
+    K --> M[Final Active Location Resolution]
+    L --> M
+    M --> N[Upstream Google Cloud Vertex AI Request]
+```
+
+### Stage 1: Dynamic Complexity Routing (Within an App)
+* **Scope**: Bound exclusively inside each individual Application's profile settings.
+* **Action**: Determines target model (`simple_model`, `medium_model`, or `complex_model`) by parsing prompt features, multimodal payloads, or character count boundaries.
+* **Tuning Criteria**: You can specify an **Additional Classification Guideline** (e.g., `"always route code analysis requests to complex"`) to customize the system instruction passed directly to the lightweight semantic LLM classifier.
+
+### Stage 2: Declarative Routing Rules (Cross-App / Global / App-Bound)
+* **Scope**: Custom standalone routing rules defined under the admin panel, which can apply globally or be restricted to client tiers and specific applications.
+* **Action**: Standard rules match variables (headers, tiers, and models) on the model resolved by Stage 1 and apply target model/location overrides or fallbacks.
+
+### 🚫 Complete Application Opt-Out
+If a particular Application requires static, untouched routing behavior (e.g., strict integration tests or static third-party systems), administrators can toggle **Opt Out of Dynamic Routing** inside the application's configuration modal:
+* All Stage 1 Complexity Routing and Stage 2 Declarative Routing Rules will be bypassed entirely.
+* The request will be forwarded to the target location exactly matching the client's requested model.
+
+---
+
 ## 🌐 3. Regional Routing Compatibility
 
 The Smart Router steers traffic using regional levels:

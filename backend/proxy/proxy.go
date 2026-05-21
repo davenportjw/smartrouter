@@ -308,86 +308,98 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 				r.Header.Set("X-Requested-Model", requestedModel)
 
-				// 1.2. Evaluate Validation for Virtual Model
-				if requestedModel == "gemini-dynamic" && !app.Complexity.Enabled {
-					w.Header().Set("Content-Type", "application/json")
-					w.WriteHeader(http.StatusBadRequest)
-					w.Write([]byte(fmt.Sprintf(`{
-						"error": {
-							"code": 400,
-							"message": "Virtual model 'gemini-dynamic' requested but dynamic complexity routing is not enabled for application '%s'. Please enable it in the smart router dashboard.",
-							"status": "INVALID_ARGUMENT"
-						}
-					}`, app.ID)))
-					return
-				}
-
-				// 1.3. Execute Dynamic Complexity Routing
+				// 1.2. Handle Dynamic Routing Opt-Out Check
 				targetModel := requestedModel
-				if app.Complexity.Enabled && (app.Complexity.AlwaysOverride || requestedModel == "gemini-dynamic") {
-					var bodyBytes []byte
-					if r.Body != nil {
-						var err error
-						bodyBytes, err = io.ReadAll(r.Body)
-						if err == nil {
-							// Restore request body for downstream proxy execution
-							r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-							
-							// Run dynamic classifier
-							complexityTier, classifyErr := rp.classifyComplexity(r.Context(), bodyBytes, app.Complexity)
-							if classifyErr == nil {
-								switch complexityTier {
-								case "simple":
-									targetModel = app.Complexity.SimpleModel
-									if targetModel == "" {
-										targetModel = "gemini-2.5-flash-lite"
-									}
-								case "medium":
-									targetModel = app.Complexity.MediumModel
-									if targetModel == "" {
-										targetModel = "gemini-2.5-flash"
-									}
-								case "complex":
-									targetModel = app.Complexity.ComplexModel
-									if targetModel == "" {
-										targetModel = "gemini-2.5-pro"
-									}
-								}
-								log.Printf("[Proxy Routing] Dynamic complexity router classified prompt as '%s' -> routed target model: %s", complexityTier, targetModel)
-							} else {
-								log.Printf("[Proxy Routing] Complexity classification failed: %v. Falling back to requested model %s", classifyErr, requestedModel)
+				if app.OptOutDynamicRouting {
+					r.Header.Set("X-Routed-Model", targetModel)
+					modelLoc := rp.Location
+					if activeModel, exists := rp.Store.LookupActiveModel(targetModel, rp.Location); exists {
+						modelLoc = activeModel.Location
+						targetModel = config.StripLocationSuffix(activeModel.ID)
+						r.Header.Set("X-Routed-Model", targetModel)
+					}
+					r.Header.Set("X-Routed-Model-Location", modelLoc)
+				} else {
+					// 1.2. Evaluate Validation for Virtual Model
+					if requestedModel == "gemini-dynamic" && !app.Complexity.Enabled {
+						w.Header().Set("Content-Type", "application/json")
+						w.WriteHeader(http.StatusBadRequest)
+						w.Write([]byte(fmt.Sprintf(`{
+							"error": {
+								"code": 400,
+								"message": "Virtual model 'gemini-dynamic' requested but dynamic complexity routing is not enabled for application '%s'. Please enable it in the smart router dashboard.",
+								"status": "INVALID_ARGUMENT"
 							}
-						} else {
-							log.Printf("[Proxy Routing] Failed to read request body for complexity classification: %v", err)
+						}`, app.ID)))
+						return
+					}
+
+					// 1.3. Execute Dynamic Complexity Routing
+					if app.Complexity.Enabled && (app.Complexity.AlwaysOverride || requestedModel == "gemini-dynamic") {
+						var bodyBytes []byte
+						if r.Body != nil {
+							var err error
+							bodyBytes, err = io.ReadAll(r.Body)
+							if err == nil {
+								// Restore request body for downstream proxy execution
+								r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+								
+								// Run dynamic classifier
+								complexityTier, classifyErr := rp.classifyComplexity(r.Context(), bodyBytes, app.Complexity)
+								if classifyErr == nil {
+									switch complexityTier {
+									case "simple":
+										targetModel = app.Complexity.SimpleModel
+										if targetModel == "" {
+											targetModel = "gemini-2.5-flash-lite"
+										}
+									case "medium":
+										targetModel = app.Complexity.MediumModel
+										if targetModel == "" {
+											targetModel = "gemini-2.5-flash"
+										}
+									case "complex":
+										targetModel = app.Complexity.ComplexModel
+										if targetModel == "" {
+											targetModel = "gemini-2.5-pro"
+										}
+									}
+									log.Printf("[Proxy Routing] Dynamic complexity router classified prompt as '%s' -> routed target model: %s", complexityTier, targetModel)
+								} else {
+									log.Printf("[Proxy Routing] Complexity classification failed: %v. Falling back to requested model %s", classifyErr, requestedModel)
+								}
+							} else {
+								log.Printf("[Proxy Routing] Failed to read request body for complexity classification: %v", err)
+							}
 						}
 					}
-				}
 
-				// Collect flat headers map for MatchRule
-				headersMap := make(map[string]string)
-				for k, v := range r.Header {
-					if len(v) > 0 {
-						headersMap[k] = v[0]
+					// Collect flat headers map for MatchRule
+					headersMap := make(map[string]string)
+					for k, v := range r.Header {
+						if len(v) > 0 {
+							headersMap[k] = v[0]
+						}
 					}
-				}
 
-				// 1.4. Apply standard dynamic rules-based routing matching on top of the complexity-classified model!
-				routedRule, matched := rp.Store.MatchRule(targetModel, client.Tier, app.ID, headersMap)
-				if matched {
-					log.Printf("[Proxy Routing] MatchRule matched rules-based routing on top of complexity routed model %s -> targeting: %s", targetModel, routedRule.TargetModel)
-					targetModel = routedRule.TargetModel
-				}
-				
-				r.Header.Set("X-Routed-Model", targetModel)
-
-				// Resolve and set the routed model's location
-				modelLoc := rp.Location // default to router's location
-				if activeModel, exists := rp.Store.LookupActiveModel(targetModel, rp.Location); exists {
-					modelLoc = activeModel.Location
-					targetModel = config.StripLocationSuffix(activeModel.ID)
+					// 1.4. Apply standard dynamic rules-based routing matching on top of the complexity-classified model!
+					routedRule, matched := rp.Store.MatchRule(targetModel, client.Tier, app.ID, headersMap)
+					if matched {
+						log.Printf("[Proxy Routing] MatchRule matched rules-based routing on top of complexity routed model %s -> targeting: %s", targetModel, routedRule.TargetModel)
+						targetModel = routedRule.TargetModel
+					}
+					
 					r.Header.Set("X-Routed-Model", targetModel)
+
+					// Resolve and set the routed model's location
+					modelLoc := rp.Location // default to router's location
+					if activeModel, exists := rp.Store.LookupActiveModel(targetModel, rp.Location); exists {
+						modelLoc = activeModel.Location
+						targetModel = config.StripLocationSuffix(activeModel.ID)
+						r.Header.Set("X-Routed-Model", targetModel)
+					}
+					r.Header.Set("X-Routed-Model-Location", modelLoc)
 				}
-				r.Header.Set("X-Routed-Model-Location", modelLoc)
 			}
 		}
 	}
@@ -778,7 +790,7 @@ func (rp *RouterProxy) classifyComplexity(ctx context.Context, body []byte, c co
 			snippetStr = snippetStr[:4000]
 		}
 
-		complexityResult, err := rp.callLLMClassifier(ctx, classifierModel, snippetStr)
+		complexityResult, err := rp.callLLMClassifier(ctx, classifierModel, snippetStr, c.AdditionalInstructions)
 		if err == nil && (complexityResult == "simple" || complexityResult == "medium" || complexityResult == "complex") {
 			log.Printf("[Complexity Classifier] LLM classified complexity: %s", complexityResult)
 			return complexityResult, nil
@@ -797,12 +809,16 @@ func (rp *RouterProxy) classifyComplexity(ctx context.Context, body []byte, c co
 }
 
 // callLLMClassifier sends a rapid structured OIDC JSON query to the Vertex AI Gemini API.
-func (rp *RouterProxy) callLLMClassifier(ctx context.Context, modelName string, prompt string) (string, error) {
+func (rp *RouterProxy) callLLMClassifier(ctx context.Context, modelName string, prompt string, additionalInstructions string) (string, error) {
 	systemInstr := "You are a low-overhead API routing complexity classifier. Classify the user prompt into one of three tiers:\n" +
 		"- simple: Greetings, chit-chat, simple factual lookups, single basic questions.\n" +
 		"- medium: Summarization, standard instructions, translations, content generation.\n" +
 		"- complex: Complex coding, math/logic puzzles, multi-step debugging, deep reasoning.\n" +
 		"Return JSON format: {\"complexity\": \"simple\" | \"medium\" | \"complex\"}"
+
+	if additionalInstructions != "" {
+		systemInstr += "\n\nAdditional classification criteria and application-specific context to respect:\n" + additionalInstructions
+	}
 
 	type schemaProp struct {
 		Type string   `json:"type"`

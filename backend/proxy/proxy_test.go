@@ -3,6 +3,7 @@ package proxy
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
@@ -1355,6 +1356,207 @@ func TestProxyComplexityRoutingLLMClassifier(t *testing.T) {
 
 	os.RemoveAll("data/local_db.json")
 }
+
+func TestProxyComplexityRoutingAdditionalInstructions(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+
+	ctx := context.Background()
+	store, _ := store.NewConfigStore(ctx, "test-project")
+
+	// Seed Client, App with LLM Semantic Classification & Additional Instructions enabled
+	app := config.App{
+		ID:       "app-complexity-instructions",
+		ClientID: "client-1",
+		RPM:      100,
+		TPM:      500000,
+		Priority: "high",
+		Complexity: config.ComplexityRouting{
+			Enabled:                true,
+			AlwaysOverride:         true,
+			SimpleModel:            "gemini-2.5-flash-lite",
+			MediumModel:            "gemini-2.5-flash",
+			ComplexModel:           "gemini-2.5-pro",
+			UseLLMClassifier:       true,
+			ClassifierModel:        "gemini-3.1-flash-lite",
+			ForceComplexMultimodal: false,
+			ForceComplexTools:      false,
+			AdditionalInstructions: "TEST UNIQUE CRITERIA: always classify greetings as simple.",
+		},
+	}
+	client1 := config.Client{ID: "client-1", Tier: "premium"}
+	key := config.APIKey{
+		KeyHash:  config.HashKey("key-instructions"),
+		AppID:    "app-complexity-instructions",
+		Status:   "active",
+	}
+
+	_ = store.SaveClient(ctx, client1)
+	_ = store.SaveApp(ctx, app)
+	_ = store.SaveKey(ctx, key)
+	_ = store.DeleteHeader(ctx, "header-1")
+	_ = store.DeleteRule(ctx, "rule-1")
+
+	var additionalInstructionsVerified bool
+	var mu sync.Mutex
+
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+
+		if strings.Contains(r.URL.Path, "/models/gemini-3.1-flash-lite:generateContent") {
+			// Read and inspect body
+			bodyBytes, _ := io.ReadAll(r.Body)
+			var classifierReq struct {
+				SystemInstruction struct {
+					Parts []struct {
+						Text string `json:"text"`
+					} `json:"parts"`
+				} `json:"systemInstruction"`
+			}
+			_ = json.Unmarshal(bodyBytes, &classifierReq)
+			if len(classifierReq.SystemInstruction.Parts) > 0 {
+				sysInstrText := classifierReq.SystemInstruction.Parts[0].Text
+				if strings.Contains(sysInstrText, "TEST UNIQUE CRITERIA: always classify greetings as simple.") {
+					additionalInstructionsVerified = true
+				}
+			}
+
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"candidates": [
+					{
+						"content": {
+							"parts": [
+								{
+									"text": "{\"complexity\": \"simple\"}"
+								}
+							]
+						}
+					}
+				]
+			}`))
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status": "success"}`))
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+	rp, _ := NewRouterProxy(store, "test-project", "us-central1")
+	rp.TokenSource = &mockTokenSource{}
+	rp.Target = backendURL
+	rp.Proxy.Transport = &mockRoundTripper{Target: backendURL}
+
+	req := httptest.NewRequest("POST", "/v1/models/gemini-dynamic:generateContent?key=key-instructions", strings.NewReader(`{"contents":[{"parts":[{"text":"hello"}]}]}`))
+	req.Header.Set("x-goog-api-key", "key-instructions")
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	rp.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d. Response: %s", rr.Code, rr.Body.String())
+	}
+
+	mu.Lock()
+	verified := additionalInstructionsVerified
+	mu.Unlock()
+
+	if !verified {
+		t.Errorf("expected AdditionalInstructions to be passed to semantic classifier, but it was not found in system instructions")
+	}
+
+	os.RemoveAll("data/local_db.json")
+}
+
+func TestProxyAppOptOutDynamicRouting(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+
+	ctx := context.Background()
+	store, _ := store.NewConfigStore(ctx, "test-project")
+
+	// Seed Client, App with OptOutDynamicRouting enabled
+	app := config.App{
+		ID:                   "app-opt-out",
+		ClientID:             "client-1",
+		RPM:                  100,
+		TPM:                  500000,
+		Priority:             "high",
+		OptOutDynamicRouting: true,
+		Complexity: config.ComplexityRouting{
+			Enabled: false,
+		},
+	}
+	client1 := config.Client{ID: "client-1", Tier: "premium"}
+	key := config.APIKey{
+		KeyHash:  config.HashKey("key-opt-out"),
+		AppID:    "app-opt-out",
+		Status:   "active",
+	}
+
+	_ = store.SaveClient(ctx, client1)
+	_ = store.SaveApp(ctx, app)
+	_ = store.SaveKey(ctx, key)
+	_ = store.DeleteHeader(ctx, "header-1")
+
+	// Seed a rule that would intercept gemini-2.5-flash-lite -> gemini-2.5-pro
+	_ = store.SaveRule(ctx, config.RoutingRule{
+		ID:             "rule-opt-out-test",
+		ModelPattern:   "gemini-2.5-flash-lite",
+		ClientTier:     "all",
+		TargetModel:    "gemini-2.5-pro",
+		TargetLocation: "us-central1",
+		PriorityWeight: 1,
+	})
+
+	var lastRoutedModel string
+	var mu sync.Mutex
+
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+
+		parts := strings.Split(r.URL.Path, "/models/")
+		if len(parts) >= 2 {
+			lastRoutedModel = strings.Split(parts[1], ":")[0]
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status": "success"}`))
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+	rp, _ := NewRouterProxy(store, "test-project", "us-central1")
+	rp.TokenSource = &mockTokenSource{}
+	rp.Target = backendURL
+	rp.Proxy.Transport = &mockRoundTripper{Target: backendURL}
+
+	req := httptest.NewRequest("POST", "/v1/models/gemini-2.5-flash-lite:generateContent?key=key-opt-out", strings.NewReader(`{"contents":[{"parts":[{"text":"hello"}]}]}`))
+	req.Header.Set("x-goog-api-key", "key-opt-out")
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	rp.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d. Response: %s", rr.Code, rr.Body.String())
+	}
+
+	mu.Lock()
+	routed := lastRoutedModel
+	mu.Unlock()
+
+	// Should remain gemini-2.5-flash-lite because app is opted out of dynamic routing rules!
+	if routed != "gemini-2.5-flash-lite" {
+		t.Errorf("expected request to bypass dynamic routing and target gemini-2.5-flash-lite directly, but it got routed to %q", routed)
+	}
+
+	os.RemoveAll("data/local_db.json")
+}
+
+
 
 func TestProxyDynamicRoutingSuite(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
