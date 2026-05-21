@@ -15,10 +15,11 @@ type ClientLimiter struct {
 	priority   string // "high", "medium", "low"
 	rpm        int
 	tpm        int
+	optOutTPM  bool
 }
 
 // NewClientLimiter creates a rate limiter for a client based on RPM and TPM settings.
-func NewClientLimiter(rpm, tpm int, priority string) *ClientLimiter {
+func NewClientLimiter(rpm, tpm int, priority string, optOutTPM bool) *ClientLimiter {
 	// Default to reasonable limits if not configured
 	if rpm <= 0 {
 		rpm = 60
@@ -27,13 +28,19 @@ func NewClientLimiter(rpm, tpm int, priority string) *ClientLimiter {
 		tpm = 40000
 	}
 
+	var tpmLimiter *rate.Limiter
+	if !optOutTPM {
+		tpmLimiter = rate.NewLimiter(rate.Limit(float64(tpm)/60.0), tpm)
+	}
+
 	return &ClientLimiter{
 		// Limit per second = limit / 60
 		rpmLimiter: rate.NewLimiter(rate.Limit(float64(rpm)/60.0), rpm),
-		tpmLimiter: rate.NewLimiter(rate.Limit(float64(tpm)/60.0), tpm),
+		tpmLimiter: tpmLimiter,
 		priority:   priority,
 		rpm:        rpm,
 		tpm:        tpm,
+		optOutTPM:  optOutTPM,
 	}
 }
 
@@ -51,18 +58,32 @@ func NewRateLimiterRegistry() *RateLimiterRegistry {
 }
 
 // UpdateLimiter dynamically updates or adds a client rate limiter.
-func (rl *RateLimiterRegistry) UpdateLimiter(clientID string, rpm, tpm int, priority string) {
+func (rl *RateLimiterRegistry) UpdateLimiter(clientID string, rpm, tpm int, priority string, optOutTPM bool) {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
 	// If limiter already exists with identical settings, do not reset it
 	if existing, exists := rl.limiters[clientID]; exists {
-		if existing.rpm == rpm && existing.tpm == tpm && existing.priority == priority {
+		if existing.rpm == rpm && existing.tpm == tpm && existing.priority == priority && existing.optOutTPM == optOutTPM {
 			return
 		}
 	}
 
-	rl.limiters[clientID] = NewClientLimiter(rpm, tpm, priority)
+	rl.limiters[clientID] = NewClientLimiter(rpm, tpm, priority, optOutTPM)
+}
+
+// AdjustLimiter dynamically corrects the token count balance.
+func (rl *RateLimiterRegistry) AdjustLimiter(clientID string, tokenCorrection int) {
+	rl.mu.RLock()
+	limiter, exists := rl.limiters[clientID]
+	rl.mu.RUnlock()
+
+	if !exists || limiter.optOutTPM || limiter.tpmLimiter == nil {
+		return
+	}
+
+	// Consume or refund tokens based on correction count
+	_ = limiter.tpmLimiter.AllowN(time.Now(), tokenCorrection)
 }
 
 // RemoveLimiter removes a client rate limiter on deletion.
@@ -85,8 +106,12 @@ func (rl *RateLimiterRegistry) EvaluateLimit(ctx context.Context, clientID strin
 
 	// Check RPM (1 request token)
 	rpmAllowed := limiter.rpmLimiter.Allow()
+	
 	// Check TPM (tokensRequested tokens)
-	tpmAllowed := limiter.tpmLimiter.AllowN(time.Now(), tokensRequested)
+	tpmAllowed := true
+	if !limiter.optOutTPM && limiter.tpmLimiter != nil {
+		tpmAllowed = limiter.tpmLimiter.AllowN(time.Now(), tokensRequested)
+	}
 
 	if rpmAllowed && tpmAllowed {
 		return true, 0
@@ -97,10 +122,14 @@ func (rl *RateLimiterRegistry) EvaluateLimit(ctx context.Context, clientID strin
 	if limiter.priority == "high" {
 		// High-priority requests can wait/queue up to 5 seconds to get a token instead of failing immediately
 		reservationRPM := limiter.rpmLimiter.Reserve()
-		reservationTPM := limiter.tpmLimiter.ReserveN(time.Now(), tokensRequested)
-
 		delayRPM := reservationRPM.Delay()
-		delayTPM := reservationTPM.Delay()
+
+		var reservationTPM *rate.Reservation
+		delayTPM := time.Duration(0)
+		if !limiter.optOutTPM && limiter.tpmLimiter != nil {
+			reservationTPM = limiter.tpmLimiter.ReserveN(time.Now(), tokensRequested)
+			delayTPM = reservationTPM.Delay()
+		}
 
 		maxDelay := delayRPM
 		if delayTPM > maxDelay {
@@ -114,16 +143,22 @@ func (rl *RateLimiterRegistry) EvaluateLimit(ctx context.Context, clientID strin
 
 		// Cancel reservations if delay is too long to avoid starvation
 		reservationRPM.Cancel()
-		reservationTPM.Cancel()
+		if reservationTPM != nil {
+			reservationTPM.Cancel()
+		}
 	}
 
 	// Medium-priority requests can wait up to 2 seconds
 	if limiter.priority == "medium" {
 		reservationRPM := limiter.rpmLimiter.Reserve()
-		reservationTPM := limiter.tpmLimiter.ReserveN(time.Now(), tokensRequested)
-
 		delayRPM := reservationRPM.Delay()
-		delayTPM := reservationTPM.Delay()
+
+		var reservationTPM *rate.Reservation
+		delayTPM := time.Duration(0)
+		if !limiter.optOutTPM && limiter.tpmLimiter != nil {
+			reservationTPM = limiter.tpmLimiter.ReserveN(time.Now(), tokensRequested)
+			delayTPM = reservationTPM.Delay()
+		}
 
 		maxDelay := delayRPM
 		if delayTPM > maxDelay {
@@ -135,7 +170,9 @@ func (rl *RateLimiterRegistry) EvaluateLimit(ctx context.Context, clientID strin
 		}
 
 		reservationRPM.Cancel()
-		reservationTPM.Cancel()
+		if reservationTPM != nil {
+			reservationTPM.Cancel()
+		}
 	}
 
 	// Low-priority requests are rejected immediately on rate limit breach (no queueing)

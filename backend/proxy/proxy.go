@@ -25,6 +25,12 @@ import (
 	"google.golang.org/api/idtoken"
 )
 
+type contextKey string
+const (
+	appIDKey           contextKey = "app_id"
+	estimatedTokensKey contextKey = "estimated_tokens"
+)
+
 // RouterProxy wraps the httputil.ReverseProxy to add custom routing and logging.
 type RouterProxy struct {
 	Target      *url.URL
@@ -202,6 +208,36 @@ func NewRouterProxy(store *store.ConfigStore, projectID, location string) (*Rout
 		}
 	}
 
+	proxy.ModifyResponse = func(resp *http.Response) error {
+		if resp.StatusCode == http.StatusOK && resp.Request != nil {
+			appID, _ := resp.Request.Context().Value(appIDKey).(string)
+			estimatedTokens, _ := resp.Request.Context().Value(estimatedTokensKey).(int)
+
+			if appID != "" && estimatedTokens > 0 {
+				if !strings.Contains(resp.Request.URL.Path, ":streamGenerateContent") && resp.Body != nil {
+					bodyBytes, err := io.ReadAll(resp.Body)
+					if err == nil {
+						resp.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+
+						var res struct {
+							UsageMetadata struct {
+								TotalTokenCount int `json:"totalTokenCount"`
+							} `json:"usageMetadata"`
+						}
+						if err := json.Unmarshal(bodyBytes, &res); err == nil {
+							actualTokens := res.UsageMetadata.TotalTokenCount
+							if actualTokens > 0 {
+								correction := actualTokens - estimatedTokens
+								rp.Limiter.AdjustLimiter(appID, correction)
+							}
+						}
+					}
+				}
+			}
+		}
+		return nil
+	}
+
 	rp.Proxy = proxy
 	return rp, nil
 }
@@ -227,6 +263,15 @@ func extractAPIKey(req *http.Request) string {
 func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
 	wrapped := newResponseWriterWrapper(w)
+
+	var bodyBytes []byte
+	if r.Body != nil && r.Method == http.MethodPost {
+		var err error
+		bodyBytes, err = io.ReadAll(r.Body)
+		if err == nil {
+			r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+		}
+	}
 
 	// Extract user custom key first to check auth before proxy director executes
 	clientKey := extractAPIKey(r)
@@ -336,40 +381,30 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 					// 1.3. Execute Dynamic Complexity Routing
 					if app.Complexity.Enabled && (app.Complexity.AlwaysOverride || requestedModel == "gemini-dynamic") {
-						var bodyBytes []byte
-						if r.Body != nil {
-							var err error
-							bodyBytes, err = io.ReadAll(r.Body)
-							if err == nil {
-								// Restore request body for downstream proxy execution
-								r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-								
-								// Run dynamic classifier
-								complexityTier, classifyErr := rp.classifyComplexity(r.Context(), bodyBytes, app.Complexity)
-								if classifyErr == nil {
-									switch complexityTier {
-									case "simple":
-										targetModel = app.Complexity.SimpleModel
-										if targetModel == "" {
-											targetModel = "gemini-2.5-flash-lite"
-										}
-									case "medium":
-										targetModel = app.Complexity.MediumModel
-										if targetModel == "" {
-											targetModel = "gemini-2.5-flash"
-										}
-									case "complex":
-										targetModel = app.Complexity.ComplexModel
-										if targetModel == "" {
-											targetModel = "gemini-2.5-pro"
-										}
+						if len(bodyBytes) > 0 {
+							// Run dynamic classifier
+							complexityTier, classifyErr := rp.classifyComplexity(r.Context(), bodyBytes, app.Complexity)
+							if classifyErr == nil {
+								switch complexityTier {
+								case "simple":
+									targetModel = app.Complexity.SimpleModel
+									if targetModel == "" {
+										targetModel = "gemini-2.5-flash-lite"
 									}
-									log.Printf("[Proxy Routing] Dynamic complexity router classified prompt as '%s' -> routed target model: %s", complexityTier, targetModel)
-								} else {
-									log.Printf("[Proxy Routing] Complexity classification failed: %v. Falling back to requested model %s", classifyErr, requestedModel)
+								case "medium":
+									targetModel = app.Complexity.MediumModel
+									if targetModel == "" {
+										targetModel = "gemini-2.5-flash"
+									}
+								case "complex":
+									targetModel = app.Complexity.ComplexModel
+									if targetModel == "" {
+										targetModel = "gemini-2.5-pro"
+									}
 								}
+								log.Printf("[Proxy Routing] Dynamic complexity router classified prompt as '%s' -> routed target model: %s", complexityTier, targetModel)
 							} else {
-								log.Printf("[Proxy Routing] Failed to read request body for complexity classification: %v", err)
+								log.Printf("[Proxy Routing] Complexity classification failed: %v. Falling back to requested model %s", classifyErr, requestedModel)
 							}
 						}
 					}
@@ -452,10 +487,19 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Sync local rate limiter with current application capacity
-	rp.Limiter.UpdateLimiter(app.ID, app.RPM, app.TPM, app.Priority)
+	rp.Limiter.UpdateLimiter(app.ID, app.RPM, app.TPM, app.Priority, app.OptOutTPM)
+
+	// Estimate tokens for TPM rate limiting if not opted out
+	estimatedTokens := 1
+	if !app.OptOutTPM && len(bodyBytes) > 0 {
+		estimatedTokens = len(bodyBytes) / 4
+		if estimatedTokens < 1 {
+			estimatedTokens = 1
+		}
+	}
 
 	// Evaluate rate limits on the application boundary
-	allowed, delay := rp.Limiter.EvaluateLimit(r.Context(), app.ID, 1)
+	allowed, delay := rp.Limiter.EvaluateLimit(r.Context(), app.ID, estimatedTokens)
 	if !allowed {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusTooManyRequests)
@@ -468,6 +512,11 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}`))
 		return
 	}
+
+	// Store app ID and estimated tokens in request context for post-request correction
+	ctx := context.WithValue(r.Context(), appIDKey, app.ID)
+	ctx = context.WithValue(ctx, estimatedTokensKey, estimatedTokens)
+	r = r.WithContext(ctx)
 
 	routedModel := r.Header.Get("X-Routed-Model")
 	if routedModel == "" {

@@ -45,6 +45,7 @@ type App struct {
 	Priority             string            `firestore:"priority" json:"priority"` // "high", "medium", "low"
 	Complexity           ComplexityRouting `firestore:"complexity" json:"complexity"`
 	OptOutDynamicRouting bool              `firestore:"opt_out_dynamic_routing" json:"opt_out_dynamic_routing"`
+	OptOutTPM            bool              `firestore:"opt_out_tpm" json:"opt_out_tpm"`
 }
 
 // APIKey represents an authorized router API key mapping to a client and app.

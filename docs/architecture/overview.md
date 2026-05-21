@@ -94,14 +94,15 @@ sequenceDiagram
 
 ---
 
-## ⏳ 3. Sliding-Window Rate Limiting
+## ⏳ 3. Token-Weight Rate Limiting (RPM & TPM)
 
-Rate limiting is computed in-memory per App using a **Sliding Window Algorithm**:
-* **RPM**: Timestamps of requests over the last 60 seconds are stored in a slice. If the count exceeds the RPM limit, the request is rejected with a `429` code.
-* **TPM**: 
-  * **Estimation**: Pre-request token count is estimated using prompt character length. If the estimation breaches the budget, the request is deferred or rejected.
-  * **Commit**: The actual token count returned in the response metadata overwrites the estimation once the request completes.
-* **Garbage Collection**: A background scheduler regularly purges stale sliding-window entries.
+Rate limiting is computed dynamically in-memory per App:
+* **RPM**: Enforced per-second using a token bucket based on the configured RPM capacity.
+* **TPM (Tokens Per Minute)**:
+  * **Estimation**: Pre-request token weight is estimated efficiently on the hot path using a character heuristic (1 token ≈ 4 characters of request body).
+  * **Commit / Correction**: Once the upstream request completes, the proxy intercepts the response, parses the exact `totalTokenCount` from the `usageMetadata` block, and dynamically corrects the limiter budget (refunding over-estimations or deducting under-estimations). Bypassed for streaming responses to avoid unmarshalling delay.
+  * **Opt Out**: Applications can choose to completely opt out of TPM rate limits via the dashboard, relying entirely on standard RPM limiting.
+* **Priority Buffering**: During transient rate limit spikes, High priority apps wait/queue up to **5s** and Medium priority apps wait up to **2s** for token availability; Low priority apps fail immediately.
 
 ---
 

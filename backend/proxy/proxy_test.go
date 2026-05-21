@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"fmt"
 	store "geminirouter/backend/config"
 	"geminirouter/pkg/config"
 	"geminirouter/frontend/dashboard"
@@ -3167,6 +3168,143 @@ func TestProxyModelOverloadQueuingAndAPI(t *testing.T) {
 
 	os.RemoveAll("data/local_db.json")
 }
+
+func TestProxyTPMRateLimitingAndOptOut(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+
+	ctx := context.Background()
+	store, err := store.NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to initialize config store: %v", err)
+	}
+
+	// 1. Seed Client, Apps, Keys
+	client := config.Client{ID: "client-tpm", Tier: "standard"}
+	
+	appEnforced := config.App{
+		ID:                   "app-tpm-enforced",
+		ClientID:             "client-tpm",
+		Name:                 "Enforced App",
+		RPM:                  100,
+		TPM:                  200, // very low TPM
+		Priority:             "low", // fails instantly on breach
+		OptOutTPM:            false,
+	}
+	
+	appOptOut := config.App{
+		ID:                   "app-tpm-optout",
+		ClientID:             "client-tpm",
+		Name:                 "Opt-out App",
+		RPM:                  100,
+		TPM:                  200, // same low TPM
+		Priority:             "low",
+		OptOutTPM:            true,
+	}
+
+	appRefund := config.App{
+		ID:                   "app-tpm-refund",
+		ClientID:             "client-tpm",
+		Name:                 "Refund App",
+		RPM:                  100,
+		TPM:                  1000,
+		Priority:             "low",
+		OptOutTPM:            false,
+	}
+
+	keyEnforced := config.APIKey{KeyHash: config.HashKey("key-enforced"), AppID: "app-tpm-enforced", Status: "active"}
+	keyOptOut := config.APIKey{KeyHash: config.HashKey("key-optout"), AppID: "app-tpm-optout", Status: "active"}
+	keyRefund := config.APIKey{KeyHash: config.HashKey("key-refund"), AppID: "app-tpm-refund", Status: "active"}
+
+	_ = store.SaveClient(ctx, client)
+	_ = store.SaveApp(ctx, appEnforced)
+	_ = store.SaveApp(ctx, appOptOut)
+	_ = store.SaveApp(ctx, appRefund)
+	_ = store.SaveKey(ctx, keyEnforced)
+	_ = store.SaveKey(ctx, keyOptOut)
+	_ = store.SaveKey(ctx, keyRefund)
+	_ = store.DeleteHeader(ctx, "header-1")
+	_ = store.DeleteRule(ctx, "rule-1")
+
+	// Mock Vertex AI response with custom token counts
+	var mockTokenCount int
+	var mu sync.Mutex
+
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		tokens := mockTokenCount
+		mu.Unlock()
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(fmt.Sprintf(`{
+			"candidates": [],
+			"usageMetadata": {
+				"totalTokenCount": %d
+			}
+		}`, tokens)))
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+	rp, _ := NewRouterProxy(store, "test-project", "us-central1")
+	rp.TokenSource = &mockTokenSource{}
+	rp.Target = backendURL
+	rp.Proxy.Transport = &mockRoundTripper{Target: backendURL}
+
+	// --- SCENARIO A: Enforced App gets rate-limited ---
+	// 1600 characters ≈ 400 estimated tokens, which exceeds the 200 TPM limit
+	largeBody := strings.Repeat("a", 1600)
+	req1 := httptest.NewRequest("POST", "/v1/models/gemini-2.5-flash:generateContent?key=key-enforced", strings.NewReader(largeBody))
+	req1.Header.Set("x-goog-api-key", "key-enforced")
+	rr1 := httptest.NewRecorder()
+
+	rp.ServeHTTP(rr1, req1)
+	if rr1.Code != http.StatusTooManyRequests {
+		t.Errorf("expected 429 Too Many Requests for enforced app, got %d: %s", rr1.Code, rr1.Body.String())
+	}
+
+	// --- SCENARIO B: Opt-out App bypasses the limit ---
+	req2 := httptest.NewRequest("POST", "/v1/models/gemini-2.5-flash:generateContent?key=key-optout", strings.NewReader(largeBody))
+	req2.Header.Set("x-goog-api-key", "key-optout")
+	rr2 := httptest.NewRecorder()
+
+	rp.ServeHTTP(rr2, req2)
+	if rr2.Code != http.StatusOK {
+		t.Errorf("expected 200 OK for opt-out app, got %d: %s", rr2.Code, rr2.Body.String())
+	}
+
+	// --- SCENARIO C: Estimate-and-Correct Refund logic ---
+	mu.Lock()
+	mockTokenCount = 50 // actual tokens is much lower than estimated 300
+	mu.Unlock()
+
+	// Request 1: 1200 chars ≈ 300 estimated tokens.
+	body1 := strings.Repeat("a", 1200)
+	req3 := httptest.NewRequest("POST", "/v1/models/gemini-2.5-flash:generateContent?key=key-refund", strings.NewReader(body1))
+	req3.Header.Set("x-goog-api-key", "key-refund")
+	rr3 := httptest.NewRecorder()
+
+	rp.ServeHTTP(rr3, req3)
+	if rr3.Code != http.StatusOK {
+		t.Fatalf("expected first refund request to succeed, got %d: %s", rr3.Code, rr3.Body.String())
+	}
+
+	// Without refund, sending a 3200 character request (800 estimated tokens) immediately after
+	// would make total tokens = 300 + 800 = 1100, exceeding the 1000 TPM limit.
+	// But since we got refunded 250 tokens, the balance is 50 + 800 = 850 < 1000, so it should succeed!
+	body2 := strings.Repeat("a", 3200)
+	req4 := httptest.NewRequest("POST", "/v1/models/gemini-2.5-flash:generateContent?key=key-refund", strings.NewReader(body2))
+	req4.Header.Set("x-goog-api-key", "key-refund")
+	rr4 := httptest.NewRecorder()
+
+	rp.ServeHTTP(rr4, req4)
+	if rr4.Code != http.StatusOK {
+		t.Errorf("expected second request to succeed due to refund adjustment, got %d: %s", rr4.Code, rr4.Body.String())
+	}
+
+	os.RemoveAll("data/local_db.json")
+}
+
 
 
 

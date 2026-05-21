@@ -16,6 +16,7 @@ You must register applications to isolate rate limits and determine queue routin
    * **Application Name**: Descriptive title (e.g., `Invoice Processor Service`).
    * **Parent Client**: Select the owner Client organization.
    * **RPM / TPM**: Configure the sliding-window rate limits.
+   * **Opt Out of TPM Rate Limiting**: Toggle this checkbox to completely bypass Tokens Per Minute (TPM) limits for this application and rely solely on RPM limits.
    * **Routing Priority**: Choose `low`, `medium`, or `high`.
 4. Click **Create Application**.
 

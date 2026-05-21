@@ -2790,6 +2790,7 @@ func (dc *DashboardController) CreateApp(w http.ResponseWriter, r *http.Request)
 	}
 
 	optOutDynamicRouting := r.FormValue("opt_out_dynamic_routing") == "true"
+	optOutTPM := r.FormValue("opt_out_tpm") == "true"
 
 	existingApp, exists := dc.Store.LookupApp(appID)
 	var complexity config.ComplexityRouting
@@ -2820,6 +2821,7 @@ func (dc *DashboardController) CreateApp(w http.ResponseWriter, r *http.Request)
 		Priority:             priority,
 		Complexity:           complexity,
 		OptOutDynamicRouting: optOutDynamicRouting,
+		OptOutTPM:            optOutTPM,
 	})
 	if err != nil {
 		log.Printf("[Dashboard] Error saving application profile: %v", err)
