@@ -30,9 +30,12 @@ data/local_logs.jsonl
 # OS Metadata
 .DS_Store
 
-# IDE settings
+# IDE and agent settings
 .idea/
 .vscode/
+.copilot/
+.squad/
+.github/
 
 # Python & CPython compiler artifacts
 __pycache__/
@@ -48,3 +51,9 @@ env/
 .mypy_cache/
 
 backend/proxy/data/local_logs.jsonl
+
+# Local-only session notes and agent workspace
+.local/
+
+# Design specs (local working docs)
+docs/specs/
