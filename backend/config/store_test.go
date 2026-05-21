@@ -151,3 +151,23 @@ func TestConfigStoreClientsCRUD(t *testing.T) {
 		t.Errorf("expected %d clients after delete, got %d", initialCount, len(clients))
 	}
 }
+
+func TestNewConfigStoreFirestore(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "false")
+	t.Setenv("FIRESTORE_EMULATOR_HOST", "localhost:8888")
+
+	ctx := context.Background()
+	store, err := NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("expected to create firestore store with emulator host: %v", err)
+	}
+	defer store.Client.Close()
+
+	if store.isLocalDev {
+		t.Errorf("expected isLocalDev to be false")
+	}
+	if store.Client == nil {
+		t.Errorf("expected firestore client to be instantiated")
+	}
+}
+
