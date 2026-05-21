@@ -57,3 +57,9 @@ backend/proxy/data/local_logs.jsonl
 
 # Design specs (local working docs)
 docs/specs/
+
+# Antigravity Session Journal
+.antigravity/
+
+# Session Journal
+.sessions/
