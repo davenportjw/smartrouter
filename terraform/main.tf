@@ -16,6 +16,13 @@ locals {
     "identitytoolkit.googleapis.com",
     "aiplatform.googleapis.com"
   ]
+
+  # Parse ALLOWED_EMAIL_DOMAINS to convert domains and specific emails to IAM members
+  parsed_email_members = [
+    for entry in split(",", var.allowed_email_domains) :
+    length(split("@", trimspace(entry))) > 1 ? "user:${trimspace(entry)}" : "domain:${trimspace(entry)}"
+    if trimspace(entry) != ""
+  ]
 }
 
 resource "google_project_service" "apis" {
@@ -132,12 +139,17 @@ resource "google_cloud_run_v2_service" "router_service" {
   }
 }
 
-# Make Backend Cloud Run publicly accessible for proxy calls and admin integrations
+# Make Backend Cloud Run accessible only to our authorized service account (UI / Generator) and authorized email members
 resource "google_cloud_run_v2_service_iam_member" "public_access" {
+  for_each = toset(concat(
+    ["serviceAccount:${google_service_account.router_sa.email}"],
+    local.parsed_email_members
+  ))
+
   location = google_cloud_run_v2_service.router_service.location
   name     = google_cloud_run_v2_service.router_service.name
   role     = "roles/run.invoker"
-  member   = "allUsers"
+  member   = each.value
 }
 
 # 2. FRONTEND SERVICE (Dashboard Admin Portal)
