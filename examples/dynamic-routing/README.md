@@ -127,3 +127,23 @@ The Smart Router automatically appends client-auditable response headers on all 
 | `X-Routed-Model` | The actual upstream model target processed by the router (e.g. `gemini-2.5-pro`). |
 | `X-Client-Tier` | The resolved tier of the customer based on the API key (e.g. `premium`). |
 | `X-App-ID` | The resolved application ID executing the request. |
+
+---
+
+## 🔌 Example 3: Google GenAI SDK Integration (`google-genai`)
+
+Instead of writing custom raw HTTP clients, you can easily point the official **Google GenAI SDK** to the Smart Router.
+
+### How it Works
+Initialize the `genai.Client` with custom `http_options` defining the Smart Router backend URL as your `api_endpoint`. The SDK will seamlessly route all actions through the proxy.
+
+### Install SDK Dependency
+```bash
+pip install google-genai
+```
+
+### Run the SDK Integration Example
+```bash
+python3 google_genai_sdk_example.py
+```
+

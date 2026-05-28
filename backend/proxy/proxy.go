@@ -43,6 +43,8 @@ type RouterProxy struct {
 	ProjectID   string
 	Location    string
 	transportMu sync.Mutex
+	ClassifierClient *http.Client
+	classifierCache  sync.Map // cache for classifier prompt hashes
 }
 
 // responseWriterWrapper intercepts writes to capture status code and response body size.
@@ -138,6 +140,13 @@ func NewRouterProxy(store *store.ConfigStore, projectID, location string) (*Rout
 		TokenSource: ts,
 		ProjectID:   projectID,
 		Location:    location,
+		ClassifierClient: &http.Client{
+			Transport: &http.Transport{
+				MaxIdleConns:        100,
+				MaxIdleConnsPerHost: 20,
+				IdleConnTimeout:     90 * time.Second,
+			},
+		},
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(target)
@@ -849,9 +858,19 @@ func (rp *RouterProxy) classifyComplexity(ctx context.Context, body []byte, c co
 			snippetStr = snippetStr[:4000]
 		}
 
+		// Check classifier cache using a simple hash or direct key
+		cacheKey := fmt.Sprintf("%s|%s|%s", classifierModel, snippetStr, c.AdditionalInstructions)
+		if cachedVal, ok := rp.classifierCache.Load(cacheKey); ok {
+			if cachedStr, ok := cachedVal.(string); ok {
+				log.Printf("[Complexity Classifier] Cache HIT: classified complexity as %s", cachedStr)
+				return cachedStr, nil
+			}
+		}
+
 		complexityResult, err := rp.callLLMClassifier(ctx, classifierModel, snippetStr, c.AdditionalInstructions)
 		if err == nil && (complexityResult == "simple" || complexityResult == "medium" || complexityResult == "complex") {
 			log.Printf("[Complexity Classifier] LLM classified complexity: %s", complexityResult)
+			rp.classifierCache.Store(cacheKey, complexityResult)
 			return complexityResult, nil
 		}
 		log.Printf("[Complexity Classifier] LLM classification call failed: %v. Falling back to static thresholds.", err)
@@ -942,8 +961,8 @@ func (rp *RouterProxy) callLLMClassifier(ctx context.Context, modelName string, 
 	targetURL := fmt.Sprintf("%s://%s/v1/projects/%s/locations/%s/publishers/google/models/%s:generateContent",
 		rp.Target.Scheme, rp.Target.Host, rp.ProjectID, rp.Location, modelName)
 
-	// Tight timeout for classification overhead safety (600ms)
-	callCtx, cancel := context.WithTimeout(ctx, 600*time.Millisecond)
+	// Tight timeout for classification overhead safety (3s)
+	callCtx, cancel := context.WithTimeout(ctx, 3000*time.Millisecond)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(callCtx, "POST", targetURL, bytes.NewReader(reqJSON))
@@ -958,8 +977,7 @@ func (rp *RouterProxy) callLLMClassifier(ctx context.Context, modelName string, 
 	req.Header.Set("Authorization", "Bearer "+token.AccessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := rp.ClassifierClient.Do(req)
 	if err != nil {
 		return "", err
 	}
