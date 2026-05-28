@@ -141,5 +141,6 @@ go test -v ./backend/proxy/... ./frontend/dashboard/...
 
 ## 🔌 Deployed Client Examples
 
+* **[Google GenAI SDK Coverage & Integration](docs/architecture/google-genai-sdk-coverage.md)**: Compatibility matrix, integration instructions, and key coverage gaps for the official `google-genai` SDKs.
 * **[API Key Integration](examples/cloudrun-apikey/)**: Client using HTTP Header (`x-goog-api-key`) authentication.
 * **[Service Account IAM](examples/cloudrun-serviceaccount/)**: Client using OIDC Token (`Authorization: Bearer`) authentication.

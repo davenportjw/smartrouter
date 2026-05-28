@@ -7,6 +7,7 @@ Welcome to the Smart Router documentation. The Smart Router is a Google Cloud Ru
 ## 🗺️ System Architecture
 Learn how the proxy processes requests, validates keys, and calculates costs.
 * 📘 **[System Architecture Overview](./architecture/overview.md)**: Data hierarchy, request execution lifecycle, and sliding-window rate limiting.
+* 📊 **[Google GenAI SDK Coverage](./architecture/google-genai-sdk-coverage.md)**: Compatibility matrix, architectural interception flow, and client integration examples.
 
 ---
 
