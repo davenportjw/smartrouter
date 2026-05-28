@@ -88,15 +88,19 @@ def detect_workspace(transcript_lines):
                 # Check standard locations
                 for key in ['Cwd', 'TargetFile', 'AbsolutePath', 'SearchPath', 'NotebookPath']:
                     path_val = args.get(key)
-                    if path_val and isinstance(path_val, str) and '/Users/jasondavenport/GitHub/' in path_val:
-                        match = re.match(r'^(/Users/jasondavenport/GitHub/[^/]+)', path_val)
-                        if match:
-                            return match.group(1)
+                    if path_val and isinstance(path_val, str):
+                        github_idx = path_val.find('/GitHub/')
+                        if github_idx != -1:
+                            base_part = path_val[:github_idx + 8]
+                            after_part = path_val[github_idx + 8:]
+                            repo_name = after_part.split('/')[0] if after_part else ''
+                            if repo_name:
+                                return base_part + repo_name
             
             # Scan raw content
-            match = re.search(r'/Users/jasondavenport/GitHub/([^/\s\n\)"\']+)', content)
+            match = re.search(r'(/[^/\s\n\)"\']+/GitHub/([^/\s\n\)"\']+))', content)
             if match:
-                return f"/Users/jasondavenport/GitHub/{match.group(1)}"
+                return match.group(1)
         except Exception:
             continue
     return None

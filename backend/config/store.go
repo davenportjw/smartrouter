@@ -30,6 +30,7 @@ type ConfigStore struct {
 	clients map[string]config.Client      // ClientID -> Client
 	apps    map[string]config.App         // AppID -> App
 	models  map[string]config.ModelConfig // Model ID -> ModelConfig
+	providers map[string]config.ProviderConfig // Provider ID -> ProviderConfig
 	rules   []config.RoutingRule
 	headers []config.CustomHeader
 
@@ -48,6 +49,7 @@ func NewConfigStore(ctx context.Context, projectID string) (*ConfigStore, error)
 		clients:       make(map[string]config.Client),
 		apps:          make(map[string]config.App),
 		models:        make(map[string]config.ModelConfig),
+		providers:     make(map[string]config.ProviderConfig),
 		ruleRegexes:   make(map[string]*regexp.Regexp),
 		headerRegexes: make(map[string]*regexp.Regexp),
 	}
@@ -81,6 +83,7 @@ func (cs *ConfigStore) StartListeners(ctx context.Context) {
 	go cs.listenRules(ctx)
 	go cs.listenHeaders(ctx)
 	go cs.listenModels(ctx)
+	go cs.listenProviders(ctx)
 }
 
 // Cache lookups and calculations
@@ -577,6 +580,59 @@ func (cs *ConfigStore) listenHeaders(ctx context.Context) {
 	}
 }
 
+func (cs *ConfigStore) listenProviders(ctx context.Context) {
+	backoff := 1 * time.Second
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		it := cs.Client.Collection("providers").Snapshots(ctx)
+		err := func() error {
+			for {
+				snap, err := it.Next()
+				if err != nil {
+					return err
+				}
+				backoff = 1 * time.Second
+
+				cs.mu.Lock()
+				cs.providers = make(map[string]config.ProviderConfig)
+				for {
+					doc, err := snap.Documents.Next()
+					if err == iterator.Done {
+						break
+					}
+					if err != nil {
+						continue
+					}
+					var p config.ProviderConfig
+					if err := doc.DataTo(&p); err == nil {
+						cs.providers[string(p.ID)] = p
+					}
+				}
+				cs.mu.Unlock()
+				log.Printf("[Firestore Cache] Synchronized %d providers", len(cs.providers))
+			}
+		}()
+
+		if err != nil {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+			time.Sleep(backoff)
+			backoff *= 2
+			if backoff > 1*time.Minute {
+				backoff = 1 * time.Minute
+			}
+		}
+	}
+}
+
 // localJSON DB Logic
 
 func (cs *ConfigStore) initLocalDB() error {
@@ -615,6 +671,20 @@ func (cs *ConfigStore) initLocalDB() error {
 				},
 			},
 			Models: []config.ModelConfig{},
+			Providers: map[string]config.ProviderConfig{
+				"google": {
+					ID:          config.ProviderGoogle,
+					DisplayName: "Google Cloud",
+					Enabled:     true,
+					Regions: map[string]config.RegionConfig{
+						"us-central1": {
+							Code:            "us-central1",
+							Active:          true,
+							EnabledServices: []string{"gemini"},
+						},
+					},
+				},
+			},
 		}
 
 		data, err := json.MarshalIndent(db, "", "  ")
@@ -642,6 +712,26 @@ func (cs *ConfigStore) initLocalDB() error {
 	}
 
 	dirty := false
+
+	// Auto-migrate providers if empty or missing
+	if db.Providers == nil || len(db.Providers) == 0 {
+		db.Providers = map[string]config.ProviderConfig{
+			"google": {
+				ID:          config.ProviderGoogle,
+				DisplayName: "Google Cloud",
+				Enabled:     true,
+				Regions: map[string]config.RegionConfig{
+					"us-central1": {
+						Code:            "us-central1",
+						Active:          true,
+						EnabledServices: []string{"gemini"},
+					},
+				},
+			},
+		}
+		dirty = true
+	}
+
 	for keyHash, key := range db.APIKeys {
 		if key.AppID == "" {
 			defaultAppID := "app-" + key.ClientID
@@ -725,6 +815,7 @@ func (cs *ConfigStore) initLocalDB() error {
 	for _, m := range db.Models {
 		cs.models[m.ID] = m
 	}
+	cs.providers = db.Providers
 	cs.sortRulesLocked()
 	cs.compileRegexesLocked()
 	cs.mu.Unlock()
@@ -745,6 +836,7 @@ func (cs *ConfigStore) saveLocalDB() error {
 		RoutingRules:  cs.rules,
 		CustomHeaders: cs.headers,
 		Models:        modelsList,
+		Providers:     cs.providers,
 	}
 	cs.mu.RUnlock()
 
@@ -1207,4 +1299,65 @@ func (cs *ConfigStore) DeleteApp(ctx context.Context, id string) error {
 
 func (cs *ConfigStore) GetQueueStatus(ctx context.Context) ([]config.QueueSnapshotItem, error) {
 	return nil, nil
+}
+
+func (cs *ConfigStore) GetAllProviders(ctx context.Context) ([]config.ProviderConfig, error) {
+	cs.mu.RLock()
+	isDev := cs.isLocalDev
+	cs.mu.RUnlock()
+
+	if isDev {
+		cs.mu.RLock()
+		defer cs.mu.RUnlock()
+		var list []config.ProviderConfig
+		for _, p := range cs.providers {
+			list = append(list, p)
+		}
+		return list, nil
+	}
+
+	providerDocs, err := cs.Client.Collection("providers").Documents(ctx).GetAll()
+	if err != nil {
+		return nil, err
+	}
+	var list []config.ProviderConfig
+	for _, doc := range providerDocs {
+		var p config.ProviderConfig
+		if err := doc.DataTo(&p); err == nil {
+			list = append(list, p)
+		}
+	}
+	return list, nil
+}
+
+func (cs *ConfigStore) SaveProvider(ctx context.Context, provider config.ProviderConfig) error {
+	cs.mu.RLock()
+	isDev := cs.isLocalDev
+	cs.mu.RUnlock()
+
+	if isDev {
+		cs.mu.Lock()
+		cs.providers[string(provider.ID)] = provider
+		cs.mu.Unlock()
+		return cs.saveLocalDB()
+	}
+
+	_, err := cs.Client.Collection("providers").Doc(string(provider.ID)).Set(ctx, provider)
+	return err
+}
+
+func (cs *ConfigStore) DeleteProvider(ctx context.Context, id string) error {
+	cs.mu.RLock()
+	isDev := cs.isLocalDev
+	cs.mu.RUnlock()
+
+	if isDev {
+		cs.mu.Lock()
+		delete(cs.providers, id)
+		cs.mu.Unlock()
+		return cs.saveLocalDB()
+	}
+
+	_, err := cs.Client.Collection("providers").Doc(id).Delete(ctx)
+	return err
 }

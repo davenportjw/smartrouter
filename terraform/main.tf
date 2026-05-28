@@ -341,3 +341,11 @@ resource "google_cloud_run_v2_service" "generator_service" {
     ]
   }
 }
+
+# Allow our authorized email members to impersonate the router service account for OIDC token generation
+resource "google_service_account_iam_member" "token_creator" {
+  for_each           = toset(local.parsed_email_members)
+  service_account_id = google_service_account.router_sa.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = each.value
+}

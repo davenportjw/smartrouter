@@ -25,4 +25,7 @@ type AdminStore interface {
 	SaveClient(ctx context.Context, client Client) error
 	DeleteClient(ctx context.Context, id string) error
 	GetQueueStatus(ctx context.Context) ([]QueueSnapshotItem, error)
+	GetAllProviders(ctx context.Context) ([]ProviderConfig, error)
+	SaveProvider(ctx context.Context, provider ProviderConfig) error
+	DeleteProvider(ctx context.Context, id string) error
 }

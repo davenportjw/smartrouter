@@ -81,13 +81,21 @@ func (ac *APIConfigStore) makeRequest(ctx context.Context, method, path string, 
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	// 1. Attach authorization token (prefer SharedSecret if configured)
+	// 1. Attach authorization token and custom X-Shared-Secret
 	if ac.SharedSecret != "" {
-		req.Header.Set("Authorization", "Bearer "+ac.SharedSecret)
-	} else if os.Getenv("LOCAL_DEV") != "true" {
+		req.Header.Set("X-Shared-Secret", ac.SharedSecret)
+		if os.Getenv("LOCAL_DEV") == "true" {
+			req.Header.Set("Authorization", "Bearer "+ac.SharedSecret)
+		}
+	}
+
+	if os.Getenv("LOCAL_DEV") != "true" {
 		token, err := ac.fetchOIDCToken(ctx)
 		if err == nil && token != "" {
 			req.Header.Set("Authorization", "Bearer "+token)
+		} else if ac.SharedSecret != "" && req.Header.Get("Authorization") == "" {
+			// Local/fallback authentications
+			req.Header.Set("Authorization", "Bearer "+ac.SharedSecret)
 		}
 	}
 
@@ -222,4 +230,19 @@ func (ac *APIConfigStore) GetQueueStatus(ctx context.Context) ([]QueueSnapshotIt
 	var status []QueueSnapshotItem
 	err := ac.makeRequest(ctx, "GET", "/api/queue", nil, &status)
 	return status, err
+}
+
+func (ac *APIConfigStore) GetAllProviders(ctx context.Context) ([]ProviderConfig, error) {
+	var providers []ProviderConfig
+	err := ac.makeRequest(ctx, "GET", "/api/providers", nil, &providers)
+	return providers, err
+}
+
+func (ac *APIConfigStore) SaveProvider(ctx context.Context, provider ProviderConfig) error {
+	return ac.makeRequest(ctx, "POST", "/api/providers", provider, nil)
+}
+
+func (ac *APIConfigStore) DeleteProvider(ctx context.Context, id string) error {
+	path := fmt.Sprintf("/api/providers?id=%s", url.QueryEscape(id))
+	return ac.makeRequest(ctx, "DELETE", path, nil, nil)
 }

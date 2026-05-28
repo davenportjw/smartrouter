@@ -70,3 +70,58 @@ chmod +x deploy.sh
 6. **Verification Tests**:
    * Runs `go run cmd/verify/main.go` against the backend to test functionality (requests routing, security boundary, and rules engine).
    * Cleans up test records from Firestore.
+
+---
+
+## 🛡️ Post-Deployment Secure Verification & Token Impersonation
+
+To maintain maximum security, the Smart Router backend on Cloud Run is deployed without public (`allUsers`) invoker permissions. Standard requests require OIDC identity token authentication matching the targeted audience (the backend service URL).
+
+Since standard user accounts (e.g., `@google.com` or `@gmail.com` accounts logged in via `gcloud`) cannot generate custom-audience OIDC tokens directly, the post-deployment verify utility (`cmd/verify/main.go`) implements a robust **ADC-Driven Service Account Impersonation** pattern.
+
+### 🔄 Authentication & Verification Flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant CLI as Verification Tool (cmd/verify)
+    participant GCloud as Local GCloud SDK
+    participant IAM as GCP IAM Credentials API
+    participant Backend as Cloud Run Backend Proxy
+
+    CLI->>GCloud: Exec 'gcloud auth application-default print-access-token'
+    GCloud-->>CLI: Return standard ADC Access Token
+    
+    CLI->>IAM: POST /projects/-/serviceAccounts/{Runner_SA}:generateIdToken
+    Note over CLI,IAM: Authorization: Bearer {ADC_Access_Token}<br/>Audience: {Backend_Cloud_Run_URL}
+    
+    IAM-->>CLI: Return Signed OIDC Identity JWT
+    
+    CLI->>Backend: Send verification requests (e.g., Gemini 2.5 Flash)
+    Note over CLI,Backend: Authorization: Bearer {OIDC_Identity_JWT}<br/>X-goog-api-key: {Test_API_Key}
+    
+    Backend-->>CLI: Return success & verify response metrics
+```
+
+### 🛠️ Running Verification Tests Manually
+
+If you need to run the verification tests manually from your local terminal against the active Cloud Run backend service:
+
+1. **Ensure ADC Credentials are Active**:
+   ```bash
+   gcloud auth application-default login
+   gcloud config set project your-gcp-project-id
+   ```
+
+2. **Retrieve your Backend Service URL**:
+   ```bash
+   export SERVICE_URL=$(gcloud run services describe gemini-smart-router --region us-central1 --format="value(status.url)")
+   ```
+
+3. **Execute the Verification Suite**:
+   ```bash
+   SERVICE_URL=$SERVICE_URL GOOGLE_CLOUD_PROJECT="your-gcp-project-id" go run cmd/verify/main.go
+   ```
+
+The utility will automatically retrieve the ADC access token, generate the signed identity token, configure mock client configurations in Firestore, verify standard and rules-based routing against real Gemini endpoints, and purge the test data upon completion.
+

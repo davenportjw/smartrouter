@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	store "geminirouter/backend/config"
 	"geminirouter/backend/proxy"
@@ -44,9 +45,15 @@ func (ac *APIController) AuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		if ac.SharedSecret != "" {
-			authHeader := r.Header.Get("Authorization")
-			expected := "Bearer " + ac.SharedSecret
-			if authHeader != expected {
+			secret := r.Header.Get("X-Shared-Secret")
+			if secret == "" {
+				// Fallback to Authorization header for compatibility
+				authHeader := r.Header.Get("Authorization")
+				if strings.HasPrefix(authHeader, "Bearer ") {
+					secret = strings.TrimPrefix(authHeader, "Bearer ")
+				}
+			}
+			if secret != ac.SharedSecret {
 				http.Error(w, "Unauthorized: Invalid API shared secret", http.StatusUnauthorized)
 				return
 			}
@@ -69,6 +76,7 @@ func (ac *APIController) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("/api/models/refresh", ac.AuthMiddleware(http.HandlerFunc(ac.HandleModelsRefresh)))
 	mux.Handle("/api/models/toggle", ac.AuthMiddleware(http.HandlerFunc(ac.HandleModelsToggle)))
 	mux.Handle("/api/queue", ac.AuthMiddleware(http.HandlerFunc(ac.HandleQueue)))
+	mux.Handle("/api/providers", ac.AuthMiddleware(http.HandlerFunc(ac.HandleProviders)))
 }
 
 // Response helpers
@@ -453,4 +461,49 @@ func (ac *APIController) HandleQueue(w http.ResponseWriter, r *http.Request) {
 	}
 	status := ac.Scheduler.GetQueueStatus()
 	respondWithJSON(w, http.StatusOK, status)
+}
+
+func (ac *APIController) HandleProviders(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	switch r.Method {
+	case http.MethodGet:
+		providers, err := ac.Store.GetAllProviders(ctx)
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		respondWithJSON(w, http.StatusOK, providers)
+
+	case http.MethodPost:
+		var provider config.ProviderConfig
+		if err := json.NewDecoder(r.Body).Decode(&provider); err != nil {
+			respondWithError(w, http.StatusBadRequest, "Invalid request payload")
+			return
+		}
+		if provider.ID == "" {
+			respondWithError(w, http.StatusBadRequest, "Missing provider ID")
+			return
+		}
+		if err := ac.Store.SaveProvider(ctx, provider); err != nil {
+			respondWithError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		respondWithJSON(w, http.StatusOK, provider)
+
+	case http.MethodDelete:
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			respondWithError(w, http.StatusBadRequest, "Missing provider id query parameter")
+			return
+		}
+		if err := ac.Store.DeleteProvider(ctx, id); err != nil {
+			respondWithError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		respondWithJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+
+	default:
+		w.Header().Set("Allow", "GET, POST, DELETE")
+		respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed")
+	}
 }

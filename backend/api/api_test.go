@@ -211,5 +211,94 @@ func TestAPIConfigStoreAndBackendAPIIntegration(t *testing.T) {
 		}
 	})
 
+	// --- TEST PROVIDERS CRUD ---
+	t.Run("Providers API CRUD Integration", func(t *testing.T) {
+		// Google provider should be present by default
+		providers, err := clientStore.GetAllProviders(ctx)
+		if err != nil {
+			t.Fatalf("GetAllProviders failed: %v", err)
+		}
+		foundGoogle := false
+		for _, p := range providers {
+			if p.ID == config.ProviderGoogle {
+				foundGoogle = true
+				if !p.Enabled {
+					t.Errorf("expected google provider to be enabled by default")
+				}
+				break
+			}
+		}
+		if !foundGoogle {
+			t.Errorf("expected to find pre-seeded google provider configuration")
+		}
+
+		// Create and save a new Local cluster provider configuration
+		newProvider := config.ProviderConfig{
+			ID:          config.ProviderLocal,
+			DisplayName: "On-Premises Local Cluster",
+			Enabled:     true,
+			Regions: map[string]config.RegionConfig{
+				"local-cluster": {
+					Code:            "local-cluster",
+					Active:          true,
+					EnabledServices: []string{"llama-3-8b"},
+					LocalConfig: &config.LocalConfig{
+						Clusters: []config.LocalCluster{
+							{
+								ID:        "cluster-alpha",
+								Name:      "Alpha GPU Node Pool",
+								QueueName: "alpha-queue",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err = clientStore.SaveProvider(ctx, newProvider)
+		if err != nil {
+			t.Fatalf("SaveProvider failed: %v", err)
+		}
+
+		// Fetch again and verify creation
+		providers, err = clientStore.GetAllProviders(ctx)
+		if err != nil {
+			t.Fatalf("GetAllProviders failed: %v", err)
+		}
+		foundLocal := false
+		for _, p := range providers {
+			if p.ID == config.ProviderLocal {
+				foundLocal = true
+				if p.DisplayName != newProvider.DisplayName {
+					t.Errorf("expected DisplayName %q, got %q", newProvider.DisplayName, p.DisplayName)
+				}
+				reg, ok := p.Regions["local-cluster"]
+				if !ok {
+					t.Errorf("expected to find 'local-cluster' region in saved local provider")
+				} else if len(reg.LocalConfig.Clusters) == 0 || reg.LocalConfig.Clusters[0].ID != "cluster-alpha" {
+					t.Errorf("expected to find cluster-alpha inside region configs")
+				}
+				break
+			}
+		}
+		if !foundLocal {
+			t.Errorf("expected to find saved local cluster provider in list")
+		}
+
+		// Delete local provider
+		err = clientStore.DeleteProvider(ctx, string(config.ProviderLocal))
+		if err != nil {
+			t.Fatalf("DeleteProvider failed: %v", err)
+		}
+
+		// Verify deletion
+		providers, _ = clientStore.GetAllProviders(ctx)
+		for _, p := range providers {
+			if p.ID == config.ProviderLocal {
+				t.Errorf("expected local provider to be deleted from list")
+			}
+		}
+	})
+
 	os.RemoveAll("data/local_db.json")
 }

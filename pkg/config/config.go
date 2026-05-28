@@ -90,14 +90,78 @@ type ModelConfig struct {
 	Active      bool   `firestore:"active" json:"active"`             // true if available for routing
 }
 
+// ProviderType defines the primary cloud or local infrastructure type.
+type ProviderType string
+
+const (
+	ProviderGoogle ProviderType = "google"
+	ProviderAWS    ProviderType = "aws"
+	ProviderAzure  ProviderType = "azure"
+	ProviderLocal  ProviderType = "local"
+)
+
+// ProviderConfig configures a top-level cloud or local infrastructure provider.
+type ProviderConfig struct {
+	ID          ProviderType            `firestore:"id" json:"id"`                     // "google", "aws", "azure", "local"
+	DisplayName string                  `firestore:"display_name" json:"display_name"` // "Google Cloud", etc.
+	Enabled     bool                    `firestore:"enabled" json:"enabled"`
+	Credentials map[string]string       `firestore:"credentials" json:"-"`             // Secured keys/roles (not exposed in JSON)
+	Regions     map[string]RegionConfig `firestore:"regions" json:"regions"`           // Map of region-code -> Region configuration
+}
+
+// RegionConfig defines enabled features and providers inside a specific region.
+type RegionConfig struct {
+	Code            string            `firestore:"code" json:"code"`                         // e.g., "us-central1" or "local-cluster"
+	Active          bool              `firestore:"active" json:"active"`
+	EnabledServices []string          `firestore:"enabled_services" json:"enabled_services"` // e.g., ["gemini", "anthropic", "llama"]
+	DiscoveryCron   string            `firestore:"discovery_cron" json:"discovery_cron"`     // e.g., "0 0 * * *" (Daily discovery)
+	LocalConfig     *LocalConfig      `firestore:"local_config,omitempty" json:"local_config,omitempty"`
+}
+
+// LocalConfig defines the parameters for running models on local systems/clusters.
+type LocalConfig struct {
+	DirectEndpoints []DirectEndpoint `firestore:"direct_endpoints" json:"direct_endpoints"` // Static local endpoints
+	Clusters        []LocalCluster   `firestore:"clusters" json:"clusters"`                 // Shared local queues
+}
+
+// DirectEndpoint describes a single static local endpoint bypassing the queue.
+type DirectEndpoint struct {
+	ID        string `firestore:"id" json:"id"`
+	ModelName string `firestore:"model_name" json:"model_name"` // e.g., "llama-3-8b"
+	URL       string `firestore:"url" json:"url"`               // e.g., "http://192.168.1.15:8000/v1"
+	Active    bool   `firestore:"active" json:"active"`
+}
+
+// LocalCluster manages dynamic pool queuing for on-prem machines.
+type LocalCluster struct {
+	ID          string            `firestore:"id" json:"id"`
+	Name        string            `firestore:"name" json:"name"`
+	QueueName   string            `firestore:"queue_name" json:"queue_name"`
+	MaxQueueAge time.Duration     `firestore:"max_queue_age" json:"max_queue_age"`
+	Nodes       map[string]Node   `firestore:"nodes" json:"nodes"` // Heartbeating computing agents
+}
+
+// Node represents a computing instance running a Smart Router agent.
+type Node struct {
+	ID                string    `firestore:"id" json:"id"`
+	Name              string    `firestore:"name" json:"name"`
+	Status            string    `firestore:"status" json:"status"` // "online", "offline", "busy"
+	LastHeartbeat     time.Time `firestore:"last_heartbeat" json:"last_heartbeat"`
+	MaxConcurrent     int       `firestore:"max_concurrent" json:"max_concurrent"`
+	MemoryAllocatedGB int       `firestore:"memory_allocated_gb" json:"memory_allocated_gb"`
+	ComputeGPUCores   int       `firestore:"compute_gpu_cores" json:"compute_gpu_cores"`
+	SupportedModels   []string  `firestore:"supported_models" json:"supported_models"`
+}
+
 // LocalDB represents the JSON schema for the local development database.
 type LocalDB struct {
-	Clients       map[string]Client      `json:"clients"`
-	Apps          map[string]App         `json:"apps"`
-	APIKeys       map[string]APIKey      `json:"api_keys"`
-	RoutingRules  []RoutingRule          `json:"routing_rules"`
-	CustomHeaders []CustomHeader         `json:"custom_headers"`
-	Models        []ModelConfig          `json:"models"`
+	Clients       map[string]Client            `json:"clients"`
+	Apps          map[string]App               `json:"apps"`
+	APIKeys       map[string]APIKey            `json:"api_keys"`
+	RoutingRules  []RoutingRule                `json:"routing_rules"`
+	CustomHeaders []CustomHeader               `json:"custom_headers"`
+	Models        []ModelConfig                `json:"models"`
+	Providers     map[string]ProviderConfig    `json:"providers"`
 }
 
 // HashKey returns the hex-encoded SHA-256 hash of an API key.
