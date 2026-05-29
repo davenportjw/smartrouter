@@ -3308,6 +3308,9 @@ func (dc *DashboardController) ServeDocs(w http.ResponseWriter, r *http.Request)
 			Name: "Architecture",
 			Items: []templates.DocItem{
 				{Title: "System Overview", Path: "architecture/overview.md"},
+				{Title: "Google GenAI SDK Coverage", Path: "architecture/google-genai-sdk-coverage.md"},
+				{Title: "Local Clusters Plan", Path: "architecture/local-clusters-plan.md"},
+				{Title: "Local Clusters Guide", Path: "architecture/local-clusters-guide.md"},
 			},
 		},
 		{
@@ -3315,6 +3318,7 @@ func (dc *DashboardController) ServeDocs(w http.ResponseWriter, r *http.Request)
 			Items: []templates.DocItem{
 				{Title: "Test-Driven Development", Path: "approaches/tdd-feature-development.md"},
 				{Title: "Model Version Compliance", Path: "approaches/model-compliance.md"},
+				{Title: "Local Runners E2E Testing Plan", Path: "approaches/local-runners-testing.md"},
 			},
 		},
 		{

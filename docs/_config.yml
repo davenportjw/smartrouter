@@ -1,0 +1,9 @@
+title: Smart Router Documentation
+description: Comprehensive system guides, architecture breakdowns, and integration specs for developers and administrators.
+baseurl: "/smartrouter"
+
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: "default"
