@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
+	"sync"
+	"time"
 
 	store "geminirouter/backend/config"
 	"geminirouter/backend/proxy"
@@ -16,15 +19,24 @@ import (
 type APIController struct {
 	Store        *store.ConfigStore
 	Scheduler    *proxy.RequestScheduler
+	Queue        *proxy.ClusterQueue
 	SharedSecret string
+
+	// Thread-safe dynamic registry of active nodes and their cluster assignments
+	runnersMu         sync.RWMutex
+	registeredRunners map[string]config.Node
+	nodeAttachments   map[string][]string
 }
 
 // NewAPIController initializes a new backend API controller.
-func NewAPIController(store *store.ConfigStore, scheduler *proxy.RequestScheduler, sharedSecret string) *APIController {
+func NewAPIController(store *store.ConfigStore, scheduler *proxy.RequestScheduler, queue *proxy.ClusterQueue, sharedSecret string) *APIController {
 	return &APIController{
-		Store:        store,
-		Scheduler:    scheduler,
-		SharedSecret: sharedSecret,
+		Store:             store,
+		Scheduler:         scheduler,
+		Queue:             queue,
+		SharedSecret:      sharedSecret,
+		registeredRunners: make(map[string]config.Node),
+		nodeAttachments:   make(map[string][]string),
 	}
 }
 
@@ -77,6 +89,17 @@ func (ac *APIController) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("/api/models/toggle", ac.AuthMiddleware(http.HandlerFunc(ac.HandleModelsToggle)))
 	mux.Handle("/api/queue", ac.AuthMiddleware(http.HandlerFunc(ac.HandleQueue)))
 	mux.Handle("/api/providers", ac.AuthMiddleware(http.HandlerFunc(ac.HandleProviders)))
+
+	// Dynamic Local Cluster REST API routes
+	mux.Handle("/api/v1/cluster/runners/register", http.HandlerFunc(ac.HandleClusterRegisterNode))
+	mux.Handle("/api/v1/cluster/runners/heartbeat", http.HandlerFunc(ac.HandleClusterHeartbeat))
+	mux.Handle("/api/v1/cluster/queue/poll", http.HandlerFunc(ac.HandleClusterPollQueue))
+	mux.Handle("/api/v1/cluster/queue/resolve", http.HandlerFunc(ac.HandleClusterResolveJob))
+
+	// Registered Runners Admin REST API routes
+	mux.Handle("/api/v1/admin/runners", ac.AuthMiddleware(http.HandlerFunc(ac.HandleAdminRunnersList)))
+	mux.Handle("/api/v1/admin/runners/attach", ac.AuthMiddleware(http.HandlerFunc(ac.HandleAdminRunnersAttach)))
+	mux.Handle("/api/v1/admin/runners/deregister", ac.AuthMiddleware(http.HandlerFunc(ac.HandleAdminRunnersDeregister)))
 }
 
 // Response helpers
@@ -507,3 +530,308 @@ func (ac *APIController) HandleProviders(w http.ResponseWriter, r *http.Request)
 		respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed")
 	}
 }
+
+func calculateMaxModelSize(mem int) int {
+	if mem < 8 {
+		return 2
+	}
+	if mem <= 16 {
+		return 8
+	}
+	if mem <= 32 {
+		return 16
+	}
+	if mem <= 64 {
+		return 32
+	}
+	if mem <= 128 {
+		return 64
+	}
+	return 128
+}
+
+func calculateMaxConcurrency(mem int) int {
+	if mem < 8 {
+		return 1
+	}
+	if mem <= 16 {
+		return 2
+	}
+	if mem <= 32 {
+		return 4
+	}
+	if mem <= 64 {
+		return 6
+	}
+	if mem <= 128 {
+		return 8
+	}
+	return 16
+}
+
+func (ac *APIController) HandleClusterRegisterNode(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	var node config.Node
+	if err := json.NewDecoder(r.Body).Decode(&node); err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+	if node.ID == "" {
+		respondWithError(w, http.StatusBadRequest, "Missing node ID")
+		return
+	}
+
+	// Dynamic capacity limit checks
+	node.MaxModelSizeGB = calculateMaxModelSize(node.MemoryAllocatedGB)
+	node.MaxConcurrent = calculateMaxConcurrency(node.MemoryAllocatedGB)
+	node.Status = "online"
+	node.LastHeartbeat = time.Now()
+
+	ac.runnersMu.Lock()
+	ac.registeredRunners[node.ID] = node
+	ac.runnersMu.Unlock()
+
+	respondWithJSON(w, http.StatusOK, map[string]string{"status": "registered"})
+}
+
+func (ac *APIController) HandleClusterHeartbeat(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	var hb struct {
+		NodeID    string `json:"node_id"`
+		ClusterID string `json:"cluster_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&hb); err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	ac.runnersMu.Lock()
+	if node, ok := ac.registeredRunners[hb.NodeID]; ok {
+		node.LastHeartbeat = time.Now()
+		ac.registeredRunners[hb.NodeID] = node
+	} else {
+		// Auto-register dynamic node on heartbeat
+		newNode := config.Node{
+			ID:                hb.NodeID,
+			Name:              "Dynamic Connected Node",
+			Status:            "online",
+			LastHeartbeat:     time.Now(),
+			MemoryAllocatedGB: 16,
+			ComputeGPUCores:   8,
+			SupportedModels:   []string{"llama3:8b"},
+			MaxModelSizeGB:    8,
+			MaxConcurrent:     2,
+		}
+		ac.registeredRunners[hb.NodeID] = newNode
+	}
+
+	// Auto-associate the runner to ClusterID on heartbeat if provided and not already mapped
+	if hb.ClusterID != "" {
+		alreadyAssigned := false
+		for _, assigned := range ac.nodeAttachments[hb.NodeID] {
+			if assigned == hb.ClusterID {
+				alreadyAssigned = true
+				break
+			}
+		}
+		if !alreadyAssigned {
+			ac.nodeAttachments[hb.NodeID] = append(ac.nodeAttachments[hb.NodeID], hb.ClusterID)
+		}
+
+		// Also auto-associate to "local-cluster" so it matches standard queued jobs
+		hasLocalCluster := false
+		for _, assigned := range ac.nodeAttachments[hb.NodeID] {
+			if assigned == "local-cluster" {
+				hasLocalCluster = true
+				break
+			}
+		}
+		if !hasLocalCluster {
+			ac.nodeAttachments[hb.NodeID] = append(ac.nodeAttachments[hb.NodeID], "local-cluster")
+		}
+	}
+	ac.runnersMu.Unlock()
+
+	maxSizeLimit := 32
+	ac.runnersMu.RLock()
+	if n, ok := ac.registeredRunners[hb.NodeID]; ok {
+		maxSizeLimit = n.MaxModelSizeGB
+	}
+	ac.runnersMu.RUnlock()
+
+	respondWithJSON(w, http.StatusOK, map[string]interface{}{
+		"status":            "alive",
+		"max_model_size_gb": maxSizeLimit,
+	})
+}
+
+func (ac *APIController) HandleClusterPollQueue(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	if ac.Queue == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Local cluster queue not enabled")
+		return
+	}
+	var req struct {
+		NodeID          string   `json:"node_id"`
+		SupportedModels []string `json:"supported_models"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	// Check if runner has administrative cluster mappings
+	var allowedClusters []string
+	if req.NodeID != "" {
+		ac.runnersMu.RLock()
+		allowedClusters = ac.nodeAttachments[req.NodeID]
+		ac.runnersMu.RUnlock()
+	}
+
+	job, found := ac.Queue.Poll(req.SupportedModels, allowedClusters)
+	if !found {
+		w.WriteHeader(http.StatusNoContent) // 204 No Content
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, job)
+}
+
+func (ac *APIController) HandleClusterResolveJob(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	if ac.Queue == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Local cluster queue not enabled")
+		return
+	}
+	var res struct {
+		JobID      string `json:"job_id"`
+		Payload    []byte `json:"payload"`
+		StatusCode int    `json:"status_code"`
+		Error      string `json:"error,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&res); err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	var err error
+	if res.Error != "" {
+		err = fmt.Errorf("%s", res.Error)
+	}
+
+	result := config.QueueResult{
+		Payload:    res.Payload,
+		StatusCode: res.StatusCode,
+		Error:      err,
+	}
+
+	if resolved := ac.Queue.Resolve(res.JobID, result); !resolved {
+		respondWithError(w, http.StatusNotFound, "Job not found or already expired")
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, map[string]string{"status": "resolved"})
+}
+
+func (ac *APIController) HandleAdminRunnersList(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	ac.runnersMu.RLock()
+	defer ac.runnersMu.RUnlock()
+
+	type RunnerResponse struct {
+		Node             config.Node `json:"node"`
+		AssignedClusters []string    `json:"assigned_clusters"`
+	}
+
+	// Return sorted slice for deterministic presentation
+	var list []RunnerResponse
+	var keys []string
+	for id := range ac.registeredRunners {
+		keys = append(keys, id)
+	}
+	sort.Strings(keys) // sort keys
+
+	for _, id := range keys {
+		node := ac.registeredRunners[id]
+		clusters := ac.nodeAttachments[id]
+		if clusters == nil {
+			clusters = []string{}
+		}
+		list = append(list, RunnerResponse{
+			Node:             node,
+			AssignedClusters: clusters,
+		})
+	}
+
+	// Fallback to empty slice instead of nil in JSON
+	if len(list) == 0 {
+		respondWithJSON(w, http.StatusOK, []RunnerResponse{})
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, list)
+}
+
+func (ac *APIController) HandleAdminRunnersAttach(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	var req struct {
+		NodeID     string   `json:"node_id"`
+		ClusterIDs []string `json:"cluster_ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	if req.NodeID == "" {
+		respondWithError(w, http.StatusBadRequest, "Missing node ID")
+		return
+	}
+
+	ac.runnersMu.Lock()
+	ac.nodeAttachments[req.NodeID] = req.ClusterIDs
+	ac.runnersMu.Unlock()
+
+	respondWithJSON(w, http.StatusOK, map[string]string{"status": "attached"})
+}
+
+func (ac *APIController) HandleAdminRunnersDeregister(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	nodeID := r.URL.Query().Get("id")
+	if nodeID == "" {
+		respondWithError(w, http.StatusBadRequest, "Missing runner id")
+		return
+	}
+
+	ac.runnersMu.Lock()
+	delete(ac.registeredRunners, nodeID)
+	delete(ac.nodeAttachments, nodeID)
+	ac.runnersMu.Unlock()
+
+	respondWithJSON(w, http.StatusOK, map[string]string{"status": "deregistered"})
+}
+

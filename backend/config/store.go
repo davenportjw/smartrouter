@@ -1361,3 +1361,17 @@ func (cs *ConfigStore) DeleteProvider(ctx context.Context, id string) error {
 	_, err := cs.Client.Collection("providers").Doc(id).Delete(ctx)
 	return err
 }
+
+// Dynamic runner stub implementations for satisfying the AdminStore interface
+
+func (cs *ConfigStore) GetRegisteredRunners(ctx context.Context) ([]config.RunnerResponse, error) {
+	return []config.RunnerResponse{}, nil
+}
+
+func (cs *ConfigStore) AttachRunnerToClusters(ctx context.Context, nodeID string, clusterIDs []string) error {
+	return nil
+}
+
+func (cs *ConfigStore) DeregisterRunner(ctx context.Context, nodeID string) error {
+	return nil
+}

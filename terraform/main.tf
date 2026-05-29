@@ -139,17 +139,12 @@ resource "google_cloud_run_v2_service" "router_service" {
   }
 }
 
-# Make Backend Cloud Run accessible only to our authorized service account (UI / Generator) and authorized email members
+# Make Backend Cloud Run publicly accessible as a hybrid API gateway, secured internally by API keys and shared secrets
 resource "google_cloud_run_v2_service_iam_member" "public_access" {
-  for_each = toset(concat(
-    ["serviceAccount:${google_service_account.router_sa.email}"],
-    local.parsed_email_members
-  ))
-
   location = google_cloud_run_v2_service.router_service.location
   name     = google_cloud_run_v2_service.router_service.name
   role     = "roles/run.invoker"
-  member   = each.value
+  member   = "allUsers"
 }
 
 # 2. FRONTEND SERVICE (Dashboard Admin Portal)

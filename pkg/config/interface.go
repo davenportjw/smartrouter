@@ -28,4 +28,9 @@ type AdminStore interface {
 	GetAllProviders(ctx context.Context) ([]ProviderConfig, error)
 	SaveProvider(ctx context.Context, provider ProviderConfig) error
 	DeleteProvider(ctx context.Context, id string) error
+
+	// Dynamic cluster runner administrative actions
+	GetRegisteredRunners(ctx context.Context) ([]RunnerResponse, error)
+	AttachRunnerToClusters(ctx context.Context, nodeID string, clusterIDs []string) error
+	DeregisterRunner(ctx context.Context, nodeID string) error
 }

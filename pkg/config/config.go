@@ -151,6 +151,7 @@ type Node struct {
 	MemoryAllocatedGB int       `firestore:"memory_allocated_gb" json:"memory_allocated_gb"`
 	ComputeGPUCores   int       `firestore:"compute_gpu_cores" json:"compute_gpu_cores"`
 	SupportedModels   []string  `firestore:"supported_models" json:"supported_models"`
+	MaxModelSizeGB    int       `firestore:"max_model_size_gb" json:"max_model_size_gb"` // Dynamic limit adjustment
 }
 
 // LocalDB represents the JSON schema for the local development database.
@@ -320,4 +321,24 @@ type QueueSnapshotItem struct {
 	ArrivalTime time.Time `json:"arrival_time"`
 	DurationMs  int64     `json:"duration_ms"`
 }
+
+// QueueJob represents an active held request inside the priority queue.
+type QueueJob struct {
+	ID           string            `json:"id"`
+	ClusterID    string            `json:"cluster_id"`
+	AppID        string            `json:"app_id"`
+	Model        string            `json:"model"`
+	Priority     string            `json:"priority"` // "high", "medium", "low"
+	Payload      []byte            `json:"payload"`
+	ResponseChan chan QueueResult  `json:"-"`
+	CreatedAt    time.Time         `json:"created_at"`
+}
+
+// QueueResult carries the execution output back to the proxy loop.
+type QueueResult struct {
+	Payload    []byte
+	StatusCode int
+	Error      error
+}
+
 

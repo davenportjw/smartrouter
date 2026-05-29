@@ -3353,3 +3353,236 @@ func (dc *DashboardController) ServeDocs(w http.ResponseWriter, r *http.Request)
 	_ = templates.Layout(activeTitle, "docs", content).Render(ctx, w)
 }
 
+// ServeClusters renders the Local Clusters status tab.
+func (dc *DashboardController) ServeClusters(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Fetch active providers to see if local config exists
+	providers, err := dc.Store.GetAllProviders(ctx)
+	if err != nil {
+		log.Printf("[Dashboard] Error loading providers for clusters: %v", err)
+	}
+
+	// Fetch active registered runners from REST API Config Store
+	activeNodes, err := dc.Store.GetRegisteredRunners(ctx)
+	if err != nil {
+		log.Printf("[Dashboard] Error loading registered runners: %v", err)
+	}
+
+	// If no nodes registered, mock some if simulating is true
+	simulate := false
+	if val, ok := ctx.Value("simulate_metrics").(bool); ok && val {
+		simulate = true
+	}
+
+	if len(activeNodes) == 0 && simulate {
+		activeNodes = []config.RunnerResponse{
+			{
+				Node: config.Node{
+					ID:                "runner-mac-m3-ultra",
+					Name:              "Jason's Mac Studio (M3 Ultra)",
+					Status:            "online",
+					LastHeartbeat:     time.Now().Add(-2 * time.Second),
+					MemoryAllocatedGB: 128,
+					ComputeGPUCores:   76,
+					SupportedModels:   []string{"gemma2:2b", "gemma2:9b", "llama3:8b"},
+					MaxModelSizeGB:    64,
+					MaxConcurrent:     8,
+				},
+				AssignedClusters: []string{"cluster-alpha"},
+			},
+			{
+				Node: config.Node{
+					ID:                "runner-k8s-pod-prod-01",
+					Name:              "K8s Pod Operator - Node Node-12",
+					Status:            "busy",
+					LastHeartbeat:     time.Now().Add(-1 * time.Second),
+					MemoryAllocatedGB: 80,
+					ComputeGPUCores:   5120, // Nvidia A100 Cores
+					SupportedModels:   []string{"gemma2:9b", "llama3:70b"},
+					MaxModelSizeGB:    64,
+					MaxConcurrent:     6,
+				},
+				AssignedClusters: []string{"cluster-beta"},
+			},
+		}
+	}
+
+	queueItems, _ := dc.Store.GetQueueStatus(ctx)
+
+	w.Header().Set("Content-Type", "text/html")
+	content := templates.ClustersTab(templates.ClustersViewModel{
+		ActiveNodes: activeNodes,
+		QueueDepth:  len(queueItems),
+		Providers:   providers,
+	})
+	_ = templates.Layout("Local Clusters", "clusters", content).Render(ctx, w)
+}
+
+// PollClustersActive returns only the raw inner nodes component for dynamic HTMX replacement.
+func (dc *DashboardController) PollClustersActive(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	providers, err := dc.Store.GetAllProviders(ctx)
+	if err != nil {
+		log.Printf("[Dashboard] Error loading providers: %v", err)
+	}
+
+	activeNodes, err := dc.Store.GetRegisteredRunners(ctx)
+	if err != nil {
+		log.Printf("[Dashboard] Error loading registered runners: %v", err)
+	}
+
+	simulate := false
+	if val, ok := ctx.Value("simulate_metrics").(bool); ok && val {
+		simulate = true
+	}
+
+	if len(activeNodes) == 0 && simulate {
+		activeNodes = []config.RunnerResponse{
+			{
+				Node: config.Node{
+					ID:                "runner-mac-m3-ultra",
+					Name:              "Jason's Mac Studio (M3 Ultra)",
+					Status:            "online",
+					LastHeartbeat:     time.Now().Add(-2 * time.Second),
+					MemoryAllocatedGB: 128,
+					ComputeGPUCores:   76,
+					SupportedModels:   []string{"gemma2:2b", "gemma2:9b", "llama3:8b"},
+					MaxModelSizeGB:    64,
+					MaxConcurrent:     8,
+				},
+				AssignedClusters: []string{"cluster-alpha"},
+			},
+			{
+				Node: config.Node{
+					ID:                "runner-k8s-pod-prod-01",
+					Name:              "K8s Pod Operator - Node Node-12",
+					Status:            "busy",
+					LastHeartbeat:     time.Now().Add(-1 * time.Second),
+					MemoryAllocatedGB: 80,
+					ComputeGPUCores:   5120,
+					SupportedModels:   []string{"gemma2:9b", "llama3:70b"},
+					MaxModelSizeGB:    64,
+					MaxConcurrent:     6,
+				},
+				AssignedClusters: []string{"cluster-beta"},
+			},
+		}
+	}
+
+	queueItems, _ := dc.Store.GetQueueStatus(ctx)
+
+	w.Header().Set("Content-Type", "text/html")
+	// Render the clusters template segment
+	_ = templates.ClustersPoller(templates.ClustersViewModel{
+		ActiveNodes: activeNodes,
+		QueueDepth:  len(queueItems),
+		Providers:   providers,
+	}).Render(ctx, w)
+}
+
+// ServeClusterMappingsModal renders the attachments modal for a specific runner node.
+func (dc *DashboardController) ServeClusterMappingsModal(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	nodeID := r.URL.Query().Get("id")
+	if nodeID == "" {
+		http.Error(w, "Missing node id", http.StatusBadRequest)
+		return
+	}
+
+	runners, err := dc.Store.GetRegisteredRunners(ctx)
+	if err != nil {
+		http.Error(w, "Failed to fetch registered runners", http.StatusInternalServerError)
+		return
+	}
+
+	var targetRunner *config.RunnerResponse
+	for _, r := range runners {
+		if r.Node.ID == nodeID {
+			targetRunner = &r
+			break
+		}
+	}
+
+	// Fallback for simulation mock nodes
+	if targetRunner == nil {
+		targetRunner = &config.RunnerResponse{
+			Node: config.Node{
+				ID:                nodeID,
+				Name:              "Dynamic Connected Node",
+				MemoryAllocatedGB: 16,
+				ComputeGPUCores:   8,
+				MaxModelSizeGB:    8,
+				MaxConcurrent:     2,
+			},
+			AssignedClusters: []string{},
+		}
+	}
+
+	providers, err := dc.Store.GetAllProviders(ctx)
+	if err != nil {
+		log.Printf("[Dashboard] Error loading providers for modal: %v", err)
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	_ = templates.RunnerModal(targetRunner.Node, targetRunner.AssignedClusters, providers).Render(ctx, w)
+}
+
+// AttachRunnerToClusters handles form submission mapping runner to selected clusters.
+func (dc *DashboardController) AttachRunnerToClusters(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx := r.Context()
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Failed to parse form payload", http.StatusBadRequest)
+		return
+	}
+
+	nodeID := r.FormValue("node_id")
+	clusterIDs := r.Form["cluster_ids"]
+
+	if nodeID == "" {
+		http.Error(w, "Missing node ID", http.StatusBadRequest)
+		return
+	}
+
+	err := dc.Store.AttachRunnerToClusters(ctx, nodeID, clusterIDs)
+	if err != nil {
+		log.Printf("[Dashboard] Error saving attachments: %v", err)
+		http.Error(w, "Failed to save runner attachments", http.StatusInternalServerError)
+		return
+	}
+
+	// Redirect back to full clusters view
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/admin/clusters")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/admin/clusters", http.StatusSeeOther)
+}
+
+// DeRegisterClusterNode removes a host from active clusters
+func (dc *DashboardController) DeRegisterClusterNode(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	ctx := r.Context()
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "Missing runner id", http.StatusBadRequest)
+		return
+	}
+
+	_ = dc.Store.DeregisterRunner(ctx, id)
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(""))
+}
+
+

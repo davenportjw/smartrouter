@@ -91,6 +91,11 @@ func main() {
 	mux.Handle("/admin/metrics", authStore.Middleware(http.HandlerFunc(dashController.ServeMetrics)))
 	mux.Handle("/admin/costs", authStore.Middleware(http.HandlerFunc(dashController.ServeCosts)))
 	mux.Handle("/admin/queue", authStore.Middleware(http.HandlerFunc(dashController.ServeQueue)))
+	mux.Handle("/admin/clusters", authStore.Middleware(http.HandlerFunc(dashController.ServeClusters)))
+	mux.Handle("/admin/clusters/poll", authStore.Middleware(http.HandlerFunc(dashController.PollClustersActive)))
+	mux.Handle("/admin/clusters/mappings", authStore.Middleware(http.HandlerFunc(dashController.ServeClusterMappingsModal)))
+	mux.Handle("/admin/clusters/attach", authStore.Middleware(http.HandlerFunc(dashController.AttachRunnerToClusters)))
+	mux.Handle("/admin/clusters/delete", authStore.Middleware(http.HandlerFunc(dashController.DeRegisterClusterNode)))
 	mux.Handle("/admin/docs", authStore.Middleware(http.HandlerFunc(dashController.ServeDocs)))
 	mux.Handle("/admin/toggle-simulation", authStore.Middleware(http.HandlerFunc(dashController.ToggleSimulation)))
 

@@ -246,3 +246,29 @@ func (ac *APIConfigStore) DeleteProvider(ctx context.Context, id string) error {
 	path := fmt.Sprintf("/api/providers?id=%s", url.QueryEscape(id))
 	return ac.makeRequest(ctx, "DELETE", path, nil, nil)
 }
+
+// Dynamic Runners Administrative Methods
+
+type RunnerResponse struct {
+	Node             Node     `json:"node"`
+	AssignedClusters []string `json:"assigned_clusters"`
+}
+
+func (ac *APIConfigStore) GetRegisteredRunners(ctx context.Context) ([]RunnerResponse, error) {
+	var runners []RunnerResponse
+	err := ac.makeRequest(ctx, "GET", "/api/v1/admin/runners", nil, &runners)
+	return runners, err
+}
+
+func (ac *APIConfigStore) AttachRunnerToClusters(ctx context.Context, nodeID string, clusterIDs []string) error {
+	req := map[string]interface{}{
+		"node_id":     nodeID,
+		"cluster_ids": clusterIDs,
+	}
+	return ac.makeRequest(ctx, "POST", "/api/v1/admin/runners/attach", req, nil)
+}
+
+func (ac *APIConfigStore) DeregisterRunner(ctx context.Context, nodeID string) error {
+	path := fmt.Sprintf("/api/v1/admin/runners/deregister?id=%s", url.QueryEscape(nodeID))
+	return ac.makeRequest(ctx, "DELETE", path, nil, nil)
+}

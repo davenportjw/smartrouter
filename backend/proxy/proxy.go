@@ -39,6 +39,7 @@ type RouterProxy struct {
 	Store       *store.ConfigStore
 	Limiter     *limiter.RateLimiterRegistry
 	Scheduler   *RequestScheduler
+	Queue       *ClusterQueue
 	TokenSource oauth2.TokenSource
 	ProjectID   string
 	Location    string
@@ -137,6 +138,7 @@ func NewRouterProxy(store *store.ConfigStore, projectID, location string) (*Rout
 		Store:       store,
 		Limiter:     limiter.NewRateLimiterRegistry(),
 		Scheduler:   NewRequestScheduler(maxQueueSize, activeLimit),
+		Queue:       NewClusterQueue(maxQueueSize, 60*time.Second),
 		TokenSource: ts,
 		ProjectID:   projectID,
 		Location:    location,
@@ -198,11 +200,9 @@ func NewRouterProxy(store *store.ConfigStore, projectID, location string) (*Rout
 				return
 			}
 			modelAndAction := req.URL.Path[idx+len("/models/"):]
-			actionParts := strings.Split(modelAndAction, ":")
-
 			var action string
-			if len(actionParts) > 1 {
-				action = ":" + actionParts[1]
+			if lastIdx := strings.LastIndex(modelAndAction, ":"); lastIdx != -1 {
+				action = modelAndAction[lastIdx:]
 			}
 
 			if strings.HasPrefix(targetModel, "projects/") {
@@ -365,8 +365,12 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			idx := strings.Index(r.URL.Path, "/models/")
 			if idx != -1 {
 				modelAndAction := r.URL.Path[idx+len("/models/"):]
-				actionParts := strings.Split(modelAndAction, ":")
-				requestedModel := actionParts[0]
+				var requestedModel string
+				if lastIdx := strings.LastIndex(modelAndAction, ":"); lastIdx != -1 {
+					requestedModel = modelAndAction[:lastIdx]
+				} else {
+					requestedModel = modelAndAction
+				}
 
 				r.Header.Set("X-Requested-Model", requestedModel)
 
@@ -435,20 +439,25 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					}
 
 					// 1.4. Apply standard dynamic rules-based routing matching on top of the complexity-classified model!
+					modelLoc := rp.Location // default to router's location
 					routedRule, matched := rp.Store.MatchRule(targetModel, client.Tier, app.ID, headersMap)
 					if matched {
-						log.Printf("[Proxy Routing] MatchRule matched rules-based routing on top of complexity routed model %s -> targeting: %s", targetModel, routedRule.TargetModel)
+						log.Printf("[Proxy Routing] MatchRule matched rules-based routing on top of complexity routed model %s -> targeting: %s in location: %s", targetModel, routedRule.TargetModel, routedRule.TargetLocation)
 						targetModel = routedRule.TargetModel
+						if routedRule.TargetLocation != "" {
+							modelLoc = routedRule.TargetLocation
+						}
 					}
 					
 					r.Header.Set("X-Routed-Model", targetModel)
 
-					// Resolve and set the routed model's location
-					modelLoc := rp.Location // default to router's location
-					if activeModel, exists := rp.Store.LookupActiveModel(targetModel, rp.Location); exists {
-						modelLoc = activeModel.Location
-						targetModel = config.StripLocationSuffix(activeModel.ID)
-						r.Header.Set("X-Routed-Model", targetModel)
+					// Resolve and set the routed model's location if not specifically overridden by the matched rule location
+					if !matched || routedRule.TargetLocation == "" {
+						if activeModel, exists := rp.Store.LookupActiveModel(targetModel, rp.Location); exists {
+							modelLoc = activeModel.Location
+							targetModel = config.StripLocationSuffix(activeModel.ID)
+							r.Header.Set("X-Routed-Model", targetModel)
+						}
 					}
 					r.Header.Set("X-Routed-Model-Location", modelLoc)
 				}
@@ -574,6 +583,57 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case <-r.Context().Done():
 			return
 		case <-time.After(delay):
+		}
+	}
+
+	// Check if routed to a dynamic local cluster queue
+	if r.Header.Get("X-Routed-Model-Location") == "local-cluster" {
+		if rp.Queue == nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte(`{"error": {"code": 503, "message": "Local cluster serving is not enabled on this router instance."}}`))
+			return
+		}
+
+		jobID := fmt.Sprintf("job-%d", time.Now().UnixNano())
+		job := &config.QueueJob{
+			ID:        jobID,
+			ClusterID: "local-cluster",
+			AppID:     app.ID,
+			Model:     routedModel,
+			Priority:  app.Priority,
+			Payload:   bodyBytes,
+			CreatedAt: time.Now(),
+		}
+
+		resChan, err := rp.Queue.Enqueue(job)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusTooManyRequests)
+			w.Write([]byte(fmt.Sprintf(`{"error": {"code": 429, "message": "Local cluster queue full: %v"}}`, err)))
+			return
+		}
+
+		select {
+		case <-r.Context().Done():
+			return
+		case res := <-resChan:
+			if res.Error != nil {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(res.StatusCode)
+				w.Write([]byte(fmt.Sprintf(`{"error": {"message": %q}}`, res.Error.Error())))
+				return
+			}
+			w.Header().Set("X-Routed-Model", routedModel)
+			w.Header().Set("X-Requested-Model", r.Header.Get("X-Requested-Model"))
+			w.Header().Set("X-Routed-Model-Location", "local-cluster")
+			w.Header().Set("X-Client-Tier", client.Tier)
+			w.Header().Set("X-App-ID", app.ID)
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(res.StatusCode)
+			w.Write(res.Payload)
+			return
 		}
 	}
 

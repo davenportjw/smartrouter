@@ -31,7 +31,7 @@ func TestDashboardUIAndRESTBackendIntegration(t *testing.T) {
 	dbStore, _ = store.NewConfigStore(ctx, "test-project")
 
 	sharedSecret := "dashboard-secure-rest-token"
-	apiController := api.NewAPIController(dbStore, proxy.NewRequestScheduler(1000, 100), sharedSecret)
+	apiController := api.NewAPIController(dbStore, proxy.NewRequestScheduler(1000, 100), nil, sharedSecret)
 
 	muxAPI := http.NewServeMux()
 	apiController.RegisterRoutes(muxAPI)

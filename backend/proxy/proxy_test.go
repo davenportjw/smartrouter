@@ -3308,6 +3308,131 @@ func TestProxyTPMRateLimitingAndOptOut(t *testing.T) {
 	os.RemoveAll("data/local_db.json")
 }
 
+func TestClusterQueuePriority(t *testing.T) {
+	q := NewClusterQueue(10, 5*time.Second)
+
+	jobLow := &config.QueueJob{ID: "job-low", Model: "gemma4:2b", Priority: "low", CreatedAt: time.Now()}
+	jobHigh := &config.QueueJob{ID: "job-high", Model: "gemma4:2b", Priority: "high", CreatedAt: time.Now()}
+	jobMed := &config.QueueJob{ID: "job-med", Model: "gemma4:2b", Priority: "medium", CreatedAt: time.Now()}
+
+	_, _ = q.Enqueue(jobLow)
+	_, _ = q.Enqueue(jobHigh)
+	_, _ = q.Enqueue(jobMed)
+
+	// High should be polled first
+	polled1, ok := q.Poll([]string{"gemma4:2b"}, nil)
+	if !ok || polled1.ID != "job-high" {
+		t.Fatalf("expected high priority job first, got %v", polled1)
+	}
+
+	// Medium second
+	polled2, ok := q.Poll([]string{"gemma4:2b"}, nil)
+	if !ok || polled2.ID != "job-med" {
+		t.Fatalf("expected medium priority job second, got %v", polled2)
+	}
+
+	// Low last
+	polled3, ok := q.Poll([]string{"gemma4:2b"}, nil)
+	if !ok || polled3.ID != "job-low" {
+		t.Fatalf("expected low priority job last, got %v", polled3)
+	}
+}
+
+func TestClusterQueueTTL(t *testing.T) {
+	// Max queue age of 10ms for quick test
+	q := NewClusterQueue(10, 10*time.Millisecond)
+
+	job := &config.QueueJob{ID: "job-ttl", Model: "gemma4:2b", Priority: "high", CreatedAt: time.Now().Add(-1 * time.Second)}
+	resChan, err := q.Enqueue(job)
+	if err != nil {
+		t.Fatalf("failed to enqueue job: %v", err)
+	}
+
+	select {
+	case res := <-resChan:
+		if res.StatusCode != http.StatusGatewayTimeout {
+			t.Errorf("expected status 504 Gateway Timeout, got %d", res.StatusCode)
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Errorf("timed out waiting for reaper to expire job")
+	}
+}
+
+func TestClusterProxyE2E(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+
+	ctx := context.Background()
+	store, err := store.NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to config store: %v", err)
+	}
+	
+	q := NewClusterQueue(10, 5*time.Second)
+	
+	rp, err := NewRouterProxy(store, "test-project", "us-central1")
+	if err != nil {
+		t.Fatalf("failed to initialize proxy: %v", err)
+	}
+	rp.Queue = q // Set local cluster queue on proxy
+
+	// Seed DB credentials for auth & priority
+	_ = store.SaveClient(ctx, config.Client{ID: "client-1", Tier: "premium"})
+	_ = store.SaveApp(ctx, config.App{ID: "app-1", ClientID: "client-1", Priority: "high", RPM: 100, TPM: 100000})
+	_ = store.SaveKey(ctx, config.APIKey{KeyHash: config.HashKey("gr_test_key"), AppID: "app-1", ClientID: "client-1", Status: "active"})
+
+	// Clear default seeded rules and headers
+	_ = store.DeleteRule(ctx, "rule-1")
+	_ = store.DeleteHeader(ctx, "header-1")
+	
+	// Seed cluster rule routing gemma4:2b to local cluster
+	rule := config.RoutingRule{
+		ID:             "rule-local-gemma4",
+		ModelPattern:   "gemma4:2b",
+		ClientTier:     "all",
+		TargetModel:    "gemma4:2b",
+		TargetLocation: "local-cluster",
+		PriorityWeight: 1,
+	}
+	_ = store.SaveRule(ctx, rule)
+
+	// 1. Call ServeHTTP -> blocks waiting on queue
+	req := httptest.NewRequest("POST", "/v1/models/gemma4:2b:generateContent?key=gr_test_key", strings.NewReader(`{"prompt":"hello"}`))
+	req.Header.Set("x-goog-api-key", "gr_test_key")
+	rr := httptest.NewRecorder()
+
+	clientDone := make(chan struct{})
+	go func() {
+		rp.ServeHTTP(rr, req)
+		close(clientDone)
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// 2. Poll from queue
+	job, ok := q.Poll([]string{"gemma4:2b"}, nil)
+	if !ok || job == nil {
+		t.Fatalf("failed to poll enqueued job. Response Code: %d, Body: %s", rr.Code, rr.Body.String())
+	}
+
+	// 3. Resolve job
+	q.Resolve(job.ID, config.QueueResult{
+		Payload:    []byte(`{"candidates": [{"content": {"parts": [{"text": "Hello from local Gemma 4 2B!"}]}}]}`),
+		StatusCode: 200,
+	})
+
+	// 4. Wait and verify response
+	<-clientDone
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected 200 OK, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), "Hello from local Gemma 4 2B!") {
+		t.Errorf("expected response to contain candidate text, got: %s", rr.Body.String())
+	}
+
+	os.RemoveAll("data/local_db.json")
+}
+
+
 
 
 

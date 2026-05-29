@@ -408,15 +408,20 @@ templ groupedNavLinks(currentTab string) {
 		</div>
 	</div>
 
-	<!-- MODELS REGISTRY GROUP -->
+	<!-- MODELS REGISTRY & CLUSTERS GROUP -->
 	<div class="space-y-2">
 		<h3 class="sidebar-group-header px-3 text-[10px] font-bold uppercase tracking-wider text-gray-400 transition-all duration-200">
-			Models Registry
+			Models & Clusters
 		</h3>
 		<div class="space-y-1">
 			@sidebarLink("/admin/models", "Models Registry", "models", currentTab) {
 				<svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+				</svg>
+			}
+			@sidebarLink("/admin/clusters", "Local Clusters", "clusters", currentTab) {
+				<svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
 				</svg>
 			}
 		</div>

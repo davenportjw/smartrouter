@@ -8,6 +8,7 @@ Welcome to the Smart Router documentation. The Smart Router is a Google Cloud Ru
 Learn how the proxy processes requests, validates keys, and calculates costs.
 * 📘 **[System Architecture Overview](./architecture/overview.md)**: Data hierarchy, request execution lifecycle, and sliding-window rate limiting.
 * 📊 **[Google GenAI SDK Coverage](./architecture/google-genai-sdk-coverage.md)**: Compatibility matrix, architectural interception flow, and client integration examples.
+* 🏗️ **[Local Clusters Architecture & Implementation Plan](./architecture/local-clusters-plan.md)**: Queuing mechanisms, macOS agents, Kubernetes agent fleets, and interaction lifecycle.
 
 ---
 
@@ -36,3 +37,4 @@ Operational runbooks for configuring, running, and integrating with the proxy.
 Developer guidelines for modifying the Smart Router codebase safely.
 * 🧪 **[TDD Feature Development](./approaches/tdd-feature-development.md)**: Implement proxy features using Test-Driven Development and full in-memory integration tests.
 * 🛡️ **[Model Version Compliance](./approaches/model-compliance.md)**: Keep rules and configs compliant with the Gemini 2.5+ series baseline.
+* 🔬 **[Local Runners E2E Testing Plan](./approaches/local-runners-testing.md)**: Comprehensive plan for local queue unit testing, GKE CPU spot-pool E2E testing, and GPU VM verification.

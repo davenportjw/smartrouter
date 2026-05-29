@@ -1,0 +1,222 @@
+package templates
+
+import (
+	"fmt"
+	"geminirouter/pkg/config"
+)
+
+// ClustersViewModel carries state for the Local Clusters status dashboard.
+type ClustersViewModel struct {
+	ActiveNodes []config.RunnerResponse
+	QueueDepth  int
+	Providers   []config.ProviderConfig
+}
+
+templ ClustersTab(vm ClustersViewModel) {
+	<div class="space-y-10">
+		<!-- Top Header Panel -->
+		<div class="border-b border-gray-200 pb-5">
+			<div class="sm:flex sm:items-center sm:justify-between">
+				<div>
+					<h1 class="text-3xl font-bold tracking-tight text-gray-900 font-sans">Local Clusters & Agents</h1>
+					<p class="mt-2 text-sm text-gray-600">
+						Monitor registered hardware nodes, Apple M-series daemons, and Kubernetes AgentFleets polling your local router queue.
+					</p>
+				</div>
+			</div>
+		</div>
+
+		<!-- Live Queue Metrics and Aggregates Grid -->
+		<div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
+			<div class="bg-white overflow-hidden shadow-sm border border-gray-200 rounded-xl p-6 flex items-center gap-4">
+				<div class="p-3 rounded-lg bg-blue-50 text-blue-600 shrink-0">
+					<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+					</svg>
+				</div>
+				<div>
+					<p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Central Queue Depth</p>
+					<p class="text-2xl font-extrabold text-gray-900 font-mono mt-1">{ fmt.Sprintf("%d Requests", vm.QueueDepth) }</p>
+				</div>
+			</div>
+
+			<div class="bg-white overflow-hidden shadow-sm border border-gray-200 rounded-xl p-6 flex items-center gap-4">
+				<div class="p-3 rounded-lg bg-emerald-50 text-emerald-600 shrink-0">
+					<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+					</svg>
+				</div>
+				<div>
+					<p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Active Computing Agents</p>
+					<p class="text-2xl font-extrabold text-gray-900 font-mono mt-1">{ fmt.Sprintf("%d Online Nodes", len(vm.ActiveNodes)) }</p>
+				</div>
+			</div>
+
+			<div class="bg-white overflow-hidden shadow-sm border border-gray-200 rounded-xl p-6 flex items-center gap-4">
+				<div class="p-3 rounded-lg bg-purple-50 text-purple-600 shrink-0">
+					<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+					</svg>
+				</div>
+				<div>
+					<p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Pool VRAM</p>
+					<p class="text-2xl font-extrabold text-gray-900 font-mono mt-1">{ fmt.Sprintf("%d GB Unified", calculateTotalVram(vm.ActiveNodes)) }</p>
+				</div>
+			</div>
+		</div>
+
+		@ClustersPoller(vm)
+	</div>
+}
+
+templ ClustersPoller(vm ClustersViewModel) {
+		<!-- Dynamic Live Poller Section using HTMX -->
+		<div 
+			hx-get="/admin/clusters/poll"
+			hx-trigger="every 5s"
+			hx-swap="outerHTML"
+			class="bg-white shadow-sm border border-gray-200 rounded-xl overflow-hidden"
+		>
+			<div class="border-b border-gray-200 px-6 py-5 flex items-center justify-between bg-gray-50/80">
+				<div>
+					<h3 class="text-base font-bold text-gray-900">Registered Cluster Nodes</h3>
+					<p class="text-xs text-gray-500 mt-0.5">Dynamically updating active compute host heartbeats and supported models.</p>
+				</div>
+				<span class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 border border-blue-200">
+					<span class="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+					Live polling
+				</span>
+			</div>
+
+			if len(vm.ActiveNodes) == 0 {
+				<div class="text-center py-16 px-4">
+					<svg class="mx-auto h-12 w-12 text-gray-350 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+					</svg>
+					<h4 class="mt-4 text-sm font-bold text-gray-900">No Local Agents Connected</h4>
+					<p class="mt-2 text-xs text-gray-500 max-w-md mx-auto">
+						Ready for local serving. Launch the native macOS daemon Wails App or deploy the Kubernetes AgentFleet, supplying your join tokens.
+					</p>
+				</div>
+			} else {
+				<div class="overflow-x-auto">
+					<table class="min-w-full divide-y divide-gray-200">
+						<thead class="bg-gray-50/50">
+							<tr>
+								<th scope="col" class="py-3.5 pl-6 pr-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Host Name / Node ID</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-gray-500">System Specs</th>
+								<th scope="col" class="px-3 py-3.5 text-center text-xs font-bold uppercase tracking-wider text-gray-500">Status</th>
+								<th scope="col" class="px-3 py-3.5 text-center text-xs font-bold uppercase tracking-wider text-gray-500">Allowed Size Limit</th>
+								<th scope="col" class="px-3 py-3.5 text-center text-xs font-bold uppercase tracking-wider text-gray-500">Active Models</th>
+								<th scope="col" class="px-3 py-3.5 text-center text-xs font-bold uppercase tracking-wider text-gray-500">Assigned Clusters</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Last Heartbeat</th>
+								<th scope="col" class="relative py-3.5 pl-3 pr-6 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Actions</th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-gray-200 bg-white">
+							for _, agent := range vm.ActiveNodes {
+								<tr class="hover:bg-gray-50/40 transition">
+									<td class="py-4 pl-6 pr-3 text-sm whitespace-nowrap">
+										<div class="font-semibold text-gray-900">{ agent.Node.Name }</div>
+										<div class="text-xs font-mono text-gray-400 mt-0.5">{ agent.Node.ID }</div>
+									</td>
+									<td class="px-3 py-4 text-xs">
+										<div class="flex flex-col gap-1 text-gray-700">
+											<span class="font-semibold">{ fmt.Sprintf("%d GB RAM / Unified Memory", agent.Node.MemoryAllocatedGB) }</span>
+											<span class="text-gray-400 font-mono">{ fmt.Sprintf("GPU Compute Cores: %d cores", agent.Node.ComputeGPUCores) }</span>
+										</div>
+									</td>
+									<td class="px-3 py-4 text-center whitespace-nowrap text-xs">
+										if agent.Node.Status == "online" {
+											<span class="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700 ring-1 ring-inset ring-green-600/20">
+												<span class="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse"></span>
+												Idle
+											</span>
+										} else if agent.Node.Status == "busy" {
+											<span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-600/20 animate-pulse">
+												<span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+												Processing
+											</span>
+										} else {
+											<span class="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-650 ring-1 ring-inset ring-gray-550/20">
+												<span class="h-1.5 w-1.5 rounded-full bg-gray-400"></span>
+												Offline
+											</span>
+										}
+									</td>
+									<td class="px-3 py-4 text-center whitespace-nowrap text-xs">
+										if agent.Node.MaxModelSizeGB > 0 {
+											<span class="inline-flex items-center rounded bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-750 border border-blue-200 font-mono">
+												{ fmt.Sprintf("≤ %d GB", agent.Node.MaxModelSizeGB) }
+											</span>
+										} else {
+											<span class="inline-flex items-center rounded bg-gray-50 px-2.5 py-1 text-xs font-bold text-gray-500 border border-gray-200">
+												No limit (∞)
+											</span>
+										}
+									</td>
+									<td class="px-3 py-4 text-xs text-center">
+										<div class="flex flex-wrap gap-1 justify-center max-w-xs mx-auto">
+											for _, model := range agent.Node.SupportedModels {
+												<span class="inline-flex items-center rounded bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-850 border border-gray-200">
+													{ model }
+												</span>
+											}
+										</div>
+									</td>
+									<td class="px-3 py-4 text-xs text-center">
+										<div class="flex flex-wrap gap-1 justify-center max-w-xs mx-auto">
+											if len(agent.AssignedClusters) == 0 {
+												<span class="inline-flex items-center rounded bg-yellow-50 px-2 py-0.5 text-[10px] font-semibold text-yellow-700 border border-yellow-200">
+													Unassigned
+												</span>
+											} else {
+												for _, cluster := range agent.AssignedClusters {
+													<span class="inline-flex items-center rounded bg-purple-50 px-2 py-0.5 text-[10px] font-semibold text-purple-700 border border-purple-200 font-mono">
+														{ cluster }
+													</span>
+												}
+											}
+										</div>
+									</td>
+									<td class="px-3 py-4 text-xs text-gray-500 whitespace-nowrap font-mono">
+										{ agent.Node.LastHeartbeat.Format("2006-01-02 15:04:05") }
+									</td>
+									<td class="whitespace-nowrap py-4 pl-3 pr-6 text-right text-sm font-medium space-x-2">
+										<button
+											hx-get={ "/admin/clusters/mappings?id=" + agent.Node.ID }
+											hx-target="#modal-container"
+											class="text-blue-600 hover:text-blue-800 font-bold text-xs bg-blue-50 border border-blue-200 px-2.5 py-1.5 rounded hover:bg-blue-100 transition"
+										>
+											Manage Mappings
+										</button>
+										<button
+											hx-delete={ "/admin/clusters/delete?id=" + agent.Node.ID }
+											hx-confirm={ "Are you sure you want to delete agent node " + agent.Node.Name + "?" }
+											hx-target="closest tr"
+											hx-swap="outerHTML"
+											class="text-gray-500 hover:text-red-600 font-bold text-xs bg-gray-50 border border-gray-200 px-2.5 py-1.5 rounded hover:bg-gray-100 transition"
+										>
+											De-register
+										</button>
+									</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			}
+			<!-- Modal Target Anchor -->
+			<div id="modal-container"></div>
+		</div>
+}
+
+func calculateTotalVram(nodes []config.RunnerResponse) int {
+	total := 0
+	for _, n := range nodes {
+		if n.Node.Status == "online" || n.Node.Status == "busy" {
+			total += n.Node.MemoryAllocatedGB
+		}
+	}
+	return total
+}
