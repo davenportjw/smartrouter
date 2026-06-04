@@ -70,7 +70,7 @@ if [ "$CHOICE" = "2" ]; then
     GPU_LIMIT="0"
     NODE_POOL="standard-cpu-pool"
     NODE_SELECTOR="cloud.google.com/gke-spot: \"true\""
-    ROLLOUT_TIMEOUT="90s"
+    ROLLOUT_TIMEOUT="300s"
     log_info "🔵 cost-saver CPU-only mode selected!"
 else
     log_info "🟢 GPU mode (Nvidia L4 Spot VMs) selected!"
@@ -166,10 +166,10 @@ spec:
         command: ["sh", "-c"]
         args:
         - |
-          echo "Downloading lightweight Qwen 1.5B GGUF model weight..."
+          echo "Downloading lightweight Gemma 2B GGUF model weight..."
           apk add --no-cache wget unzip
           mkdir -p /models
-          wget -O /models/model.gguf https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf
+          wget -O /models/model.gguf https://huggingface.co/lmstudio-community/gemma-2-2b-it-GGUF/resolve/main/gemma-2-2b-it-Q4_K_M.gguf
           
           echo "Downloading precompiled CPU llama-server binary..."
           wget -O /models/llama.zip https://github.com/ggerganov/llama.cpp/releases/download/b4719/llama-b4719-bin-ubuntu-x64.zip
