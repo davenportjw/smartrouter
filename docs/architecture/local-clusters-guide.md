@@ -159,7 +159,7 @@ spec:
           mountPath: /models
       containers:
       - name: poller-runner
-        image: gcr.io/davenport-boutique/smart-router-k8s-runner:latest
+        image: gcr.io/YOUR_GCP_PROJECT_ID/smart-router-k8s-runner:latest
         args: ["--router-url=https://gemini-smart-router.a.run.app", "--cluster-id=gke-cpu-spot-pool", "--cpu-mode=true"]
       - name: llama-engine
         image: ubuntu:22.04

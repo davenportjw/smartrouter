@@ -141,3 +141,97 @@ To manually verify query routing through the local runner, execute:
 chmod +x examples/local-cluster/run-local-query.sh
 ./examples/local-cluster/run-local-query.sh
 ```
+
+---
+
+## 🎛️ Control Plane API References
+
+You can interact with the central Smart Router control plane to view active compute runners, register clients, apps, and define routing rules.
+
+### 1. View Registered Runners (Admin API)
+To check which compute runners are active in GKE or macOS and heartbeating to the router:
+```bash
+# Fetch the shared backend secret from Secret Manager
+PROJECT_ID="YOUR_GCP_PROJECT_ID" # Or PROJECT_ID=$(gcloud config get-value project)
+SHARED_SECRET=$(gcloud secrets versions access latest --secret="backend-shared-secret" --project="$PROJECT_ID")
+BACKEND_URL=$(gcloud run services describe gemini-smart-router --region "us-central1" --format="value(status.url)" --project="$PROJECT_ID")
+
+# Query registered runners
+curl -s -H "X-Shared-Secret: $SHARED_SECRET" "$BACKEND_URL/api/v1/admin/runners" | jq .
+```
+
+### 2. Register Client, App, API Key, and Routing Rule
+If you want to configure routing manually rather than using `run-local-query.sh`:
+
+#### A. Register a Client
+```bash
+curl -s -X POST "$BACKEND_URL/api/clients" \
+    -H "X-Shared-Secret: $SHARED_SECRET" \
+    -H "Content-Type: application/json" \
+    -d '{
+        "id": "client-local-verify",
+        "name": "Local GKE Verification Client",
+        "tier": "premium",
+        "rpm": 60,
+        "tpm": 40000,
+        "priority": "high"
+    }'
+```
+
+#### B. Register a Client Application
+```bash
+curl -s -X POST "$BACKEND_URL/api/apps" \
+    -H "X-Shared-Secret: $SHARED_SECRET" \
+    -H "Content-Type: application/json" \
+    -d '{
+        "id": "app-local-verify",
+        "client_id": "client-local-verify",
+        "name": "GKE Local Runner App",
+        "rpm": 60,
+        "tpm": 40000,
+        "priority": "high"
+    }'
+```
+
+#### C. Register an API Key (Hashed)
+```bash
+# Hash the key hash using SHA-256
+KEY_HASH=$(echo -n "gr_local_cluster_verify_key" | shasum -a 256 | cut -d' ' -f1)
+
+curl -s -X POST "$BACKEND_URL/api/keys" \
+    -H "X-Shared-Secret: $SHARED_SECRET" \
+    -H "Content-Type: application/json" \
+    -d "{
+        \"key_hash\": \"$KEY_HASH\",
+        \"client_id\": \"client-local-verify\",
+        \"app_id\": \"app-local-verify\",
+        \"status\": \"active\"
+    }"
+```
+
+#### D. Register the Routing Rule
+```bash
+curl -s -X POST "$BACKEND_URL/api/rules" \
+    -H "X-Shared-Secret: $SHARED_SECRET" \
+    -H "Content-Type: application/json" \
+    -d '{
+        "id": "rule-route-to-gke-cpu",
+        "app_id": "app-local-verify",
+        "model_pattern": "gemma2:2b",
+        "client_tier": "premium",
+        "target_model": "gemma2:2b",
+        "target_location": "local-cluster",
+        "priority_weight": 100
+    }'
+```
+
+### 3. Submit Inference Prompt Query
+To execute a query through the proxy that routes to your GKE runner:
+```bash
+curl -i -X POST "$BACKEND_URL/v1/models/gemma2:2b:generateContent" \
+    -H "x-goog-api-key: gr_local_cluster_verify_key" \
+    -H "X-Client-App-ID: app-local-verify" \
+    -H "Content-Type: application/json" \
+    -d '\''{"contents": [{"parts": [{"text": "What is 2+2? Answer in one word."}]}], "generationConfig": {"maxOutputTokens": 10}}'\''
+```
+

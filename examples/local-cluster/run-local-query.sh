@@ -21,7 +21,14 @@ log_error() { echo -e "${RED}[ERROR] $1${NC}"; }
 log_step() { echo -e "${CYAN}👉 $1${NC}"; }
 
 # Load active settings
-PROJECT_ID="davenport-boutique"
+if [ -z "$PROJECT_ID" ]; then
+    PROJECT_ID=$(gcloud config get-value project 2>/dev/null || true)
+fi
+
+if [ -z "$PROJECT_ID" ] || [ "$PROJECT_ID" = "(unset)" ]; then
+    log_error "No active Google Cloud project found. Please set PROJECT_ID environment variable or run 'gcloud config set project PROJECT_ID' first."
+    exit 1
+fi
 REGION="us-central1"
 
 log_info "Fetching dynamic control plane configurations..."

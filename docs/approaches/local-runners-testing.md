@@ -55,7 +55,7 @@ go test -v ./pkg/runner/engine/...
 This plan verifies unaccelerated CPU serving using standard x86_64 cores. It downloads a lightweight `Qwen 1.5B` GGUF model and a precompiled static `llama-server` binary to run unprivileged on GKE CPU spot pools.
 
 ### Prerequisites
-* Active GCP Project (`davenport-boutique` or target sandbox).
+* Active GCP Project (your target sandbox project ID).
 * Valid GKE Autopilot Cluster initialized.
 * Target router deployed to Google Cloud Run.
 

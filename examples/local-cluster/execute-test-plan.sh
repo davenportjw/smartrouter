@@ -20,7 +20,14 @@ log_error() {
 }
 
 # 1. Validate GCP Context
-PROJECT_ID="davenport-boutique"
+if [ -z "$PROJECT_ID" ]; then
+    PROJECT_ID=$(gcloud config get-value project 2>/dev/null || true)
+fi
+
+if [ -z "$PROJECT_ID" ] || [ "$PROJECT_ID" = "(unset)" ]; then
+    log_error "No active Google Cloud project found. Please set PROJECT_ID environment variable or run 'gcloud config set project PROJECT_ID' first."
+    exit 1
+fi
 log_info "Setting active GCP Project context to: $PROJECT_ID"
 gcloud config set project "$PROJECT_ID" --quiet
 

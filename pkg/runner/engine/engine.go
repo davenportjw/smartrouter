@@ -368,16 +368,21 @@ func (e *CoreRunnerEngine) forwardToLlamaCpp(model string, payload []byte) ([]by
 		log.Printf("[Runner Warning] Local llama.cpp host at %s unavailable. Forwarding query to Vertex AI API for live fallback...", e.LlamaServerURL)
 		
 		// Try to execute a completely real, live Vertex AI call!
-		projectID := "davenport-boutique" // Default fallback
-		// Query metadata server for real project ID if available
-		metaReq, _ := http.NewRequest("GET", "http://metadata.google.internal/computeMetadata/v1/project/project-id", nil)
-		metaReq.Header.Set("Metadata-Flavor", "Google")
-		metaResp, metaErr := e.httpClient.Do(metaReq)
-		if metaErr == nil {
-			bodyBytes, _ := io.ReadAll(metaResp.Body)
-			metaResp.Body.Close()
-			if len(bodyBytes) > 0 {
-				projectID = strings.TrimSpace(string(bodyBytes))
+		projectID := os.Getenv("GCP_PROJECT")
+		if projectID == "" {
+			projectID = os.Getenv("PROJECT_ID")
+		}
+		if projectID == "" {
+			// Query metadata server for real project ID if available
+			metaReq, _ := http.NewRequest("GET", "http://metadata.google.internal/computeMetadata/v1/project/project-id", nil)
+			metaReq.Header.Set("Metadata-Flavor", "Google")
+			metaResp, metaErr := e.httpClient.Do(metaReq)
+			if metaErr == nil {
+				bodyBytes, _ := io.ReadAll(metaResp.Body)
+				metaResp.Body.Close()
+				if len(bodyBytes) > 0 {
+					projectID = strings.TrimSpace(string(bodyBytes))
+				}
 			}
 		}
 
