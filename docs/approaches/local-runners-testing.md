@@ -62,7 +62,7 @@ This plan verifies unaccelerated CPU serving using standard x86_64 cores. It dow
 ### Step-by-Step Execution
 
 #### 1. Seed Configurations in Database
-Configure Firestore mapping rules to redirect requests targeting `gemma2:2b` to our dynamic local cluster queue:
+Configure Firestore mapping rules to redirect requests targeting `gemma-4-4b` to our dynamic local cluster queue:
 ```bash
 ./examples/local-cluster/run-local-query.sh
 ```
@@ -85,9 +85,9 @@ curl -s -H "X-Shared-Secret: $SECRET" "https://<YOUR_ROUTER_URL>/api/v1/admin/ru
 ```
 
 #### 4. Submit E2E routed Prompt Query
-Submit a generated content request targeting `gemma2:2b` via the router:
+Submit a generated content request targeting `gemma-4-4b` via the router:
 ```bash
-curl -s -X POST "https://<YOUR_ROUTER_URL>/v1/models/gemma2:2b:generateContent" \
+curl -s -X POST "https://<YOUR_ROUTER_URL>/v1/models/gemma-4-4b:generateContent" \
     -H "Content-Type: application/json" \
     -H "x-goog-api-key: gr_local_cluster_verify_key" \
     -H "X-Client-App-ID: app-local-verify" \
@@ -123,7 +123,7 @@ SKIP_BUILD=true ./examples/local-cluster/deploy-runner.sh 1
 #### 2. Submit E2E Routed GPU Prompt Query
 Submit a content generation prompt via the Cloud Run router proxy:
 ```bash
-curl -s -X POST "https://<YOUR_ROUTER_URL>/v1/models/gemma2:2b:generateContent" \
+curl -s -X POST "https://<YOUR_ROUTER_URL>/v1/models/gemma-4-4b:generateContent" \
     -H "Content-Type: application/json" \
     -H "x-goog-api-key: gr_local_cluster_verify_key" \
     -H "X-Client-App-ID: app-local-verify" \

@@ -32,9 +32,9 @@ func main() {
 		models = strings.Split(*modelListStr, ",")
 	} else {
 		if *cpuMode {
-			models = []string{"gemma2:2b", "gemma2:2b-instruct-q4_K_M"} // Light CPU-friendly models
+			models = []string{"gemma-4-4b"} // Light CPU-friendly Gemma 4 model
 		} else {
-			models = []string{"gemma2:9b", "llama3:8b", "llama3:70b"} // Heavy GPU models
+			models = []string{"gemma-4-4b", "gemma-4-26b"} // GPU-accelerated Gemma 4 models
 		}
 	}
 

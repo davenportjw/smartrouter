@@ -195,11 +195,11 @@ func main() {
 		Complexity: config.ComplexityRouting{
 			Enabled:         true,
 			AlwaysOverride:  false,
-			SimpleModel:     "gemini-2.5-flash-lite",
-			MediumModel:     "gemini-2.5-flash",
-			ComplexModel:    "gemini-2.5-pro",
-			SimpleCharLimit: 50,  // under 50 characters is "simple" -> gemini-2.5-flash-lite
-			MediumCharLimit: 200, // under 200 characters is "medium" -> gemini-2.5-flash
+			SimpleModel:     "gemini-3.5-flash-lite",
+			MediumModel:     "gemini-3.8-flash",
+			ComplexModel:    "gemini-3.1-pro",
+			SimpleCharLimit: 50,  // under 50 characters is "simple" -> gemini-3.5-flash-lite
+			MediumCharLimit: 200, // under 200 characters is "medium" -> gemini-3.8-flash
 		},
 	}
 	_, err = client.Collection("apps").Doc(testAppID).Set(ctx, dbApp)
@@ -225,13 +225,13 @@ func main() {
 	dbRule := config.RoutingRule{
 		ID:             testRuleID,
 		AppID:          testAppID,
-		ModelPattern:   "gemini-1.5-pro",
+		ModelPattern:   "gemini-custom-rule",
 		ClientTier:     "premium",
 		HeaderName:     "X-Route-Priority",
 		HeaderValue:    "gold",
-		TargetModel:    "gemini-2.5-pro",
-		TargetLocation: "us-central1",
-		FallbackModel:  "gemini-2.5-flash",
+		TargetModel:    "gemini-3.8-flash",
+		TargetLocation: "global",
+		FallbackModel:  "gemini-3.5-flash-lite",
 		PriorityWeight: 5,
 	}
 	_, err = client.Collection("routing_rules").Doc(testRuleID).Set(ctx, dbRule)
@@ -304,9 +304,9 @@ func main() {
 		log.Printf("[RESPONSE A] Raw JSON: %s", string(bodyBytes))
 	}
 
-	// Test Case B: Rules-Based Routing (Rewrite gemini-1.5-pro -> gemini-2.5-pro)
-	log.Println("--- [TEST] Case B: Rules-Based Header Routing (gemini-1.5-pro -> gemini-2.5-pro) ---")
-	req, _ = http.NewRequest("POST", fmt.Sprintf("%s/v1/models/gemini-1.5-pro:generateContent", serviceURL), bytes.NewReader(payloadBytes))
+	// Test Case B: Rules-Based Routing (Rewrite gemini-custom-rule -> gemini-3.8-flash)
+	log.Println("--- [TEST] Case B: Rules-Based Header Routing (gemini-custom-rule -> gemini-3.8-flash) ---")
+	req, _ = http.NewRequest("POST", fmt.Sprintf("%s/v1/models/gemini-custom-rule:generateContent", serviceURL), bytes.NewReader(payloadBytes))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-goog-api-key", testAPIKey)
 	req.Header.Set("X-Route-Priority", "gold")
@@ -331,8 +331,8 @@ func main() {
 
 	routedModel = resp.Header.Get("X-Routed-Model")
 	log.Printf("[PASS] Case B succeeded! HTTP Status: %d. Routed Model: %s", resp.StatusCode, routedModel)
-	if routedModel != "gemini-2.5-pro" {
-		log.Fatalf("[FAIL] Case B expected Routed Model 'gemini-2.5-pro', got '%s'", routedModel)
+	if routedModel != "gemini-3.8-flash" {
+		log.Fatalf("[FAIL] Case B expected Routed Model 'gemini-3.8-flash', got '%s'", routedModel)
 	}
 
 	// Parse and log Case B response text
@@ -373,7 +373,7 @@ func main() {
 	// Test Case D: Complexity-Based Dynamic Routing (gemini-dynamic)
 	log.Println("--- [TEST] Case D: Complexity-Based Dynamic Routing (gemini-dynamic) ---")
 
-	// Case D1: Short Prompt (under 50 characters) should target gemini-2.5-flash-lite (SimpleModel)
+	// Case D1: Short Prompt (under 50 characters) should target gemini-3.5-flash-lite (SimpleModel)
 	log.Println("[INFO] Case D1: Executing simple query...")
 	payloadD1 := map[string]interface{}{
 		"contents": []interface{}{
@@ -408,8 +408,8 @@ func main() {
 
 	routedModelD1 := respD1.Header.Get("X-Routed-Model")
 	log.Printf("[PASS] Case D1 succeeded! HTTP Status: %d. Routed Model: %s", respD1.StatusCode, routedModelD1)
-	if routedModelD1 != "gemini-2.5-flash-lite" {
-		log.Fatalf("[FAIL] Case D1 expected Routed Model 'gemini-2.5-flash-lite', got '%s'", routedModelD1)
+	if routedModelD1 != "gemini-3.5-flash-lite" {
+		log.Fatalf("[FAIL] Case D1 expected Routed Model 'gemini-3.5-flash-lite', got '%s'", routedModelD1)
 	}
 
 	var geminiRespD1 struct {
@@ -425,7 +425,7 @@ func main() {
 		log.Printf("[RESPONSE D1] Generated Text: %s", strings.TrimSpace(geminiRespD1.Candidates[0].Content.Parts[0].Text))
 	}
 
-	// Case D2: Medium Prompt (over 50 but under 200 characters) should target gemini-2.5-flash (MediumModel)
+	// Case D2: Medium Prompt (over 50 but under 200 characters) should target gemini-3.8-flash (MediumModel)
 	log.Println("[INFO] Case D2: Executing medium query...")
 	payloadD2 := map[string]interface{}{
 		"contents": []interface{}{
@@ -460,8 +460,8 @@ func main() {
 
 	routedModelD2 := respD2.Header.Get("X-Routed-Model")
 	log.Printf("[PASS] Case D2 succeeded! HTTP Status: %d. Routed Model: %s", respD2.StatusCode, routedModelD2)
-	if routedModelD2 != "gemini-2.5-flash" {
-		log.Fatalf("[FAIL] Case D2 expected Routed Model 'gemini-2.5-flash', got '%s'", routedModelD2)
+	if routedModelD2 != "gemini-3.8-flash" {
+		log.Fatalf("[FAIL] Case D2 expected Routed Model 'gemini-3.8-flash', got '%s'", routedModelD2)
 	}
 
 	var geminiRespD2 struct {
@@ -476,6 +476,87 @@ func main() {
 	if err := json.Unmarshal(bodyBytesD2, &geminiRespD2); err == nil && len(geminiRespD2.Candidates) > 0 && len(geminiRespD2.Candidates[0].Content.Parts) > 0 {
 		log.Printf("[RESPONSE D2] Generated Text: %s", strings.TrimSpace(geminiRespD2.Candidates[0].Content.Parts[0].Text))
 	}
+
+	// Test Case E: OpenAI Spec Chat Completions (/v1/chat/completions with gemini-dynamic)
+	log.Println("--- [TEST] Case E: OpenAI Spec Chat Completions (/v1/chat/completions) ---")
+	payloadE := map[string]interface{}{
+		"model": "gemini-dynamic",
+		"messages": []interface{}{
+			map[string]interface{}{"role": "system", "content": "Reply in one short sentence."},
+			map[string]interface{}{"role": "user", "content": "Hello!"},
+		},
+	}
+	payloadBytesE, _ := json.Marshal(payloadE)
+
+	reqE, _ := http.NewRequest("POST", fmt.Sprintf("%s/v1/chat/completions", serviceURL), bytes.NewReader(payloadBytesE))
+	reqE.Header.Set("Content-Type", "application/json")
+	reqE.Header.Set("x-goog-api-key", testAPIKey)
+	reqE.Header.Set("X-Client-App-ID", testAppID)
+	if oidcToken != "" {
+		reqE.Header.Set("Authorization", "Bearer "+oidcToken)
+	} else {
+		reqE.Header.Set("Authorization", "Bearer "+testAPIKey)
+	}
+
+	respE, err := httpClient.Do(reqE)
+	if err != nil {
+		log.Fatalf("[FAIL] Case E HTTP Request failed: %v", err)
+	}
+	bodyBytesE, _ := io.ReadAll(respE.Body)
+	respE.Body.Close()
+
+	if respE.StatusCode != http.StatusOK {
+		log.Fatalf("[FAIL] Case E expected Status 200, got %d. Response: %s", respE.StatusCode, string(bodyBytesE))
+	}
+
+	var oaiRespE struct {
+		Object  string `json:"object"`
+		Model   string `json:"model"`
+		Choices []struct {
+			Message struct {
+				Role    string `json:"role"`
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	if err := json.Unmarshal(bodyBytesE, &oaiRespE); err != nil {
+		log.Fatalf("[FAIL] Case E failed to parse OpenAI response JSON: %v (raw: %s)", err, string(bodyBytesE))
+	}
+	if oaiRespE.Object != "chat.completion" || len(oaiRespE.Choices) == 0 {
+		log.Fatalf("[FAIL] Case E expected object='chat.completion' with non-empty choices, got: %s", string(bodyBytesE))
+	}
+	log.Printf("[PASS] Case E succeeded! OpenAI Model: %s, Assistant Reply: %s", oaiRespE.Model, strings.TrimSpace(oaiRespE.Choices[0].Message.Content))
+
+	// Test Case F: OpenAI Spec Models List (GET /v1/models)
+	log.Println("--- [TEST] Case F: OpenAI Spec Models List (GET /v1/models) ---")
+	reqF, _ := http.NewRequest("GET", fmt.Sprintf("%s/v1/models", serviceURL), nil)
+	reqF.Header.Set("x-goog-api-key", testAPIKey)
+	if oidcToken != "" {
+		reqF.Header.Set("Authorization", "Bearer "+oidcToken)
+	} else {
+		reqF.Header.Set("Authorization", "Bearer "+testAPIKey)
+	}
+
+	respF, err := httpClient.Do(reqF)
+	if err != nil {
+		log.Fatalf("[FAIL] Case F HTTP Request failed: %v", err)
+	}
+	bodyBytesF, _ := io.ReadAll(respF.Body)
+	respF.Body.Close()
+
+	if respF.StatusCode != http.StatusOK {
+		log.Fatalf("[FAIL] Case F expected Status 200, got %d. Response: %s", respF.StatusCode, string(bodyBytesF))
+	}
+	var modelsRespF struct {
+		Object string `json:"object"`
+		Data   []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(bodyBytesF, &modelsRespF); err != nil || modelsRespF.Object != "list" || len(modelsRespF.Data) == 0 {
+		log.Fatalf("[FAIL] Case F invalid /v1/models payload: %s", string(bodyBytesF))
+	}
+	log.Printf("[PASS] Case F succeeded! Listed %d models via /v1/models", len(modelsRespF.Data))
 
 	log.Println("============================================================")
 	log.Println("👉 SUCCESS: ALL POST-DEPLOYMENT VERIFICATION SCENARIOS PASSED!")

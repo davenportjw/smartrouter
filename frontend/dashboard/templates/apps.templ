@@ -23,6 +23,7 @@ templ AppsTab(items []AppsViewModel) {
 				<button
 					hx-get="/admin/apps/new"
 					hx-target="#modal-container"
+					onclick="document.querySelectorAll('[data-edit-row]').forEach(r => r.classList.remove('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30'))"
 					class="block rounded-md bg-blue-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-blue-500 transition"
 				>
 					Add Application
@@ -31,7 +32,7 @@ templ AppsTab(items []AppsViewModel) {
 		</div>
 
 		<!-- Premium Application Limits & Scheduling Priority Explanation Card -->
-		<div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5 shadow-xs">
+		<div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5 shadow-sm">
 			<div class="flex gap-4">
 				<div class="flex-shrink-0 p-2 bg-emerald-500 text-white rounded-lg self-start">
 					<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
@@ -61,262 +62,255 @@ templ AppsTab(items []AppsViewModel) {
 			</div>
 		</div>
 
-		<!-- Apps Data Table -->
-		<div class="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
-			<div class="inline-block min-w-full align-middle">
-				<table class="min-w-full divide-y divide-gray-300">
-					<thead class="bg-gray-50">
-						<tr>
-							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Application Name</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Owner Client</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Client Tier</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Priority</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Limits (RPM/TPM)</th>
-							<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
-								<span class="sr-only">Actions</span>
-							</th>
-						</tr>
-					</thead>
-					<tbody class="divide-y divide-gray-200 bg-white">
-						if len(items) == 0 {
+		<!-- Master-Detail Split View: Apps Table (Left) + Contextual Inspector Pane (Right) -->
+		<div data-layout="master-detail-split" class="flex flex-col lg:flex-row gap-6 items-start">
+			<!-- Left Master Pane: Apps Data Table -->
+			<div class="flex-1 min-w-0 w-full bg-white shadow-xs ring-1 ring-slate-900/5 sm:rounded-xl overflow-hidden">
+				<div class="overflow-x-auto">
+					<table class="min-w-full divide-y divide-gray-300">
+						<thead class="bg-gray-50">
 							<tr>
-								<td colspan="6" class="text-center py-8 text-sm text-gray-500 italic">
-									No Applications configured. Please register an Application to generate custom credentials.
-								</td>
+								<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Application Name</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Owner Client</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Client Tier</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Priority</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Limits (RPM/TPM)</th>
+								<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
+									<span class="sr-only">Actions</span>
+								</th>
 							</tr>
-						} else {
-							for _, item := range items {
-								<tr class="hover:bg-gray-50 transition-colors">
-									<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
-										<div class="font-semibold text-gray-900">{ item.App.Name }</div>
-										<div class="text-xs font-mono text-gray-400">{ item.App.ID }</div>
-									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600">
-										<div class="font-medium text-gray-800">{ item.Client.Name }</div>
-										<div class="text-xs text-gray-400 font-mono">{ item.Client.ID }</div>
-									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm">
-										<span class={ "inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset " + getTierBadgeStyle(item.Client.Tier) }>
-											{ item.Client.Tier }
-										</span>
-									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm">
-										<span class={ "inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset " + getPriorityBadgeStyle(item.App.Priority) }>
-											{ item.App.Priority }
-										</span>
-									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-mono text-xs">
-										<span class="font-semibold text-gray-950">{ intToString(item.App.RPM) }</span> RPM /
-										<span class="font-semibold text-gray-950">{ intToString(item.App.TPM) }</span> TPM
-									</td>
-									<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-										<button
-											hx-get={ "/admin/apps/edit?id=" + item.App.ID }
-											hx-target="#modal-container"
-											class="text-blue-600 hover:text-blue-900 transition font-semibold mr-4"
-										>
-											Edit
-										</button>
-										<button
-											hx-delete={ "/admin/apps/delete?id=" + item.App.ID }
-											hx-confirm={ "Are you sure you want to remove application " + item.App.Name + "?" }
-											hx-target="closest tr"
-											hx-swap="outerHTML"
-											class="text-red-600 hover:text-red-900 transition font-semibold"
-										>
-											Delete
-										</button>
+						</thead>
+						<tbody class="divide-y divide-gray-200 bg-white">
+							if len(items) == 0 {
+								<tr>
+									<td colspan="6" class="text-center py-8 text-sm text-gray-500 italic">
+										No Applications configured. Please register an Application to generate custom credentials.
 									</td>
 								</tr>
+							} else {
+								for _, item := range items {
+									<tr data-edit-row={ item.App.ID } class="hover:bg-gray-50 transition-colors">
+										<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
+											<div class="font-semibold text-gray-900">{ item.App.Name }</div>
+											<div class="text-xs font-mono text-gray-400">{ item.App.ID }</div>
+										</td>
+										<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600">
+											<div class="font-medium text-gray-800">{ item.Client.Name }</div>
+											<div class="text-xs text-gray-400 font-mono">{ item.Client.ID }</div>
+										</td>
+										<td class="whitespace-nowrap px-3 py-4 text-sm">
+											<span class="capitalize text-slate-700 font-medium">{ item.Client.Tier }</span>
+										</td>
+										<td class="whitespace-nowrap px-3 py-4 text-sm">
+											<span class={ "inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset " + getPriorityBadgeStyle(item.App.Priority) }>
+												{ item.App.Priority }
+											</span>
+										</td>
+										<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-mono text-xs">
+											<span class="font-semibold text-gray-950">{ intToString(item.App.RPM) }</span> RPM /
+											<span class="font-semibold text-gray-950">{ intToString(item.App.TPM) }</span> TPM
+										</td>
+										<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+											<button
+												hx-get={ "/admin/apps/edit?id=" + item.App.ID }
+												hx-target="#modal-container"
+												onclick="document.querySelectorAll('[data-edit-row]').forEach(r => r.classList.remove('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30')); this.closest('tr').classList.add('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30')"
+												class="text-blue-600 hover:text-blue-900 transition font-semibold mr-4"
+											>
+												Edit
+											</button>
+											<button
+												hx-delete={ "/admin/apps/delete?id=" + item.App.ID }
+												hx-confirm={ "Are you sure you want to remove application " + item.App.Name + "?" }
+												hx-target="closest tr"
+												hx-swap="outerHTML"
+												class="text-red-600 hover:text-red-900 transition font-semibold"
+											>
+												Delete
+											</button>
+										</td>
+									</tr>
+								}
 							}
-						}
-					</tbody>
-				</table>
+						</tbody>
+					</table>
+				</div>
 			</div>
-		</div>
 
-		<!-- Modal Target Anchor -->
-		<div id="modal-container"></div>
+			<!-- Right Detail Inspector Pane -->
+			<aside id="modal-container" class="w-full lg:w-[400px] xl:w-[440px] shrink-0 lg:sticky lg:top-6 hidden [&:has(*)]:block"></aside>
+		</div>
 	</div>
 }
 
 templ AppModal(clients []config.Client, app *config.App) {
-	<!-- Modal backdrop -->
-	<div id="create-app-modal" class="relative z-50" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-		<div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
-		
-		<div class="fixed inset-0 z-50 w-screen overflow-y-auto">
-			<div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-				
-				<!-- Modal Panel -->
-				<div class="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6 border border-gray-200">
-					<div class="absolute right-0 top-0 hidden pr-4 pt-4 sm:block">
-						<button
-							type="button"
-							onclick="document.getElementById('create-app-modal').remove()"
-							class="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none"
-						>
-							<span class="sr-only">Close</span>
-							<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-							</svg>
-						</button>
+	<!-- Right-Hand Application Configuration Inspector Panel -->
+	<div id="create-app-modal" class="rounded-xl bg-white shadow-md border border-slate-200 overflow-hidden max-h-[calc(100vh-5rem)] flex flex-col" aria-labelledby="modal-title" role="region">
+		<!-- Sticky Inspector Header Bar -->
+		<div class="bg-slate-100/90 border-b border-slate-200 px-5 py-3.5 flex items-center justify-between gap-3">
+			<div>
+				<div class="text-[11px] font-semibold uppercase tracking-wider text-blue-600">Application Inspector</div>
+				<h3 class="text-sm font-bold text-slate-900" id="modal-title">
+					if app != nil {
+						Edit Logical Application
+					} else {
+						Add Logical Application
+					}
+				</h3>
+			</div>
+			<button
+				type="button"
+				onclick="document.querySelectorAll('[data-edit-row]').forEach(r => r.classList.remove('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30')); document.getElementById('create-app-modal').remove()"
+				class="rounded-md p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 focus:outline-none transition"
+			>
+				<span class="sr-only">Close</span>
+				<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+				</svg>
+			</button>
+		</div>
+
+		<!-- Scrollable Inspector Body -->
+		<div class="p-5 overflow-y-auto">
+			<p class="text-xs text-gray-500">
+				if app != nil {
+					Update application details, priority weights, and rate limits.
+				} else {
+					Register a specific project or client-side service to define distinct rate-limits and validation rules.
+				}
+			</p>
+
+			<!-- Creation Form -->
+			<form
+				hx-post="/admin/apps/create"
+				class="mt-4 space-y-4"
+			>
+				<div id="error-alert-container"></div>
+				<div class="grid grid-cols-2 gap-4">
+					<div>
+						<label for="app_id" class="block text-xs font-medium text-gray-700">Application ID (Slug)</label>
+						if app != nil {
+							<input type="text" name="app_id" id="app_id" required readonly value={ app.ID } class="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm cursor-not-allowed" />
+						} else {
+							<input type="text" name="app_id" id="app_id" required placeholder="e.g. customer-chat-prod" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
+						}
 					</div>
-
-					<div class="sm:flex sm:items-start">
-						<div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
-							<h3 class="text-lg font-semibold leading-6 text-gray-900" id="modal-title">
-								if app != nil {
-									Edit Logical Application
-								} else {
-									Add Logical Application
-								}
-							</h3>
-							<div class="mt-2">
-								<p class="text-xs text-gray-500">
-									if app != nil {
-										Update application details, priority weights, and rate limits.
-									} else {
-										Register a specific project or client-side service to define distinct rate-limits and validation rules.
-									}
-								</p>
-							</div>
-
-							<!-- Creation Form -->
-							<form
-								hx-post="/admin/apps/create"
-								class="mt-6 space-y-4"
-							>
-								<div id="error-alert-container"></div>
-								<div class="grid grid-cols-2 gap-4">
-									<div>
-										<label for="app_id" class="block text-xs font-medium text-gray-700">Application ID (Slug)</label>
-										if app != nil {
-											<input type="text" name="app_id" id="app_id" required readonly value={ app.ID } class="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm cursor-not-allowed" />
-										} else {
-											<input type="text" name="app_id" id="app_id" required placeholder="e.g. customer-chat-prod" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
-										}
-									</div>
-									<div>
-										<label for="app_name" class="block text-xs font-medium text-gray-700">Application Title</label>
-										if app != nil {
-											<input type="text" name="app_name" id="app_name" required value={ app.Name } placeholder="e.g. Customer Support Bot" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
-										} else {
-											<input type="text" name="app_name" id="app_name" required placeholder="e.g. Customer Support Bot" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
-										}
-									</div>
-								</div>
-
-								<div class="grid grid-cols-2 gap-4">
-									<div>
-										<label for="client_id" class="block text-xs font-medium text-gray-700">Parent Client Organization</label>
-										<select name="client_id" id="client_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm">
-											for _, c := range clients {
-												if app != nil && app.ClientID == c.ID {
-													<option value={ c.ID } selected>{ c.Name } ({ c.ID })</option>
-												} else {
-													<option value={ c.ID }>{ c.Name } ({ c.ID })</option>
-												}
-											}
-										</select>
-										<p class="text-[10px] text-gray-500 mt-0.5">💡 Secondary tie-breaker in priority queueing (Premium=+3, Standard=+2, Free=+1).</p>
-									</div>
-									<div>
-										<label for="priority" class="block text-xs font-medium text-gray-700">Queueing Priority Profile</label>
-										<select name="priority" id="priority" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm">
-											if app != nil {
-												<option value="low" if app.Priority == "low" { selected }>Low (Non-critical, Fail Instantly)</option>
-												<option value="medium" if app.Priority == "medium" { selected }>Medium (Standard, Up to 2s Rate Spike Buffer)</option>
-												<option value="high" if app.Priority == "high" { selected }>High (Mission Critical, Up to 5s Rate Spike Buffer)</option>
-											} else {
-												<option value="low">Low (Non-critical, Fail Instantly)</option>
-												<option value="medium" selected>Medium (Standard, Up to 2s Rate Spike Buffer)</option>
-												<option value="high">High (Mission Critical, Up to 5s Rate Spike Buffer)</option>
-											}
-										</select>
-										<p class="text-[10px] text-gray-500 mt-0.5">💡 Primary sort weight (High=+300, Med=+200, Low=+100). Upstream model overload queue duration is governed by the client's own HTTP timeout.</p>
-									</div>
-								</div>
-
-								<!-- Dynamic Routing Opt-Out -->
-								<div class="bg-yellow-50/50 border border-yellow-200 rounded-md p-3 flex items-center justify-between">
-									<div class="flex flex-col">
-										<label for="opt_out_dynamic_routing" class="text-xs font-bold text-yellow-950">Opt Out of Dynamic Routing</label>
-										<span class="text-[10px] text-yellow-800 font-medium leading-tight">Bypass all dynamic complexity routing and custom declarative routing rules for this app.</span>
-									</div>
-									<input
-										type="checkbox"
-										name="opt_out_dynamic_routing"
-										id="opt_out_dynamic_routing"
-										value="true"
-										class="h-4 w-4 rounded border-yellow-300 text-yellow-600 focus:ring-yellow-500"
-										if app != nil && app.OptOutDynamicRouting { checked }
-									/>
-								</div>
-
-								<!-- TPM Rate Limiting Opt-Out -->
-								<div class="bg-blue-50/50 border border-blue-200 rounded-md p-3 flex items-center justify-between">
-									<div class="flex flex-col">
-										<label for="opt_out_tpm" class="text-xs font-bold text-blue-950">Opt Out of TPM Rate Limiting</label>
-										<span class="text-[10px] text-blue-800 font-medium leading-tight">Bypass tokens per minute (TPM) rate limiting and rely entirely on RPM (Requests Per Minute).</span>
-									</div>
-									<input
-										type="checkbox"
-										name="opt_out_tpm"
-										id="opt_out_tpm"
-										value="true"
-										class="h-4 w-4 rounded border-blue-300 text-blue-600 focus:ring-blue-500"
-										if app != nil && app.OptOutTPM { checked }
-									/>
-								</div>
-
-								<div class="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded-md border border-gray-150">
-									<div class="col-span-2 text-xs font-medium text-gray-700 border-b border-gray-200 pb-1.5">
-										Active Enforced Capacity Limits
-									</div>
-									<div>
-										<label for="rpm" class="block text-xs font-medium text-gray-500">RPM (Requests Per Minute)</label>
-										if app != nil {
-											<input type="number" name="rpm" id="rpm" required value={ intToString(app.RPM) } min="1" max="10000" class="mt-1 block w-full bg-white rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-sm" />
-										} else {
-											<input type="number" name="rpm" id="rpm" required value="60" min="1" max="10000" class="mt-1 block w-full bg-white rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-sm" />
-										}
-									</div>
-									<div>
-										<label for="tpm" class="block text-xs font-medium text-gray-500">TPM (Tokens Per Minute)</label>
-										if app != nil {
-											<input type="number" name="tpm" id="tpm" required value={ intToString(app.TPM) } min="1000" max="50000000" class="mt-1 block w-full bg-white rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-sm" />
-										} else {
-											<input type="number" name="tpm" id="tpm" required value="40000" min="1000" max="50000000" class="mt-1 block w-full bg-white rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-sm" />
-										}
-									</div>
-									<div class="col-span-2 text-[10px] text-gray-500 italic mt-1">
-										💡 Smart Router rate limits are strictly checked and enforced at this Application boundary. Ensure correct values are set.
-									</div>
-								</div>
-
-								<div class="mt-6 sm:mt-4 sm:flex sm:flex-row-reverse gap-3">
-									<button type="submit" class="inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:w-auto transition">
-										if app != nil {
-											Save Changes
-										} else {
-											Create Application
-										}
-									</button>
-									<button
-										type="button"
-										onclick="document.getElementById('create-app-modal').remove()"
-										class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto transition"
-									>
-										Cancel
-									</button>
-								</div>
-							</form>
-						</div>
+					<div>
+						<label for="app_name" class="block text-xs font-medium text-gray-700">Application Title</label>
+						if app != nil {
+							<input type="text" name="app_name" id="app_name" required value={ app.Name } placeholder="e.g. Customer Support Bot" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
+						} else {
+							<input type="text" name="app_name" id="app_name" required placeholder="e.g. Customer Support Bot" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
+						}
 					</div>
 				</div>
-				
-			</div>
+
+				<div class="grid grid-cols-2 gap-4">
+					<div>
+						<label for="client_id" class="block text-xs font-medium text-gray-700">Parent Client Organization</label>
+						<select name="client_id" id="client_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm">
+							for _, c := range clients {
+								if app != nil && app.ClientID == c.ID {
+									<option value={ c.ID } selected>{ c.Name } ({ c.ID })</option>
+								} else {
+									<option value={ c.ID }>{ c.Name } ({ c.ID })</option>
+								}
+							}
+						</select>
+						<p class="text-[10px] text-gray-500 mt-0.5">💡 Secondary tie-breaker in priority queueing (Premium=+3, Standard=+2, Free=+1).</p>
+					</div>
+					<div>
+						<label for="priority" class="block text-xs font-medium text-gray-700">Queueing Priority Profile</label>
+						<select name="priority" id="priority" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm">
+							if app != nil {
+								<option value="low" if app.Priority == "low" { selected }>Low (Non-critical, Fail Instantly)</option>
+								<option value="medium" if app.Priority == "medium" { selected }>Medium (Standard, Up to 2s Rate Spike Buffer)</option>
+								<option value="high" if app.Priority == "high" { selected }>High (Mission Critical, Up to 5s Rate Spike Buffer)</option>
+							} else {
+								<option value="" selected>Inherit from Parent Client</option>
+								<option value="low">Low (Non-critical, Fail Instantly)</option>
+								<option value="medium">Medium (Standard, Up to 2s Rate Spike Buffer)</option>
+								<option value="high">High (Mission Critical, Up to 5s Rate Spike Buffer)</option>
+							}
+						</select>
+						<p class="text-[10px] text-gray-500 mt-0.5">💡 Primary sort weight (High=+300, Med=+200, Low=+100). Upstream model overload queue duration is governed by the client's own HTTP timeout.</p>
+					</div>
+				</div>
+
+				<!-- Dynamic Routing Opt-Out -->
+				<div class="bg-yellow-50/50 border border-yellow-200 rounded-md p-3 flex items-center justify-between">
+					<div class="flex flex-col">
+						<label for="opt_out_dynamic_routing" class="text-xs font-bold text-yellow-950">Opt Out of Dynamic Routing</label>
+						<span class="text-[10px] text-yellow-800 font-medium leading-tight">Bypass all dynamic complexity routing and custom declarative routing rules for this app.</span>
+					</div>
+					<input
+						type="checkbox"
+						name="opt_out_dynamic_routing"
+						id="opt_out_dynamic_routing"
+						value="true"
+						class="h-4 w-4 rounded border-yellow-300 text-yellow-600 focus:ring-yellow-500"
+						if app != nil && app.OptOutDynamicRouting { checked }
+					/>
+				</div>
+
+				<!-- TPM Rate Limiting Opt-Out -->
+				<div class="bg-blue-50/50 border border-blue-200 rounded-md p-3 flex items-center justify-between">
+					<div class="flex flex-col">
+						<label for="opt_out_tpm" class="text-xs font-bold text-blue-950">Opt Out of TPM Rate Limiting</label>
+						<span class="text-[10px] text-blue-800 font-medium leading-tight">Bypass tokens per minute (TPM) rate limiting and rely entirely on RPM (Requests Per Minute).</span>
+					</div>
+					<input
+						type="checkbox"
+						name="opt_out_tpm"
+						id="opt_out_tpm"
+						value="true"
+						class="h-4 w-4 rounded border-blue-300 text-blue-600 focus:ring-blue-500"
+						if app != nil && app.OptOutTPM { checked }
+					/>
+				</div>
+
+				<div class="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded-md border border-slate-200">
+					<div class="col-span-2 text-xs font-medium text-gray-700 border-b border-gray-200 pb-1.5">
+						Active Enforced Capacity Limits (Leave blank to inherit from Parent Client)
+					</div>
+					<div>
+						<label for="rpm" class="block text-xs font-medium text-gray-500">RPM (Requests Per Minute)</label>
+						if app != nil {
+							<input type="number" name="rpm" id="rpm" required value={ intToString(app.RPM) } min="1" max="10000" class="mt-1 block w-full bg-white rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-sm" />
+						} else {
+							<input type="number" name="rpm" id="rpm" placeholder="Inherit from Client" min="1" max="10000" class="mt-1 block w-full bg-white rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-sm" />
+						}
+					</div>
+					<div>
+						<label for="tpm" class="block text-xs font-medium text-gray-500">TPM (Tokens Per Minute)</label>
+						if app != nil {
+							<input type="number" name="tpm" id="tpm" required value={ intToString(app.TPM) } min="1000" max="50000000" class="mt-1 block w-full bg-white rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-sm" />
+						} else {
+							<input type="number" name="tpm" id="tpm" placeholder="Inherit from Client" min="1000" max="50000000" class="mt-1 block w-full bg-white rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-sm" />
+						}
+					</div>
+					<div class="col-span-2 text-[10px] text-gray-500 italic mt-1">
+						💡 Smart Router rate limits are strictly checked and enforced at this Application boundary. Ensure correct values are set.
+					</div>
+				</div>
+
+				<div class="mt-6 sm:mt-4 sm:flex sm:flex-row-reverse gap-3 border-t border-slate-200 pt-4">
+					<button type="submit" class="inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:w-auto transition">
+						if app != nil {
+							Save Changes
+						} else {
+							Create Application
+						}
+					</button>
+					<button
+						type="button"
+						onclick="document.querySelectorAll('[data-edit-row]').forEach(r => r.classList.remove('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30')); document.getElementById('create-app-modal').remove()"
+						class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto transition"
+					>
+						Cancel
+					</button>
+				</div>
+			</form>
 		</div>
 	</div>
 }

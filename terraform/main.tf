@@ -23,6 +23,31 @@ locals {
     length(split("@", trimspace(entry))) > 1 ? "user:${trimspace(entry)}" : "domain:${trimspace(entry)}"
     if trimspace(entry) != ""
   ]
+
+  parsed_auth_domains = [
+    for entry in split(",", var.allowed_email_domains) :
+    trimprefix(trimspace(entry), "@")
+    if trimspace(entry) != "" && length(split("@", trimprefix(trimspace(entry), "@"))) == 1
+  ]
+
+  # Managed Secret Manager container IDs (secret versions are populated out-of-band via
+  # `gcloud secrets versions add` / `./deploy.sh` so raw secret values never enter terraform.tfstate).
+  managed_secret_ids = toset([
+    "JEV_API_KEY",
+    "FASTINO_API_KEY",
+    "CLM_API_KEY",
+    "BACKEND_SHARED_SECRET"
+  ])
+
+  mounted_secret_ids = toset([
+    for s in var.enabled_secret_mounts : s
+    if contains([
+      "JEV_API_KEY",
+      "FASTINO_API_KEY",
+      "CLM_API_KEY",
+      "BACKEND_SHARED_SECRET"
+    ], s)
+  ])
 }
 
 resource "google_project_service" "apis" {
@@ -85,11 +110,41 @@ resource "google_project_iam_member" "firebase_auth_access" {
   member  = "serviceAccount:${google_service_account.router_sa.email}"
 }
 
+# Google Cloud Secret Manager: Managed Secret Containers for Decision Engines & Shared Auth
+# Note: Secret versions are populated out-of-band via `gcloud secrets versions add` (see deploy.sh)
+# so secret payloads are never persisted in plaintext inside terraform.tfstate.
+resource "google_secret_manager_secret" "app_secrets" {
+  for_each  = local.managed_secret_ids
+  project   = var.project_id
+  secret_id = each.key
+
+  labels = {
+    managed_by = "smartrouter-terraform"
+    component  = "decision-engine"
+  }
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_secret_manager_secret_iam_member" "router_sa_secret_accessor" {
+  for_each  = google_secret_manager_secret.app_secrets
+  project   = var.project_id
+  secret_id = each.value.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.router_sa.email}"
+}
+
 # 1. BACKEND SERVICE (Gemini Router API and Administrative Configuration APIs)
 resource "google_cloud_run_v2_service" "router_service" {
   depends_on = [
     google_project_service.apis,
-    google_service_account.router_sa
+    google_service_account.router_sa,
+    google_secret_manager_secret.app_secrets,
+    google_secret_manager_secret_iam_member.router_sa_secret_accessor
   ]
 
   name     = var.service_name
@@ -116,9 +171,17 @@ resource "google_cloud_run_v2_service" "router_service" {
         value = var.region
       }
 
-      env {
-        name  = "BACKEND_SHARED_SECRET"
-        value = var.backend_shared_secret
+      dynamic "env" {
+        for_each = local.mounted_secret_ids
+        content {
+          name = env.value
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.app_secrets[env.value].secret_id
+              version = "latest"
+            }
+          }
+        }
       }
 
       resources {
@@ -151,7 +214,9 @@ resource "google_cloud_run_v2_service_iam_member" "public_access" {
 resource "google_cloud_run_v2_service" "frontend_service" {
   depends_on = [
     google_project_service.apis,
-    google_service_account.router_sa
+    google_service_account.router_sa,
+    google_secret_manager_secret.app_secrets,
+    google_secret_manager_secret_iam_member.router_sa_secret_accessor
   ]
 
   name     = "${var.service_name}-ui"
@@ -179,6 +244,11 @@ resource "google_cloud_run_v2_service" "frontend_service" {
       }
 
       env {
+        name  = "PROXY_PUBLIC_URL"
+        value = google_cloud_run_v2_service.router_service.uri
+      }
+
+      env {
         name  = "BACKEND_SERVICE_NAME"
         value = var.service_name
       }
@@ -188,9 +258,17 @@ resource "google_cloud_run_v2_service" "frontend_service" {
         value = var.region
       }
 
-      env {
-        name  = "BACKEND_SHARED_SECRET"
-        value = var.backend_shared_secret
+      dynamic "env" {
+        for_each = local.mounted_secret_ids
+        content {
+          name = env.value
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.app_secrets[env.value].secret_id
+              version = "latest"
+            }
+          }
+        }
       }
 
       # Inject Firebase Web SDK credentials
@@ -220,6 +298,14 @@ resource "google_cloud_run_v2_service" "frontend_service" {
       }
       env {
         name  = "ALLOWED_EMAIL_DOMAINS"
+        value = var.allowed_email_domains
+      }
+      env {
+        name  = "ALLOWED_AUTH_DOMAINS"
+        value = var.allowed_email_domains
+      }
+      env {
+        name  = "ALLOWED_DOMAINS"
         value = var.allowed_email_domains
       }
 
@@ -253,17 +339,13 @@ resource "google_cloud_run_v2_service_iam_member" "frontend_public_access" {
 resource "google_identity_platform_config" "auth_config" {
   project = var.project_id
 
-  authorized_domains = [
+  authorized_domains = distinct(concat([
     "localhost",
-    "google.com",
-    "cloudadvocacyorg.joonix.net",
-    "gemini-smart-router-txgsracloq-uc.a.run.app",
-    "gemini-smart-router-834476222725.us-central1.run.app",
     "${var.project_id}.firebaseapp.com",
     "${var.project_id}.web.app",
     replace(replace(google_cloud_run_v2_service.frontend_service.uri, "https://", ""), "/", ""),
     replace(replace(google_cloud_run_v2_service.router_service.uri, "https://", ""), "/", "")
-  ]
+  ], local.parsed_auth_domains))
 
   lifecycle {
     ignore_changes = [

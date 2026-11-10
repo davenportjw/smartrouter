@@ -111,5 +111,6 @@ go test -v ./backend/proxy -run TestTDD_PromptWordBlocklistFilter
 ### Step 3: Refactor
 Clean up the code and run all package tests:
 ```bash
-go test -v ./backend/proxy/... ./frontend/dashboard/...
+go test -v ./pkg/... ./backend/... ./frontend/...
 ```
+

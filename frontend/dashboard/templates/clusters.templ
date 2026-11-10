@@ -3,6 +3,8 @@ package templates
 import (
 	"fmt"
 	"geminirouter/pkg/config"
+	"strings"
+	"time"
 )
 
 // ClustersViewModel carries state for the Local Clusters status dashboard.
@@ -13,191 +15,201 @@ type ClustersViewModel struct {
 }
 
 templ ClustersTab(vm ClustersViewModel) {
-	<div class="space-y-10">
-		<!-- Top Header Panel -->
-		<div class="border-b border-gray-200 pb-5">
-			<div class="sm:flex sm:items-center sm:justify-between">
+	<div class="space-y-6">
+		<!-- Top-level Modal Overlay Container (outside live poller so open modals survive 5s polling) -->
+		<div id="modal-container"></div>
+
+		<!-- Top Header Panel with Compact Intent Pill -->
+		<div class="border-b border-slate-200 pb-4">
+			<div class="sm:flex sm:items-center sm:justify-between gap-4">
 				<div>
-					<h1 class="text-3xl font-bold tracking-tight text-gray-900 font-sans">Local Clusters & Agents</h1>
-					<p class="mt-2 text-sm text-gray-600">
-						Monitor registered hardware nodes, Apple M-series daemons, and Kubernetes AgentFleets polling your local router queue.
+					<h1 class="text-2xl font-bold tracking-tight text-slate-900">Local Clusters &amp; Agents</h1>
+					<p class="mt-1 text-sm text-slate-600">
+						Manage on-premises pull-queue cluster pools, registered hardware runner nodes, and unmanaged direct HTTP inference or Contrastive-LM endpoints.
+					</p>
+				</div>
+			</div>
+
+			<!-- 3-Step Visual Workflow Guide -->
+			<div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+				<div class="rounded-lg border border-blue-200/80 bg-blue-50/40 px-3.5 py-2.5">
+					<div class="text-xs font-bold text-blue-900">1. Cluster Pool (Job Queue &amp; Policy)</div>
+					<p class="mt-0.5 text-[11px] text-slate-600 leading-relaxed">
+						The routing target (<code class="font-mono bg-white px-1 rounded border border-blue-200 text-blue-800">Location = &lt;Cluster ID&gt;</code>). Holds queued requests up to <code class="font-mono">MaxQueueAge</code> and defines Cloud Failover (<code class="font-mono">FallbackModel</code>).
+					</p>
+				</div>
+				<div class="rounded-lg border border-emerald-200/80 bg-emerald-50/40 px-3.5 py-2.5">
+					<div class="text-xs font-bold text-emerald-900">2. Cluster Nodes (Worker Daemons)</div>
+					<p class="mt-0.5 text-[11px] text-slate-600 leading-relaxed">
+						Mac Studio or K8s daemons attached to one or more Cluster Pools. They poll the pool queue and execute jobs up to their <code class="font-mono">MaxConcurrent</code> &amp; VRAM limits.
+					</p>
+				</div>
+				<div class="rounded-lg border border-amber-200/80 bg-amber-50/40 px-3.5 py-2.5">
+					<div class="text-xs font-bold text-amber-900">3. Direct HTTP Endpoints (Push Servers)</div>
+					<p class="mt-0.5 text-[11px] text-slate-600 leading-relaxed">
+						Standalone <code class="font-mono">vllm</code>, <code class="font-mono">ollama</code>, <code class="font-mono">sglang</code>, or <code class="font-mono">mlx</code> HTTP URLs where Smart Router pushes requests directly without a pull-queue.
 					</p>
 				</div>
 			</div>
 		</div>
 
-		<!-- Live Queue Metrics and Aggregates Grid -->
-		<div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
-			<div class="bg-white overflow-hidden shadow-sm border border-gray-200 rounded-xl p-6 flex items-center gap-4">
-				<div class="p-3 rounded-lg bg-blue-50 text-blue-600 shrink-0">
-					<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-					</svg>
-				</div>
+		<!-- Table 1: 1. On-Premises Clusters (Pull-Queue Pools) -->
+		<div class="bg-white shadow-sm border border-slate-200 rounded-xl overflow-hidden">
+			<div class="border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-slate-50/70">
 				<div>
-					<p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Central Queue Depth</p>
-					<p class="text-2xl font-extrabold text-gray-900 font-mono mt-1">{ fmt.Sprintf("%d Requests", vm.QueueDepth) }</p>
-				</div>
-			</div>
-
-			<div class="bg-white overflow-hidden shadow-sm border border-gray-200 rounded-xl p-6 flex items-center gap-4">
-				<div class="p-3 rounded-lg bg-emerald-50 text-emerald-600 shrink-0">
-					<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-					</svg>
-				</div>
-				<div>
-					<p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Active Computing Agents</p>
-					<p class="text-2xl font-extrabold text-gray-900 font-mono mt-1">{ fmt.Sprintf("%d Online Nodes", len(vm.ActiveNodes)) }</p>
-				</div>
-			</div>
-
-			<div class="bg-white overflow-hidden shadow-sm border border-gray-200 rounded-xl p-6 flex items-center gap-4">
-				<div class="p-3 rounded-lg bg-purple-50 text-purple-600 shrink-0">
-					<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-					</svg>
-				</div>
-				<div>
-					<p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Pool VRAM</p>
-					<p class="text-2xl font-extrabold text-gray-900 font-mono mt-1">{ fmt.Sprintf("%d GB Unified", calculateTotalVram(vm.ActiveNodes)) }</p>
-				</div>
-			</div>
-		</div>
-
-		@ClustersPoller(vm)
-	</div>
-}
-
-templ ClustersPoller(vm ClustersViewModel) {
-		<!-- Dynamic Live Poller Section using HTMX -->
-		<div 
-			hx-get="/admin/clusters/poll"
-			hx-trigger="every 5s"
-			hx-swap="outerHTML"
-			class="bg-white shadow-sm border border-gray-200 rounded-xl overflow-hidden"
-		>
-			<div class="border-b border-gray-200 px-6 py-5 flex items-center justify-between bg-gray-50/80">
-				<div>
-					<h3 class="text-base font-bold text-gray-900">Registered Cluster Nodes</h3>
-					<p class="text-xs text-gray-500 mt-0.5">Dynamically updating active compute host heartbeats and supported models.</p>
-				</div>
-				<span class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 border border-blue-200">
-					<span class="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse"></span>
-					Live polling
-				</span>
-			</div>
-
-			if len(vm.ActiveNodes) == 0 {
-				<div class="text-center py-16 px-4">
-					<svg class="mx-auto h-12 w-12 text-gray-350 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
-					</svg>
-					<h4 class="mt-4 text-sm font-bold text-gray-900">No Local Agents Connected</h4>
-					<p class="mt-2 text-xs text-gray-500 max-w-md mx-auto">
-						Ready for local serving. Launch the native macOS daemon Wails App or deploy the Kubernetes AgentFleet, supplying your join tokens.
+					<h3 class="text-base font-bold text-slate-900">1. On-Premises Clusters (Pull-Queue Pools)</h3>
+					<p class="text-xs text-slate-500 mt-0.5">
+						Logical job queues that hold inference requests for Smart Router-managed hardware nodes to pull from.
 					</p>
+				</div>
+				<div class="flex items-center gap-2 shrink-0">
+					<button
+						type="button"
+						hx-get="/admin/clusters/edit-modal?type=cluster"
+						hx-target="#modal-container"
+						hx-swap="innerHTML"
+						class="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-blue-700 transition cursor-pointer"
+					>
+						+ Add Cluster Pool
+					</button>
+				</div>
+			</div>
+
+			if len(extractLocalClustersWithRunners(vm.Providers, vm.ActiveNodes)) == 0 {
+				<div class="text-center py-10 px-4">
+					<h4 class="text-sm font-bold text-slate-900">No On-Premises Cluster Pools Configured</h4>
+					<p class="mt-1 text-xs text-slate-500 max-w-md mx-auto">
+						Create a pull-queue cluster pool and select existing worker nodes (or register new Mac Studio / K8s runner nodes below) to start serving local models.
+					</p>
+					<div class="mt-3">
+						<button
+							type="button"
+							hx-get="/admin/clusters/edit-modal?type=cluster"
+							hx-target="#modal-container"
+							hx-swap="innerHTML"
+							class="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-blue-700 transition cursor-pointer"
+						>
+							+ Add Cluster Pool
+						</button>
+					</div>
 				</div>
 			} else {
 				<div class="overflow-x-auto">
-					<table class="min-w-full divide-y divide-gray-200">
-						<thead class="bg-gray-50/50">
+					<table class="min-w-full divide-y divide-slate-200">
+						<thead class="bg-slate-50">
 							<tr>
-								<th scope="col" class="py-3.5 pl-6 pr-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Host Name / Node ID</th>
-								<th scope="col" class="px-3 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-gray-500">System Specs</th>
-								<th scope="col" class="px-3 py-3.5 text-center text-xs font-bold uppercase tracking-wider text-gray-500">Status</th>
-								<th scope="col" class="px-3 py-3.5 text-center text-xs font-bold uppercase tracking-wider text-gray-500">Allowed Size Limit</th>
-								<th scope="col" class="px-3 py-3.5 text-center text-xs font-bold uppercase tracking-wider text-gray-500">Active Models</th>
-								<th scope="col" class="px-3 py-3.5 text-center text-xs font-bold uppercase tracking-wider text-gray-500">Assigned Clusters</th>
-								<th scope="col" class="px-3 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Last Heartbeat</th>
-								<th scope="col" class="relative py-3.5 pl-3 pr-6 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Actions</th>
+								<th scope="col" class="py-3 pl-6 pr-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Cluster Name &amp; ID</th>
+								<th scope="col" class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Queue Name</th>
+								<th scope="col" class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Served Models</th>
+								<th scope="col" class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Max Queue Age (TTL)</th>
+								<th scope="col" class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Attached Nodes</th>
+								<th scope="col" class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Description</th>
+								<th scope="col" class="py-3 pl-3 pr-6 text-right text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Actions</th>
 							</tr>
 						</thead>
-						<tbody class="divide-y divide-gray-200 bg-white">
-							for _, agent := range vm.ActiveNodes {
-								<tr class="hover:bg-gray-50/40 transition">
-									<td class="py-4 pl-6 pr-3 text-sm whitespace-nowrap">
-										<div class="font-semibold text-gray-900">{ agent.Node.Name }</div>
-										<div class="text-xs font-mono text-gray-400 mt-0.5">{ agent.Node.ID }</div>
+						<tbody class="divide-y divide-slate-200 bg-white">
+							for _, cl := range extractLocalClustersWithRunners(vm.Providers, vm.ActiveNodes) {
+								<tr class="hover:bg-slate-50/80 transition align-middle">
+									<td class="py-3.5 pl-6 pr-3 whitespace-nowrap">
+										<div class="text-sm font-semibold text-slate-900">{ cl.Name }</div>
+										<div class="font-mono text-xs text-slate-500 mt-0.5">{ cl.ID }</div>
 									</td>
-									<td class="px-3 py-4 text-xs">
-										<div class="flex flex-col gap-1 text-gray-700">
-											<span class="font-semibold">{ fmt.Sprintf("%d GB RAM / Unified Memory", agent.Node.MemoryAllocatedGB) }</span>
-											<span class="text-gray-400 font-mono">{ fmt.Sprintf("GPU Compute Cores: %d cores", agent.Node.ComputeGPUCores) }</span>
-										</div>
-									</td>
-									<td class="px-3 py-4 text-center whitespace-nowrap text-xs">
-										if agent.Node.Status == "online" {
-											<span class="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700 ring-1 ring-inset ring-green-600/20">
-												<span class="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse"></span>
-												Idle
-											</span>
-										} else if agent.Node.Status == "busy" {
-											<span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-600/20 animate-pulse">
-												<span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
-												Processing
+									<td class="px-3 py-3.5 whitespace-nowrap">
+										if cl.QueueName != "" {
+											<span class="text-xs font-mono text-slate-700">
+												{ cl.QueueName }
 											</span>
 										} else {
-											<span class="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-650 ring-1 ring-inset ring-gray-550/20">
-												<span class="h-1.5 w-1.5 rounded-full bg-gray-400"></span>
-												Offline
-											</span>
+											<span class="text-xs font-mono text-slate-400">default</span>
 										}
 									</td>
-									<td class="px-3 py-4 text-center whitespace-nowrap text-xs">
-										if agent.Node.MaxModelSizeGB > 0 {
-											<span class="inline-flex items-center rounded bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-750 border border-blue-200 font-mono">
-												{ fmt.Sprintf("≤ %d GB", agent.Node.MaxModelSizeGB) }
-											</span>
-										} else {
-											<span class="inline-flex items-center rounded bg-gray-50 px-2.5 py-1 text-xs font-bold text-gray-500 border border-gray-200">
-												No limit (∞)
-											</span>
-										}
-									</td>
-									<td class="px-3 py-4 text-xs text-center">
-										<div class="flex flex-wrap gap-1 justify-center max-w-xs mx-auto">
-											for _, model := range agent.Node.SupportedModels {
-												<span class="inline-flex items-center rounded bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-850 border border-gray-200">
-													{ model }
-												</span>
-											}
-										</div>
-									</td>
-									<td class="px-3 py-4 text-xs text-center">
-										<div class="flex flex-wrap gap-1 justify-center max-w-xs mx-auto">
-											if len(agent.AssignedClusters) == 0 {
-												<span class="inline-flex items-center rounded bg-yellow-50 px-2 py-0.5 text-[10px] font-semibold text-yellow-700 border border-yellow-200">
-													Unassigned
-												</span>
+									<td class="px-3 py-3.5">
+										<div class="flex flex-wrap gap-1 max-w-xs">
+											if len(getClusterServedModels(cl.ID, vm.ActiveNodes, cl.Nodes)) == 0 {
+												<span class="text-xs text-slate-400 italic">No models (attach node)</span>
 											} else {
-												for _, cluster := range agent.AssignedClusters {
-													<span class="inline-flex items-center rounded bg-purple-50 px-2 py-0.5 text-[10px] font-semibold text-purple-700 border border-purple-200 font-mono">
-														{ cluster }
+												for _, model := range getClusterServedModels(cl.ID, vm.ActiveNodes, cl.Nodes) {
+													<span class="bg-slate-100 text-slate-700 font-mono text-xs px-2 py-0.5 rounded border border-slate-200/80">
+														{ model }
 													</span>
 												}
 											}
 										</div>
 									</td>
-									<td class="px-3 py-4 text-xs text-gray-500 whitespace-nowrap font-mono">
-										{ agent.Node.LastHeartbeat.Format("2006-01-02 15:04:05") }
+									<td class="px-3 py-3.5 whitespace-nowrap">
+										<div class="flex flex-wrap items-center gap-1.5">
+											if cl.MaxQueueAge > 0 {
+												<span class="text-xs font-mono text-slate-700 tabular-nums">
+													{ fmt.Sprintf("%ds", cl.MaxQueueAge) }
+												</span>
+											} else {
+												<span class="text-xs font-mono text-slate-600 tabular-nums">
+													90s
+												</span>
+											}
+											if len(getClusterServedModels(cl.ID, vm.ActiveNodes, cl.Nodes)) > 0 {
+												if cl.FallbackModel != "" {
+													<span class="inline-flex items-center rounded bg-indigo-50 px-2 py-0.5 text-xs font-mono font-semibold text-indigo-700 border border-indigo-200" title="Cloud failover model used when queue TTL expires or all nodes are offline">
+														if cl.FallbackLocation != "" {
+															{ fmt.Sprintf("Failover → %s (%s)", cl.FallbackModel, cl.FallbackLocation) }
+														} else {
+															{ fmt.Sprintf("Failover → %s", cl.FallbackModel) }
+														}
+													</span>
+												} else {
+													<span class="text-xs text-slate-400">No failover (504 on timeout)</span>
+												}
+											} else {
+												<span class="text-xs text-slate-400">Awaiting node models</span>
+											}
+										</div>
 									</td>
-									<td class="whitespace-nowrap py-4 pl-3 pr-6 text-right text-sm font-medium space-x-2">
+									<td class="px-3 py-3.5">
+										<div class="flex flex-wrap items-center gap-1.5 max-w-sm">
+											if len(getAssignedNodesForCluster(cl.ID, vm.ActiveNodes, cl.Nodes)) == 0 {
+												<span class="text-xs text-slate-400 italic">0 nodes attached</span>
+											} else {
+												for _, nodeID := range getAssignedNodesForCluster(cl.ID, vm.ActiveNodes, cl.Nodes) {
+													<span class="inline-flex items-center rounded bg-emerald-50 px-2 py-0.5 text-xs font-mono font-medium text-emerald-800 border border-emerald-200">
+														{ nodeID }
+													</span>
+												}
+											}
+											<button
+												type="button"
+												hx-get={ "/admin/clusters/edit-modal?type=pull-queue&id=" + cl.ID }
+												hx-target="#modal-container"
+												hx-swap="innerHTML"
+												class="inline-flex items-center rounded bg-blue-50 hover:bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-700 border border-blue-200 transition cursor-pointer"
+											>
+												+ Attach / Manage Nodes
+											</button>
+										</div>
+									</td>
+									<td class="px-3 py-3.5 text-xs text-slate-600 max-w-xs truncate">
+										if cl.Description != "" {
+											{ cl.Description }
+										} else {
+											<span class="text-slate-400">—</span>
+										}
+									</td>
+									<td class="whitespace-nowrap py-3.5 pl-3 pr-6 text-right text-xs font-medium space-x-1.5">
 										<button
-											hx-get={ "/admin/clusters/mappings?id=" + agent.Node.ID }
+											type="button"
+											hx-get={ "/admin/clusters/edit-modal?type=pull-queue&id=" + cl.ID }
 											hx-target="#modal-container"
-											class="text-blue-600 hover:text-blue-800 font-bold text-xs bg-blue-50 border border-blue-200 px-2.5 py-1.5 rounded hover:bg-blue-100 transition"
+											hx-swap="innerHTML"
+											class="text-slate-700 hover:text-blue-700 font-semibold text-xs bg-white border border-slate-200 px-2.5 py-1 rounded hover:bg-slate-50 transition cursor-pointer shadow-2xs"
 										>
-											Manage Mappings
+											Edit
 										</button>
 										<button
-											hx-delete={ "/admin/clusters/delete?id=" + agent.Node.ID }
-											hx-confirm={ "Are you sure you want to delete agent node " + agent.Node.Name + "?" }
-											hx-target="closest tr"
-											hx-swap="outerHTML"
-											class="text-gray-500 hover:text-red-600 font-bold text-xs bg-gray-50 border border-gray-200 px-2.5 py-1.5 rounded hover:bg-gray-100 transition"
+											type="button"
+											hx-delete={ "/admin/clusters/providers/delete?type=cluster&id=" + cl.ID }
+											hx-confirm={ "Delete cluster " + cl.Name + "?" }
+											class="text-slate-500 hover:text-red-600 font-semibold text-xs bg-white border border-slate-200 px-2.5 py-1 rounded hover:bg-red-50 hover:border-red-200 transition cursor-pointer"
 										>
-											De-register
+											Delete
 										</button>
 									</td>
 								</tr>
@@ -206,17 +218,537 @@ templ ClustersPoller(vm ClustersViewModel) {
 					</table>
 				</div>
 			}
-			<!-- Modal Target Anchor -->
-			<div id="modal-container"></div>
 		</div>
+
+		<!-- Table 2: 2. Cluster Nodes (Managed Runners) inside Live HTMX Poller -->
+		@ClustersPoller(vm)
+
+		<!-- Table 3: 3. Custom / Direct HTTP Endpoints (Unmanaged Hardware) -->
+		<div class="bg-white shadow-sm border border-slate-200 rounded-xl overflow-hidden">
+			<div class="border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-slate-50/70">
+				<div>
+					<h3 class="text-base font-bold text-slate-900">3. Custom / Direct HTTP Endpoints (Unmanaged Hardware)</h3>
+					<p class="text-xs text-slate-500 mt-0.5">
+						External push-based HTTP servers (<code class="font-mono">vllm</code>, <code class="font-mono">ollama</code>, <code class="font-mono">sglang</code>, <code class="font-mono">mlx</code>, <code class="font-mono">contrastive-lm</code>) where Smart Router forwards requests directly to Base URL without managing node queues.
+					</p>
+				</div>
+				<div class="flex items-center gap-2 shrink-0">
+					<button
+						type="button"
+						hx-get="/admin/clusters/edit-modal?type=endpoint"
+						hx-target="#modal-container"
+						hx-swap="innerHTML"
+						class="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-blue-700 transition cursor-pointer"
+					>
+						+ Add Direct Endpoint
+					</button>
+				</div>
+			</div>
+
+			if len(extractDirectEndpoints(vm.Providers)) == 0 {
+				<div class="text-center py-10 px-4">
+					<h4 class="text-sm font-bold text-slate-900">No Direct HTTP Endpoints Configured</h4>
+					<p class="mt-1 text-xs text-slate-500 max-w-md mx-auto">
+						Register a standalone vLLM, Ollama, SGLang, Apple MLX, or Contrastive-LM HTTP server for direct push routing.
+					</p>
+					<div class="mt-3">
+						<button
+							type="button"
+							hx-get="/admin/clusters/edit-modal?type=endpoint"
+							hx-target="#modal-container"
+							hx-swap="innerHTML"
+							class="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-blue-700 transition cursor-pointer"
+						>
+							+ Add Direct Endpoint
+						</button>
+					</div>
+				</div>
+			} else {
+				<div class="overflow-x-auto">
+					<table class="min-w-full divide-y divide-slate-200">
+						<thead class="bg-slate-50">
+							<tr>
+								<th scope="col" class="py-3 pl-6 pr-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Endpoint Name &amp; ID</th>
+								<th scope="col" class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Served Model</th>
+								<th scope="col" class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Engine &amp; Role</th>
+								<th scope="col" class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Target Base URL</th>
+								<th scope="col" class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Status</th>
+								<th scope="col" class="py-3 pl-3 pr-6 text-right text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Actions</th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-slate-200 bg-white">
+							for _, ep := range extractDirectEndpoints(vm.Providers) {
+								<tr class="hover:bg-slate-50/80 transition align-middle">
+									<td class="py-3.5 pl-6 pr-3 whitespace-nowrap">
+										<div class="text-sm font-semibold text-slate-900">
+											if ep.Name != "" {
+												{ ep.Name }
+											} else {
+												{ ep.ModelName }
+											}
+										</div>
+										<div class="font-mono text-xs text-slate-500 mt-0.5">{ ep.ID }</div>
+									</td>
+									<td class="px-3 py-3.5 whitespace-nowrap">
+										<span class="text-xs font-mono text-slate-700">
+											{ ep.ModelName }
+										</span>
+									</td>
+									<td class="px-3 py-3.5 whitespace-nowrap">
+										<div class="flex flex-wrap items-center gap-1.5">
+											if ep.Engine != "" {
+												<span class="text-xs font-mono text-slate-600">
+													{ ep.Engine }
+												</span>
+											}
+											if ep.Role == "decision_engine" || ep.ModelName == "contrastive-lm" || ep.Engine == "contrastive-lm" {
+												<span class="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 ring-1 ring-inset ring-indigo-600/20">
+													Decision Engine (CLM)
+												</span>
+											} else {
+												<span class="text-xs text-slate-500">
+													Inference
+												</span>
+											}
+										</div>
+									</td>
+									<td class="px-3 py-3.5 font-mono text-xs text-slate-600 max-w-xs truncate" title={ ep.URL }>
+										{ ep.URL }
+									</td>
+									<td class="px-3 py-3.5 whitespace-nowrap">
+										if ep.Active {
+											<span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+												<span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+												Active
+											</span>
+										} else {
+											<span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-slate-500/20">
+												<span class="h-1.5 w-1.5 rounded-full bg-slate-400"></span>
+												Disabled
+											</span>
+										}
+									</td>
+									<td class="whitespace-nowrap py-3.5 pl-3 pr-6 text-right text-xs font-medium space-x-1.5">
+										<button
+											type="button"
+											hx-get={ "/admin/clusters/edit-modal?type=direct-http&id=" + ep.ID }
+											hx-target="#modal-container"
+											hx-swap="innerHTML"
+											class="text-slate-700 hover:text-blue-700 font-semibold text-xs bg-white border border-slate-200 px-2.5 py-1 rounded hover:bg-slate-50 transition cursor-pointer shadow-2xs"
+										>
+											Edit
+										</button>
+										<button
+											type="button"
+											hx-delete={ "/admin/clusters/providers/delete?type=endpoint&id=" + ep.ID }
+											hx-confirm={ "Delete direct endpoint " + ep.ID + "?" }
+											class="text-slate-500 hover:text-red-600 font-semibold text-xs bg-white border border-slate-200 px-2.5 py-1 rounded hover:bg-red-50 hover:border-red-200 transition cursor-pointer"
+										>
+											Delete
+										</button>
+									</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			}
+		</div>
+
+		<script>
+			document.addEventListener('keydown', function(evt) {
+				if (evt.key === 'Escape') {
+					const mc = document.getElementById('modal-container');
+					if (mc) mc.innerHTML = '';
+				}
+			});
+		</script>
+	</div>
 }
 
-func calculateTotalVram(nodes []config.RunnerResponse) int {
+templ ClustersPoller(vm ClustersViewModel) {
+	<!-- Dynamic Live Poller Section using HTMX -->
+	<div
+		id="clusters-poller"
+		hx-get="/admin/clusters/active"
+		hx-trigger="every 5s"
+		hx-swap="outerHTML"
+		class="bg-white shadow-sm border border-slate-200 rounded-xl overflow-hidden"
+	>
+		<div class="border-b border-slate-200 px-6 py-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 bg-slate-50/70">
+			<div>
+				<h3 class="text-base font-bold text-slate-900">2. Cluster Nodes (Managed Runners)</h3>
+				<p class="text-xs text-slate-500 mt-0.5">
+					Physical or VM compute agents (Mac Studio M-series daemons, K8s pods) that poll On-Premises Cluster queues for work.
+				</p>
+			</div>
+			<div class="flex flex-wrap items-center gap-2">
+				<!-- Central Queue Intent Pill -->
+				<span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-700 border border-slate-200 shadow-2xs tabular-nums whitespace-nowrap">
+					if vm.QueueDepth > 0 {
+						<span class="h-2 w-2 rounded-full bg-amber-500 animate-pulse"></span>
+					} else {
+						<span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+					}
+					{ fmt.Sprintf("Central Queue: %s", formatRequestCount(vm.QueueDepth)) }
+				</span>
+				<!-- Online Nodes Pill -->
+				<span class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 border border-slate-200 tabular-nums whitespace-nowrap">
+					{ formatOnlineNodeCount(countOnlineNodes(vm.ActiveNodes)) }
+				</span>
+				<!-- Live Polling Pill -->
+				<span class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 border border-blue-200 shrink-0 whitespace-nowrap">
+					<span class="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+					Live polling · 5s
+				</span>
+				<!-- Primary Action: Register Cluster Node -->
+				<button
+					type="button"
+					hx-get="/admin/clusters/node-modal"
+					hx-target="#modal-container"
+					hx-swap="innerHTML"
+					class="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-blue-700 transition cursor-pointer shrink-0"
+				>
+					+ Register Cluster Node
+				</button>
+			</div>
+		</div>
+
+		if len(vm.ActiveNodes) == 0 {
+			<div class="text-center py-12 px-4">
+				<svg class="mx-auto h-10 w-10 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+				</svg>
+				<h4 class="mt-3 text-sm font-bold text-slate-900">No Local Agents Connected</h4>
+				<p class="mt-1.5 text-xs text-slate-500 max-w-md mx-auto">
+					Pre-register a cluster node below or run the daemon heartbeat registration command on your Mac Studio or Linux GPU host.
+				</p>
+				<div class="mt-4">
+					<button
+						type="button"
+						hx-get="/admin/clusters/node-modal"
+						hx-target="#modal-container"
+						hx-swap="innerHTML"
+						class="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-blue-700 transition cursor-pointer"
+					>
+						+ Register Cluster Node
+					</button>
+				</div>
+			</div>
+		} else {
+			<div class="overflow-x-auto">
+				<table class="min-w-full divide-y divide-slate-200">
+					<thead class="bg-slate-50">
+						<tr>
+							<th scope="col" class="py-3 pl-6 pr-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Node &amp; Heartbeat</th>
+							<th scope="col" class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Compute &amp; Concurrency</th>
+							<th scope="col" class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Memory &amp; Model Cap</th>
+							<th scope="col" class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Supported Models</th>
+							<th scope="col" class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Cluster Pool</th>
+							<th scope="col" class="py-3 pl-3 pr-6 text-right text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Actions</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-slate-200 bg-white">
+						for _, agent := range vm.ActiveNodes {
+							<tr class="hover:bg-slate-50/80 transition align-middle">
+								<!-- Column 1: Node & Heartbeat -->
+								<td class="py-3.5 pl-6 pr-3">
+									<div class="flex items-center gap-2">
+										if agent.Node.Status == "online" {
+											<span class="h-2 w-2 rounded-full bg-emerald-500 shrink-0" title="Online / Idle"></span>
+										} else if agent.Node.Status == "busy" {
+											<span class="h-2 w-2 rounded-full bg-amber-500 animate-pulse shrink-0" title="Busy / Processing"></span>
+										} else if agent.Node.Status == "pre-registered" {
+											<span class="h-2 w-2 rounded-full bg-blue-500 shrink-0" title="Pre-registered (Awaiting Heartbeat)"></span>
+										} else {
+											<span class="h-2 w-2 rounded-full bg-slate-400 shrink-0" title="Offline"></span>
+										}
+										<span class="text-sm font-semibold text-slate-900">{ agent.Node.Name }</span>
+										<span class="text-xs text-slate-500 tabular-nums">
+											{ formatNodeStatusAndHeartbeat(agent.Node.Status, agent.Node.LastHeartbeat) }
+										</span>
+									</div>
+									<div class="mt-0.5 pl-4 font-mono text-xs text-slate-500 truncate max-w-[220px]" title={ agent.Node.ID }>
+										{ agent.Node.ID }
+									</div>
+								</td>
+
+								<!-- Column 2: Compute & Concurrency -->
+								<td class="px-3 py-3.5 whitespace-nowrap">
+									<div class="text-sm font-medium text-slate-900 tabular-nums">
+										{ fmt.Sprintf("%d GPU Cores", agent.Node.ComputeGPUCores) }
+									</div>
+									<div class="text-xs text-slate-500 tabular-nums mt-0.5">
+										{ fmt.Sprintf("%dx Max Concurrent", effectiveConcurrency(agent.Node.MaxConcurrent)) }
+									</div>
+								</td>
+
+								<!-- Column 3: Memory & Model Cap -->
+								<td class="px-3 py-3.5 whitespace-nowrap min-w-[180px]">
+									<div class="flex items-baseline justify-between gap-3">
+										<span class="text-sm font-semibold text-slate-900 tabular-nums">
+											{ fmt.Sprintf("%d GB Unified", agent.Node.MemoryAllocatedGB) }
+										</span>
+										if agent.Node.MaxModelSizeGB > 0 {
+											<span class="text-xs font-mono text-slate-600 tabular-nums">
+												{ fmt.Sprintf("Cap ≤ %d GB", agent.Node.MaxModelSizeGB) }
+											</span>
+										} else {
+											<span class="text-xs font-mono text-slate-400">
+												No Cap
+											</span>
+										}
+									</div>
+									<div class="mt-1.5 w-full bg-slate-100 h-1.5 rounded-full overflow-hidden" title="Max Model Weight Threshold vs Unified Memory">
+										<div class="bg-blue-600 h-full rounded-full" style={ modelCapWidthStyle(agent.Node.MaxModelSizeGB, agent.Node.MemoryAllocatedGB) }></div>
+									</div>
+								</td>
+
+								<!-- Column 4: Supported Models -->
+								<td class="px-3 py-3.5">
+									<div class="flex flex-wrap gap-1 max-w-xs">
+										if len(agent.Node.SupportedModels) == 0 {
+											<span class="text-xs text-slate-400 italic">None reported</span>
+										} else {
+											for _, model := range agent.Node.SupportedModels {
+												<span class="bg-slate-100 text-slate-700 font-mono text-xs px-2 py-0.5 rounded border border-slate-200/80">
+													{ model }
+												</span>
+											}
+										}
+									</div>
+								</td>
+
+								<!-- Column 5: Cluster Pool -->
+								<td class="px-3 py-3.5">
+									<div class="flex flex-wrap gap-1 max-w-xs">
+										if len(agent.AssignedClusters) == 0 {
+											<span class="inline-flex items-center rounded bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 border border-amber-200">
+												Unassigned
+											</span>
+										} else {
+											for _, cluster := range agent.AssignedClusters {
+												<span class="inline-flex items-center rounded bg-slate-100 px-2 py-0.5 text-xs font-mono font-medium text-slate-700 border border-slate-200">
+													{ cluster }
+												</span>
+											}
+										}
+									</div>
+								</td>
+
+								<!-- Column 6: Actions -->
+								<td class="whitespace-nowrap py-3.5 pl-3 pr-6 text-right text-xs font-medium space-x-1.5">
+									<button
+										type="button"
+										hx-get={ "/admin/clusters/node-modal?id=" + agent.Node.ID }
+										hx-target="#modal-container"
+										hx-swap="innerHTML"
+										class="text-slate-700 hover:text-blue-700 font-semibold text-xs bg-white border border-slate-200 px-2.5 py-1 rounded hover:bg-slate-50 transition cursor-pointer shadow-2xs"
+									>
+										Configure
+									</button>
+									<button
+										type="button"
+										hx-delete={ "/admin/clusters/delete?id=" + agent.Node.ID }
+										hx-confirm={ "Are you sure you want to delete agent node " + agent.Node.Name + "?" }
+										hx-target="closest tr"
+										hx-swap="outerHTML"
+										class="text-slate-500 hover:text-red-600 font-semibold text-xs bg-white border border-slate-200 px-2.5 py-1 rounded hover:bg-red-50 hover:border-red-200 transition cursor-pointer"
+									>
+										Remove
+									</button>
+								</td>
+							</tr>
+						}
+					</tbody>
+					<tfoot class="bg-slate-50/70 border-t border-slate-200 text-xs text-slate-600 font-medium tabular-nums">
+						<tr>
+							<td class="py-2.5 pl-6 pr-3 font-semibold text-slate-700" colspan="3">
+								{ fmt.Sprintf("Fleet Total: %s", formatOnlineNodeCount(countOnlineNodes(vm.ActiveNodes))) }
+							</td>
+							<td class="py-2.5 pl-3 pr-6 text-right text-slate-500" colspan="3">
+								{ fmt.Sprintf("Central Queue: %s", formatRequestCount(vm.QueueDepth)) }
+							</td>
+						</tr>
+					</tfoot>
+				</table>
+			</div>
+		}
+	</div>
+}
+
+func getAssignedNodesForCluster(clusterID string, activeNodes []config.RunnerResponse, clusterNodes map[string]config.Node) []string {
+	seen := make(map[string]bool)
+	var out []string
+	for _, r := range activeNodes {
+		for _, cid := range r.AssignedClusters {
+			if cid == clusterID && r.Node.ID != "" && !seen[r.Node.ID] {
+				seen[r.Node.ID] = true
+				out = append(out, r.Node.ID)
+			}
+		}
+	}
+	for id := range clusterNodes {
+		if id != "" && !seen[id] {
+			seen[id] = true
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+func getClusterServedModels(clusterID string, activeNodes []config.RunnerResponse, clusterNodes map[string]config.Node) []string {
+	seen := make(map[string]bool)
+	var out []string
+	for _, r := range activeNodes {
+		for _, cid := range r.AssignedClusters {
+			if cid == clusterID {
+				for _, m := range r.Node.SupportedModels {
+					trimmed := strings.TrimSpace(m)
+					if trimmed != "" && !seen[trimmed] {
+						seen[trimmed] = true
+						out = append(out, trimmed)
+					}
+				}
+			}
+		}
+	}
+	for _, n := range clusterNodes {
+		for _, m := range n.SupportedModels {
+			trimmed := strings.TrimSpace(m)
+			if trimmed != "" && !seen[trimmed] {
+				seen[trimmed] = true
+				out = append(out, trimmed)
+			}
+		}
+	}
+	return out
+}
+
+func countOnlineNodes(nodes []config.RunnerResponse) int {
 	total := 0
 	for _, n := range nodes {
-		if n.Node.Status == "online" || n.Node.Status == "busy" {
-			total += n.Node.MemoryAllocatedGB
+		if n.Node.Status == "online" || n.Node.Status == "busy" || n.Node.Status == "pre-registered" {
+			total++
 		}
 	}
 	return total
 }
+
+func formatRequestCount(depth int) string {
+	if depth == 1 {
+		return "1 Active Request"
+	}
+	return fmt.Sprintf("%d Active Requests", depth)
+}
+
+func formatOnlineNodeCount(count int) string {
+	if count == 1 {
+		return "1 Online Node"
+	}
+	return fmt.Sprintf("%d Online Nodes", count)
+}
+
+func effectiveConcurrency(maxConc int) int {
+	if maxConc <= 0 {
+		return 1
+	}
+	return maxConc
+}
+
+func modelCapWidthStyle(maxModelGB int, totalMemGB int) string {
+	if totalMemGB <= 0 || maxModelGB <= 0 {
+		return "width: 100%"
+	}
+	pct := (maxModelGB * 100) / totalMemGB
+	if pct > 100 {
+		pct = 100
+	}
+	if pct < 8 {
+		pct = 8
+	}
+	return fmt.Sprintf("width: %d%%", pct)
+}
+
+func formatNodeStatusAndHeartbeat(status string, hb time.Time) string {
+	label := "Offline"
+	if status == "online" {
+		label = "Idle"
+	} else if status == "busy" {
+		label = "Busy"
+	} else if status == "pre-registered" {
+		label = "Pre-registered"
+	}
+	if hb.IsZero() {
+		return fmt.Sprintf("· %s", label)
+	}
+	return fmt.Sprintf("· %s · %s", label, hb.Format("15:04:05"))
+}
+
+func extractLocalClusters(providers []config.ProviderConfig) []config.LocalCluster {
+	var out []config.LocalCluster
+	for _, p := range providers {
+		if p.ID == config.ProviderLocal {
+			for _, reg := range p.Regions {
+				if reg.LocalConfig != nil {
+					out = append(out, reg.LocalConfig.Clusters...)
+				}
+			}
+		}
+	}
+	return out
+}
+
+func extractLocalClustersWithRunners(providers []config.ProviderConfig, runners []config.RunnerResponse) []config.LocalCluster {
+	out := extractLocalClusters(providers)
+	seen := make(map[string]int)
+	for i := range out {
+		seen[out[i].ID] = i
+	}
+	for _, r := range runners {
+		for _, cid := range r.AssignedClusters {
+			trimmed := strings.TrimSpace(cid)
+			if trimmed == "" {
+				continue
+			}
+			if idx, ok := seen[trimmed]; ok {
+				if out[idx].Nodes == nil {
+					out[idx].Nodes = make(map[string]config.Node)
+				}
+				if r.Node.ID != "" {
+					out[idx].Nodes[r.Node.ID] = r.Node
+				}
+			} else {
+				nodes := make(map[string]config.Node)
+				if r.Node.ID != "" {
+					nodes[r.Node.ID] = r.Node
+				}
+				seen[trimmed] = len(out)
+				out = append(out, config.LocalCluster{
+					ID:          trimmed,
+					Name:        trimmed,
+					Description: "Auto-discovered from connected runner node(s). Click Edit to customize timeout & cloud failover.",
+					QueueName:   "queue-" + trimmed,
+					Nodes:       nodes,
+					MaxQueueAge: 90,
+				})
+			}
+		}
+	}
+	return out
+}
+
+func extractDirectEndpoints(providers []config.ProviderConfig) []config.DirectEndpoint {
+	var out []config.DirectEndpoint
+	for _, p := range providers {
+		if p.ID == config.ProviderLocal {
+			for _, reg := range p.Regions {
+				if reg.LocalConfig != nil {
+					out = append(out, reg.LocalConfig.DirectEndpoints...)
+				}
+			}
+		}
+	}
+	return out
+}
+

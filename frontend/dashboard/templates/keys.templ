@@ -5,7 +5,6 @@ import (
 	"geminirouter/pkg/config"
 )
 
-
 // KeysViewModel binds keys, their parent clients, and logical apps together for the view.
 type KeysViewModel struct {
 	Key    config.APIKey
@@ -18,8 +17,8 @@ templ KeysTab(items []KeysViewModel) {
 		<!-- Header & Actions -->
 		<div class="sm:flex sm:items-center sm:justify-between">
 			<div>
-				<h1 class="text-2xl font-bold tracking-tight text-gray-900">Access Control</h1>
-				<p class="mt-2 text-sm text-gray-700">
+				<h1 class="text-2xl font-bold tracking-tight text-slate-900">Access Control</h1>
+				<p class="mt-2 text-sm text-slate-700">
 					Manage active API keys and Google Service Account credentials. Access rules inherit their logical application's specific rate capacity and queueing priorities.
 				</p>
 			</div>
@@ -27,7 +26,8 @@ templ KeysTab(items []KeysViewModel) {
 				<button
 					hx-get="/admin/keys/new"
 					hx-target="#modal-container"
-					class="block rounded-md bg-blue-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-blue-500 transition"
+					onclick="document.querySelectorAll('[data-edit-row]').forEach(r => r.classList.remove('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30'))"
+					class="block rounded-md bg-blue-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-blue-700 transition"
 				>
 					Generate API Key
 				</button>
@@ -35,11 +35,11 @@ templ KeysTab(items []KeysViewModel) {
 		</div>
 
 		<!-- Key Insertion Container for Newly Generated Keys (dynamically injected by HTMX) -->
-		<div id="new-key-alert" class="hidden"></div>
+		<div id="new-key-alert"></div>
 
 		<!-- Expandable Usage Guide -->
-		<details class="group border border-gray-200 rounded-lg bg-white shadow-sm overflow-hidden">
-			<summary class="flex items-center justify-between cursor-pointer p-4 bg-gray-50 hover:bg-gray-100 transition select-none">
+		<details class="group border border-slate-200 rounded-lg bg-white shadow-sm overflow-hidden">
+			<summary class="flex items-center justify-between cursor-pointer p-4 bg-slate-50 hover:bg-slate-100 transition select-none">
 				<div class="flex items-center gap-3">
 					<div class="p-2 bg-blue-50 text-blue-600 rounded-lg">
 						<svg class="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
@@ -47,45 +47,56 @@ templ KeysTab(items []KeysViewModel) {
 						</svg>
 					</div>
 					<div class="text-left">
-						<span class="text-sm font-semibold text-gray-900">How to configure and authenticate with the Smart Router</span>
-						<p class="text-xs text-gray-500">View endpoints, API Key methods, Google Service Account (IAM) setups, and SDK examples</p>
+						<span class="text-sm font-semibold text-slate-900">How to configure and authenticate with the Smart Router</span>
+						<p class="text-xs text-slate-500">View endpoints, API Key methods, Google Service Account (IAM) setups, and SDK examples</p>
 					</div>
 				</div>
-				<div class="text-gray-400 group-open:rotate-180 transition-transform duration-200">
+				<div class="text-slate-400 group-open:rotate-180 transition-transform duration-200">
 					<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
 					</svg>
 				</div>
 			</summary>
 			
-			<div class="p-6 border-t border-gray-200 bg-white space-y-8 text-sm text-gray-600 text-left">
+			<div class="p-6 border-t border-slate-200 bg-white space-y-8 text-sm text-slate-600 text-left">
 				<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
 					<!-- Endpoint & Auth -->
-					<div class="md:col-span-1 space-y-4 border-r border-gray-100 pr-6">
+					<div class="md:col-span-1 space-y-4 border-r border-slate-100 pr-6">
 						<div>
-							<h4 class="text-xs font-bold uppercase tracking-wider text-gray-500">Router Endpoint</h4>
-							<div class="mt-2 flex items-center gap-2">
-								<code class="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs font-mono select-all dynamic-origin-url">http://localhost:8080</code>
+							<h4 class="text-xs font-bold uppercase tracking-wider text-slate-500">Router Endpoint</h4>
+							<div class="mt-2 flex items-center gap-2" data-code-snippet>
+								<code class="bg-slate-100 text-slate-800 px-2 py-1 rounded text-xs font-mono select-all">{ ProxyURL() }</code>
+								<button
+									type="button"
+									onclick="copyCodeSnippet(this)"
+									title="Copy to clipboard"
+									aria-label="Copy to clipboard"
+									class="copy-snippet-btn p-1 rounded bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-900 border border-slate-200 transition-colors cursor-pointer"
+								>
+									<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+									</svg>
+								</button>
 							</div>
 						</div>
 						<div>
-							<h4 class="text-xs font-bold uppercase tracking-wider text-gray-500">Auth Options</h4>
+							<h4 class="text-xs font-bold uppercase tracking-wider text-slate-500">Auth Options</h4>
 							<ul class="mt-2 space-y-2 text-xs">
 								<li class="flex items-center gap-2">
-									<span class="px-1.5 py-0.5 bg-blue-50 text-blue-700 font-semibold rounded">Header</span>
-									<code class="font-mono text-gray-700">x-goog-api-key: YOUR_KEY</code>
+									<span class="font-semibold text-slate-700">Header:</span>
+									<code class="font-mono text-slate-700">x-goog-api-key: YOUR_KEY</code>
 								</li>
 								<li class="flex items-center gap-2">
-									<span class="px-1.5 py-0.5 bg-green-50 text-green-700 font-semibold rounded">Query</span>
-									<code class="font-mono text-gray-700">?key=YOUR_KEY</code>
+									<span class="font-semibold text-slate-700">Query:</span>
+									<code class="font-mono text-slate-700">?key=YOUR_KEY</code>
 								</li>
 								<li class="flex items-center gap-2">
-									<span class="px-1.5 py-0.5 bg-purple-50 text-purple-700 font-semibold rounded">Bearer</span>
-									<code class="font-mono text-gray-700">Bearer YOUR_KEY</code>
+									<span class="font-semibold text-slate-700">Bearer:</span>
+									<code class="font-mono text-slate-700">Bearer YOUR_KEY</code>
 								</li>
 								<li class="flex items-center gap-2">
-									<span class="px-1.5 py-0.5 bg-pink-50 text-pink-700 font-semibold rounded">OIDC JWT</span>
-									<code class="font-mono text-gray-700">Bearer GOOGLE_ID_TOKEN</code>
+									<span class="font-semibold text-slate-700">OIDC JWT:</span>
+									<code class="font-mono text-slate-700">Bearer GOOGLE_ID_TOKEN</code>
 								</li>
 							</ul>
 						</div>
@@ -93,65 +104,85 @@ templ KeysTab(items []KeysViewModel) {
 
 					<!-- Code Tabs/Examples -->
 					<div class="md:col-span-2 space-y-4">
-						<h4 class="text-xs font-bold uppercase tracking-wider text-gray-500">API Key Integration Examples</h4>
+						<h4 class="text-xs font-bold uppercase tracking-wider text-slate-500">API Key Integration Examples</h4>
 						
 						<div class="space-y-4">
 							<!-- curl block -->
-							<div class="rounded-lg overflow-hidden bg-gray-950">
-								<div class="bg-gray-900 px-4 py-1.5 flex justify-between items-center">
-									<span class="text-xs font-semibold text-gray-400 font-mono">cURL / HTTP</span>
+							<div class="rounded-lg overflow-hidden bg-slate-950" data-code-snippet>
+								<div class="bg-slate-900 px-4 py-1.5 flex justify-between items-center">
+									<span class="text-xs font-semibold text-slate-400 font-mono">cURL / HTTP</span>
+									<button
+										type="button"
+										onclick="copyCodeSnippet(this)"
+										title="Copy to clipboard"
+										aria-label="Copy to clipboard"
+										class="copy-snippet-btn p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer"
+									>
+										<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+										</svg>
+									</button>
 								</div>
-								<pre class="p-4 text-xs font-mono text-gray-300 overflow-x-auto whitespace-pre-wrap"><code>curl -X POST "<span class="dynamic-origin-url">http://localhost:8080</span>/v1/models/gemini-2.5-flash:generateContent" \
-  -H "x-goog-api-key: YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"{"}contents": [{"{"}parts":[{"{"}text": "Hello Gemini!"{"}"}]{"}"}]{"}"}'</code></pre>
+								<pre class="p-4 text-xs font-mono text-slate-300 overflow-x-auto whitespace-pre-wrap"><code>{ fmt.Sprintf("curl -X POST \"%s/v1/models/gemini-3.8-flash:generateContent\" \\\n  -H \"x-goog-api-key: YOUR_API_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"contents\": [{\"parts\":[{\"text\": \"Hello Gemini!\"}]}]}'", ProxyURL()) }</code></pre>
 							</div>
 
 							<!-- Multi-language Grid -->
 							<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
 								<!-- Python -->
-								<div class="rounded-lg overflow-hidden bg-gray-950">
-									<div class="bg-gray-900 px-3 py-1 flex justify-between items-center">
-										<span class="text-[10px] font-semibold text-gray-400 font-mono">Python SDK</span>
+								<div class="rounded-lg overflow-hidden bg-slate-950" data-code-snippet>
+									<div class="bg-slate-900 px-3 py-1 flex justify-between items-center">
+										<span class="text-[10px] font-semibold text-slate-400 font-mono">Python SDK</span>
+										<button
+											type="button"
+											onclick="copyCodeSnippet(this)"
+											title="Copy to clipboard"
+											aria-label="Copy to clipboard"
+											class="copy-snippet-btn p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer"
+										>
+											<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+											</svg>
+										</button>
 									</div>
-									<pre class="p-3 text-[11px] font-mono text-gray-300 overflow-x-auto"><code>import google.generativeai as genai
-
-genai.configure(
-    api_key="YOUR_KEY",
-    client_options={"{"}
-        "api_endpoint": 
-        "<span class="dynamic-origin-url">http://localhost:8080</span>"
-    {"}"}
-)</code></pre>
+									<pre class="p-3 text-[11px] font-mono text-slate-300 overflow-x-auto whitespace-pre"><code>{ fmt.Sprintf("from google import genai\nfrom google.genai import types\n\nclient = genai.Client(\n    api_key=\"YOUR_KEY\",\n    http_options=types.HttpOptions(\n        base_url=\"%s\"\n    )\n)", ProxyURL()) }</code></pre>
 								</div>
 
 								<!-- Go -->
-								<div class="rounded-lg overflow-hidden bg-gray-950">
-									<div class="bg-gray-900 px-3 py-1 flex justify-between items-center">
-										<span class="text-[10px] font-semibold text-gray-400 font-mono">Go SDK</span>
+								<div class="rounded-lg overflow-hidden bg-slate-950" data-code-snippet>
+									<div class="bg-slate-900 px-3 py-1 flex justify-between items-center">
+										<span class="text-[10px] font-semibold text-slate-400 font-mono">Go SDK</span>
+										<button
+											type="button"
+											onclick="copyCodeSnippet(this)"
+											title="Copy to clipboard"
+											aria-label="Copy to clipboard"
+											class="copy-snippet-btn p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer"
+										>
+											<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+											</svg>
+										</button>
 									</div>
-									<pre class="p-3 text-[11px] font-mono text-gray-300 overflow-x-auto"><code>import "google.golang.org/api/option"
-
-client, err := genai.NewClient(ctx,
-    option.WithAPIKey("YOUR_KEY"),
-    option.WithEndpoint(
-        "<span class="dynamic-origin-url">http://localhost:8080</span>",
-    ),
-)</code></pre>
+									<pre class="p-3 text-[11px] font-mono text-slate-300 overflow-x-auto whitespace-pre"><code>{ fmt.Sprintf("import \"google.golang.org/genai\"\n\nclient, err := genai.NewClient(ctx, &genai.ClientConfig{\n    APIKey: \"YOUR_KEY\",\n    HTTPOptions: genai.HTTPOptions{\n        BaseURL: \"%s\",\n    },\n})", ProxyURL()) }</code></pre>
 								</div>
 
 								<!-- JS/TS -->
-								<div class="rounded-lg overflow-hidden bg-gray-950">
-									<div class="bg-gray-900 px-3 py-1 flex justify-between items-center">
-										<span class="text-[10px] font-semibold text-gray-400 font-mono">JS/TS SDK</span>
+								<div class="rounded-lg overflow-hidden bg-slate-950" data-code-snippet>
+									<div class="bg-slate-900 px-3 py-1 flex justify-between items-center">
+										<span class="text-[10px] font-semibold text-slate-400 font-mono">JS/TS SDK</span>
+										<button
+											type="button"
+											onclick="copyCodeSnippet(this)"
+											title="Copy to clipboard"
+											aria-label="Copy to clipboard"
+											class="copy-snippet-btn p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer"
+										>
+											<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+											</svg>
+										</button>
 									</div>
-									<pre class="p-3 text-[11px] font-mono text-gray-300 overflow-x-auto"><code>import {"{"} GoogleGenAI {"}"} from '@google/genai';
-
-const ai = new GoogleGenAI({"{"}
-  apiKey: "YOUR_KEY",
-  baseUrl: 
-    "<span class="dynamic-origin-url">http://localhost:8080</span>"
-{"}"});</code></pre>
+									<pre class="p-3 text-[11px] font-mono text-slate-300 overflow-x-auto whitespace-pre"><code>{ fmt.Sprintf("import { GoogleGenAI } from '@google/genai';\n\nconst ai = new GoogleGenAI({\n  apiKey: \"YOUR_KEY\",\n  httpOptions: {\n    baseUrl: \"%s\"\n  }\n});", ProxyURL()) }</code></pre>
 								</div>
 							</div>
 						</div>
@@ -159,14 +190,14 @@ const ai = new GoogleGenAI({"{"}
 				</div>
 
 				<!-- Google Service Account Setup -->
-				<div class="border-t border-gray-200 pt-6 space-y-4">
+				<div class="border-t border-slate-200 pt-6 space-y-4">
 					<div class="flex items-center gap-2 text-blue-600">
 						<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.57-.598-3.75h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
 						</svg>
-						<h4 class="text-sm font-bold uppercase tracking-wider">Google Service Account & IAM Authentication (Zero-Key)</h4>
+						<h4 class="text-sm font-bold uppercase tracking-wider">Google Service Account &amp; IAM Authentication (Zero-Key)</h4>
 					</div>
-					<p class="text-xs text-gray-500 leading-relaxed">
+					<p class="text-xs text-slate-500 leading-relaxed">
 						You can interact with the router using native Google Service Accounts or Google Identities directly. Instead of managing custom API keys, authenticate calls via Google OpenID Connect (OIDC) ID Tokens. 
 					</p>
 
@@ -184,137 +215,124 @@ const ai = new GoogleGenAI({"{"}
 
 						<!-- Invocation Step -->
 						<div class="md:col-span-2 space-y-3">
-							<h5 class="text-xs font-bold text-gray-900 uppercase">2. Direct API Invocation</h5>
-							<p class="text-xs text-gray-500">
-								When executing requests, fetch an OIDC ID Token representing the Service Account, using the router URL as the audience parameter. Send it in the standard <code class="font-mono bg-gray-100 text-gray-700 px-1 rounded">Authorization</code> header:
+							<h5 class="text-xs font-bold text-slate-900 uppercase">2. Direct API Invocation</h5>
+							<p class="text-xs text-slate-500">
+								When executing requests, fetch an OIDC ID Token representing the Service Account, using the router URL as the audience parameter. Send it in the standard <code class="font-mono bg-slate-100 text-slate-700 px-1 rounded">Authorization</code> header:
 							</p>
 
-							<div class="rounded-lg overflow-hidden bg-gray-950">
-								<div class="bg-gray-900 px-4 py-1.5 flex justify-between items-center">
-									<span class="text-xs font-semibold text-gray-400 font-mono">cURL / Google IAM Integration</span>
+							<div class="rounded-lg overflow-hidden bg-slate-950" data-code-snippet>
+								<div class="bg-slate-900 px-4 py-1.5 flex justify-between items-center">
+									<span class="text-xs font-semibold text-slate-400 font-mono">cURL / Google IAM Integration</span>
+									<button
+										type="button"
+										onclick="copyCodeSnippet(this)"
+										title="Copy to clipboard"
+										aria-label="Copy to clipboard"
+										class="copy-snippet-btn p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer"
+									>
+										<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+										</svg>
+									</button>
 								</div>
-								<pre class="p-4 text-xs font-mono text-gray-300 overflow-x-auto whitespace-pre-wrap"><code># 1. Generate a Google ID (OIDC) Token bound to the router's audience
-token=$(gcloud auth print-identity-token --audience="<span class="dynamic-origin-url">http://localhost:8080</span>")
-
-# 2. Execute router Gemini API request natively without an API Key
-curl -X POST "<span class="dynamic-origin-url">http://localhost:8080</span>/v1/models/gemini-2.5-flash:generateContent" \
-  -H "Authorization: Bearer $token" \
-  -H "Content-Type: application/json" \
-  -d '{"{"}contents": [{"{"}parts":[{"{"}text": "Hello from Service Account!"{"}"}]{"}"}]{"}"}'</code></pre>
+								<pre class="p-4 text-xs font-mono text-slate-300 overflow-x-auto whitespace-pre-wrap"><code>{ fmt.Sprintf("# 1. Generate a Google ID (OIDC) Token bound to the router's audience\ntoken=$(gcloud auth print-identity-token --audience=\"%s\")\n\n# 2. Execute router Gemini API request natively without an API Key\ncurl -X POST \"%s/v1/models/gemini-3.8-flash:generateContent\" \\\n  -H \"Authorization: Bearer $token\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"contents\": [{\"parts\":[{\"text\": \"Hello from Service Account!\"}]}]}'", ProxyURL(), ProxyURL()) }</code></pre>
 							</div>
 						</div>
 					</div>
 				</div>
 			</div>
-			
-			<!-- Self-executing script to dynamically grab and replace active base domain -->
-			<script>
-				(function() {
-					const updateOrigins = () => {
-						const origin = window.location.origin;
-						document.querySelectorAll('.dynamic-origin-url').forEach(el => {
-							el.innerText = origin;
-						});
-					};
-					updateOrigins();
-					// Re-run if HTMX performs layout/body swap updates
-					document.body.addEventListener('htmx:afterSwap', updateOrigins);
-				})();
-			</script>
 		</details>
 
-		<!-- Keys Data Table -->
-		<div class="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
-			<div class="inline-block min-w-full align-middle">
-				<table class="min-w-full divide-y divide-gray-300">
-					<thead class="bg-gray-50">
-						<tr>
-							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Bound Application</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Parent Client</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Key Hash</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Billing Tier</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Queueing Priority</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Limits (RPM/TPM)</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Status</th>
-							<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
-								<span class="sr-only">Actions</span>
-							</th>
-						</tr>
-					</thead>
-					<tbody class="divide-y divide-gray-200 bg-white">
-						for _, item := range items {
-							<tr class="hover:bg-gray-50 transition-colors">
-								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
-									<div class="font-semibold text-gray-900">{ item.App.Name }</div>
-									<div class="text-xs text-gray-400 font-mono">{ item.App.ID }</div>
-								</td>
-								<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600">
-									<div class="font-medium text-gray-800">{ item.Client.Name }</div>
-									<div class="text-xs text-gray-400 font-mono">{ item.Client.ID }</div>
-								</td>
-								<td class="whitespace-nowrap px-3 py-4 text-sm font-mono text-gray-500 text-xs">
-									{ item.Key.KeyHash[:8] }...{ item.Key.KeyHash[len(item.Key.KeyHash)-8:] }
-								</td>
-								<td class="whitespace-nowrap px-3 py-4 text-sm">
-									<span class={ "inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset " + getTierBadgeStyle(item.Client.Tier) }>
-										{ item.Client.Tier }
-									</span>
-								</td>
-								<td class="whitespace-nowrap px-3 py-4 text-sm">
-									<span class={ "inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset " + getPriorityBadgeStyle(item.App.Priority) }>
-										{ item.App.Priority }
-									</span>
-								</td>
-								<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-mono text-xs">
-									<span class="font-semibold text-gray-950">{ intToString(item.App.RPM) }</span> RPM /
-									<span class="font-semibold text-gray-950">{ intToString(item.App.TPM) }</span> TPM
-								</td>
-								<td class="whitespace-nowrap px-3 py-4 text-sm">
-									if item.Key.Status == "active" {
-										<span class="inline-flex items-center gap-x-1.5 rounded-md bg-green-100 px-2 py-1 text-xs font-medium text-green-700">
-											<svg class="h-1.5 w-1.5 fill-green-500" viewBox="0 0 6 6" aria-hidden="true">
-												<circle cx="3" cy="3" r="3" />
-											</svg>
-											Active
-										</span>
-									} else {
-										<span class="inline-flex items-center gap-x-1.5 rounded-md bg-red-100 px-2 py-1 text-xs font-medium text-red-700">
-											<svg class="h-1.5 w-1.5 fill-red-500" viewBox="0 0 6 6" aria-hidden="true">
-												<circle cx="3" cy="3" r="3" />
-											</svg>
-											Revoked
-										</span>
-									}
-								</td>
-								<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-									<button
-										hx-get={ "/admin/keys/edit?hash=" + item.Key.KeyHash }
-										hx-target="#modal-container"
-										class="text-blue-600 hover:text-blue-900 transition font-semibold mr-4"
-									>
-										Edit
-									</button>
-									if item.Key.Status == "active" {
-										<button
-											hx-post={ "/admin/keys/revoke?hash=" + item.Key.KeyHash }
-											hx-confirm={ "Are you sure you want to revoke API credentials for " + item.App.Name + "?" }
-											hx-target="closest tr"
-											hx-swap="outerHTML"
-											class="text-red-600 hover:text-red-900 transition font-semibold"
-										>
-											Revoke
-										</button>
-									}
-								</td>
+		<!-- Master-Detail Split View: Keys Table (Left) + Contextual Inspector Pane (Right) -->
+		<div data-layout="master-detail-split" class="flex flex-col lg:flex-row gap-6 items-start">
+			<!-- Left Master Pane: Keys Data Table -->
+			<div class="flex-1 min-w-0 w-full bg-white shadow-xs ring-1 ring-slate-900/5 sm:rounded-xl overflow-hidden">
+				<div class="overflow-x-auto">
+					<table class="min-w-full divide-y divide-slate-300">
+						<thead class="bg-slate-50">
+							<tr>
+								<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-slate-900 sm:pl-6">Bound Application</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-slate-900">Parent Client</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-slate-900">Key Hash</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-slate-900">Billing Tier</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-slate-900">Queueing Priority</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-slate-900">Limits (RPM/TPM)</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-slate-900">Status</th>
+								<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
+									<span class="sr-only">Actions</span>
+								</th>
 							</tr>
-						}
-					</tbody>
-				</table>
+						</thead>
+						<tbody class="divide-y divide-slate-200 bg-white">
+							for _, item := range items {
+								<tr data-edit-row={ item.Key.KeyHash } class="hover:bg-slate-50 transition-colors">
+									<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
+										<div class="font-semibold text-slate-900">{ item.App.Name }</div>
+										<div class="text-xs text-slate-400 font-mono">{ item.App.ID }</div>
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-sm text-slate-600">
+										<div class="font-medium text-slate-800">{ item.Client.Name }</div>
+										<div class="text-xs text-slate-400 font-mono">{ item.Client.ID }</div>
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-sm font-mono text-slate-500 text-xs">
+										{ shortHash(item.Key.KeyHash) }
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-sm">
+										<span class="capitalize text-slate-700">{ item.Client.Tier }</span>
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-sm">
+										<span class="capitalize text-slate-700">{ item.App.Priority }</span>
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-sm text-slate-600 font-mono text-xs">
+										<span class="font-semibold text-slate-950">{ intToString(item.App.RPM) }</span> RPM /
+										<span class="font-semibold text-slate-950">{ intToString(item.App.TPM) }</span> TPM
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-sm">
+										if item.Key.Status == "active" {
+											<span class="inline-flex items-center gap-x-1.5 rounded-md bg-green-100 px-2 py-1 text-xs font-medium text-green-700">
+												<svg class="h-1.5 w-1.5 fill-green-500" viewBox="0 0 6 6" aria-hidden="true">
+													<circle cx="3" cy="3" r="3" />
+												</svg>
+												Active
+											</span>
+										} else {
+											<span class="inline-flex items-center gap-x-1.5 rounded-md bg-red-100 px-2 py-1 text-xs font-medium text-red-700">
+												<svg class="h-1.5 w-1.5 fill-red-500" viewBox="0 0 6 6" aria-hidden="true">
+													<circle cx="3" cy="3" r="3" />
+												</svg>
+												Revoked
+											</span>
+										}
+									</td>
+									<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+										<button
+											hx-get={ "/admin/keys/edit?hash=" + item.Key.KeyHash }
+											hx-target="#modal-container"
+											onclick="document.querySelectorAll('[data-edit-row]').forEach(r => r.classList.remove('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30')); this.closest('tr').classList.add('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30')"
+											class="text-blue-600 hover:text-blue-900 transition font-semibold mr-4"
+										>
+											Edit
+										</button>
+										if item.Key.Status == "active" {
+											<button
+												hx-post={ "/admin/keys/revoke?hash=" + item.Key.KeyHash }
+												hx-confirm={ "Are you sure you want to revoke API credentials for " + item.App.Name + "?" }
+												class="text-red-600 hover:text-red-900 transition font-semibold"
+											>
+												Revoke
+											</button>
+										}
+									</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
 			</div>
-		</div>
 
-		<!-- Modal Target Anchor -->
-		<div id="modal-container"></div>
+			<!-- Right Detail Inspector Pane -->
+			<aside id="modal-container" class="w-full lg:w-[400px] xl:w-[440px] shrink-0 lg:sticky lg:top-6 hidden [&:has(*)]:block"></aside>
+		</div>
 	</div>
 }
 
@@ -327,7 +345,7 @@ func getTierBadgeStyle(tier string) string {
 	case "standard":
 		return "bg-green-50 text-green-700 ring-green-600/20"
 	default:
-		return "bg-gray-50 text-gray-600 ring-gray-500/10"
+		return "bg-slate-50 text-slate-600 ring-slate-500/10"
 	}
 }
 
@@ -338,11 +356,10 @@ func getPriorityBadgeStyle(prio string) string {
 	case "medium":
 		return "bg-yellow-50 text-yellow-800 ring-yellow-600/20"
 	default:
-		return "bg-gray-50 text-gray-600 ring-gray-500/10"
+		return "bg-slate-50 text-slate-600 ring-slate-500/10"
 	}
 }
 
 func intToString(val int) string {
 	return fmt.Sprintf("%d", val)
 }
-

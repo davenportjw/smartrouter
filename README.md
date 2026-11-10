@@ -132,9 +132,9 @@ To manually configure Firebase credentials:
 
 ## 🧪 Testing & Verification
 
-Run integration and unit tests:
+Run integration and unit tests across all packages:
 ```bash
-go test -v ./backend/proxy/... ./frontend/dashboard/...
+go test -v ./pkg/... ./backend/... ./frontend/...
 ```
 
 ---
@@ -144,3 +144,4 @@ go test -v ./backend/proxy/... ./frontend/dashboard/...
 * **[Google GenAI SDK Coverage & Integration](docs/architecture/google-genai-sdk-coverage.md)**: Compatibility matrix, integration instructions, and key coverage gaps for the official `google-genai` SDKs.
 * **[API Key Integration](examples/cloudrun-apikey/)**: Client using HTTP Header (`x-goog-api-key`) authentication.
 * **[Service Account IAM](examples/cloudrun-serviceaccount/)**: Client using OIDC Token (`Authorization: Bearer`) authentication.
+

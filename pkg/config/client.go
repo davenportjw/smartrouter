@@ -110,7 +110,7 @@ func (ac *APIConfigStore) makeRequest(ctx context.Context, method, path string, 
 		return fmt.Errorf("API returned status %s: %s", resp.Status, string(bodyErr))
 	}
 
-	if result != nil {
+	if result != nil && resp.StatusCode != http.StatusNoContent {
 		if err := json.NewDecoder(resp.Body).Decode(result); err != nil {
 			return fmt.Errorf("failed to decode response: %w", err)
 		}
@@ -247,17 +247,25 @@ func (ac *APIConfigStore) DeleteProvider(ctx context.Context, id string) error {
 	return ac.makeRequest(ctx, "DELETE", path, nil, nil)
 }
 
-// Dynamic Runners Administrative Methods
+// Dynamic Runners Administrative & Cluster Methods
 
 type RunnerResponse struct {
-	Node             Node     `json:"node"`
-	AssignedClusters []string `json:"assigned_clusters"`
+	Node             Node     `firestore:"node" json:"node"`
+	AssignedClusters []string `firestore:"assigned_clusters" json:"assigned_clusters"`
 }
 
 func (ac *APIConfigStore) GetRegisteredRunners(ctx context.Context) ([]RunnerResponse, error) {
 	var runners []RunnerResponse
 	err := ac.makeRequest(ctx, "GET", "/api/v1/admin/runners", nil, &runners)
 	return runners, err
+}
+
+func (ac *APIConfigStore) GetAllRunners(ctx context.Context) ([]RunnerResponse, error) {
+	return ac.GetRegisteredRunners(ctx)
+}
+
+func (ac *APIConfigStore) SaveRegisteredRunner(ctx context.Context, runner RunnerResponse) error {
+	return ac.makeRequest(ctx, "POST", "/api/v1/admin/runners", runner, nil)
 }
 
 func (ac *APIConfigStore) AttachRunnerToClusters(ctx context.Context, nodeID string, clusterIDs []string) error {
@@ -272,3 +280,70 @@ func (ac *APIConfigStore) DeregisterRunner(ctx context.Context, nodeID string) e
 	path := fmt.Sprintf("/api/v1/admin/runners/deregister?id=%s", url.QueryEscape(nodeID))
 	return ac.makeRequest(ctx, "DELETE", path, nil, nil)
 }
+
+func (ac *APIConfigStore) RegisterRunner(ctx context.Context, node Node) error {
+	return ac.makeRequest(ctx, "POST", "/api/v1/cluster/runners/register", node, nil)
+}
+
+func (ac *APIConfigStore) HeartbeatRunner(ctx context.Context, node Node) ([]string, error) {
+	var res struct {
+		Status           string   `json:"status"`
+		AssignedClusters []string `json:"assigned_clusters"`
+	}
+	err := ac.makeRequest(ctx, "POST", "/api/v1/cluster/runners/heartbeat", node, &res)
+	return res.AssignedClusters, err
+}
+
+func (ac *APIConfigStore) PollQueueJob(ctx context.Context, clusterIDs []string, supportedModels []string) (*QueueJob, error) {
+	reqBody := map[string]interface{}{
+		"supported_models": supportedModels,
+	}
+	if len(clusterIDs) > 0 {
+		reqBody["cluster_id"] = clusterIDs[0]
+		reqBody["cluster_ids"] = clusterIDs
+	}
+	var job QueueJob
+	if err := ac.makeRequest(ctx, "POST", "/api/v1/cluster/queue/poll", reqBody, &job); err != nil {
+		return nil, err
+	}
+	if job.ID == "" {
+		return nil, nil
+	}
+	return &job, nil
+}
+
+func (ac *APIConfigStore) ResolveQueueJob(ctx context.Context, jobID string, statusCode int, payload string, errMsg string) error {
+	req := map[string]interface{}{
+		"job_id":      jobID,
+		"status_code": statusCode,
+		"payload":     payload,
+		"error":       errMsg,
+	}
+	return ac.makeRequest(ctx, "POST", "/api/v1/cluster/queue/resolve", req, nil)
+}
+
+// SyncDecisionProvider forwards decision engine secret keys and cluster/endpoint configurations to the Backend API.
+func (ac *APIConfigStore) SyncDecisionProvider(ctx context.Context, engine, apiKey, secretRef, endpoint, connectionMode, clusterID string) error {
+	req := map[string]string{
+		"engine":          engine,
+		"api_key":         apiKey,
+		"secret_ref":      secretRef,
+		"endpoint":        endpoint,
+		"connection_mode": connectionMode,
+		"cluster_id":      clusterID,
+	}
+	return ac.makeRequest(ctx, "POST", "/api/decision/providers", req, nil)
+}
+
+// DeleteDecisionSecret removes a decision engine secret key from the Backend API runtime vault.
+func (ac *APIConfigStore) DeleteDecisionSecret(ctx context.Context, engine, secretRef string) error {
+	q := url.Values{}
+	if engine != "" {
+		q.Set("engine", engine)
+	}
+	if secretRef != "" {
+		q.Set("secret_ref", secretRef)
+	}
+	return ac.makeRequest(ctx, "DELETE", "/api/decision/providers?"+q.Encode(), nil, nil)
+}
+

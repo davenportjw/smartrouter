@@ -74,8 +74,8 @@ To test the Service Account microservice locally using your active developer acc
      ```bash
      gcloud config get-value account
      ```
-     *(E.g., `your-developer-name@google.com`)*
-   - In the local Smart Router dashboard (or by editing `/data/local_db.json`), create a new Application with the **Application ID (Slug)** set to your exact email address (e.g., `your-developer-name@google.com`).
+     *(E.g., `your-developer-name@example.com`)*
+   - In the local Smart Router dashboard (or by editing `/data/local_db.json`), create a new Application with the **Application ID (Slug)** set to your exact email address (e.g., `your-developer-name@example.com`).
 3. **Setup your Python environment**:
    ```bash
    python3 -m venv venv
@@ -87,7 +87,7 @@ To test the Service Account microservice locally using your active developer acc
    Specify the local router port and your developer email address as the client App ID:
    ```bash
    export ROUTER_URL="http://localhost:8080"
-   export CLIENT_APP_ID="your-developer-name@google.com"
+   export CLIENT_APP_ID="your-developer-name@example.com"
    ```
 5. **Start the client microservice**:
    ```bash

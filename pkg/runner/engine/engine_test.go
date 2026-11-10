@@ -53,7 +53,7 @@ func TestCoreRunnerEngineExecutionLoop(t *testing.T) {
 				// Return a mock queued job with Gemini GenAI format
 				job := pollJob{
 					ID:      "job-test-uuid",
-					Model:   "gemma2:2b",
+					Model:   "gemma-4-4b",
 					Payload: []byte(`{"contents":[{"role":"user","parts":[{"text":"who are you?"}]}]}`),
 				}
 				w.Header().Set("Content-Type", "application/json")
@@ -79,7 +79,7 @@ func TestCoreRunnerEngineExecutionLoop(t *testing.T) {
 	defer routerServer.Close()
 
 	// 3. Instantiate core runner engine
-	runner := NewCoreRunnerEngine(routerServer.URL, []string{"gemma2:2b"})
+	runner := NewCoreRunnerEngine(routerServer.URL, []string{"gemma-4-4b"})
 	runner.LlamaServerURL = llamaServer.URL
 
 	// Start the polling/heartbeat loop in a background goroutine
@@ -122,3 +122,107 @@ func TestCoreRunnerEngineExecutionLoop(t *testing.T) {
 		t.Errorf("expected final status to be 'offline', got %q", stats.Status)
 	}
 }
+
+func TestCoreRunnerEngineFailureSurfaces502Error(t *testing.T) {
+	t.Setenv("BACKEND_SHARED_SECRET", "runner-secret-xyz")
+	t.Setenv("LOCAL_DEV", "true")
+
+	var resolvedStatus int32
+	var resolvedErr string
+	var authHeaderSeen int32
+
+	routerServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Shared-Secret") == "runner-secret-xyz" {
+			atomic.AddInt32(&authHeaderSeen, 1)
+		}
+		if r.URL.Path == "/api/v1/cluster/queue/resolve" {
+			var res struct {
+				JobID      string `json:"job_id"`
+				StatusCode int    `json:"status_code"`
+				Error      string `json:"error"`
+			}
+			bodyBytes, _ := io.ReadAll(r.Body)
+			_ = json.Unmarshal(bodyBytes, &res)
+			atomic.StoreInt32(&resolvedStatus, int32(res.StatusCode))
+			resolvedErr = res.Error
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		if r.URL.Path == "/api/v1/cluster/queue/poll" {
+			job := pollJob{
+				ID:      "job-fail-502",
+				Model:   "gemma-4-4b",
+				Payload: []byte(`{"contents":[{"role":"user","parts":[{"text":"hello"}]}]}`),
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(job)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer routerServer.Close()
+
+	runner := NewCoreRunnerEngine(routerServer.URL, []string{"gemma-4-4b"})
+	// Point LlamaServerURL to a closed local port so local inference fails immediately
+	closedServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	closedURL := closedServer.URL
+	closedServer.Close()
+	runner.LlamaServerURL = closedURL
+
+	runner.pollAndProcess()
+
+	if atomic.LoadInt32(&authHeaderSeen) < 2 {
+		t.Fatalf("expected X-Shared-Secret header on poll and resolve calls, got %d", atomic.LoadInt32(&authHeaderSeen))
+	}
+	if atomic.LoadInt32(&resolvedStatus) != http.StatusBadGateway {
+		t.Fatalf("expected 502 Bad Gateway when llama-server and fallback fail, got %d", atomic.LoadInt32(&resolvedStatus))
+	}
+	if resolvedErr == "" || strings.Contains(resolvedErr, "Greetings!") {
+		t.Fatalf("expected real error message instead of fake greeting, got %q", resolvedErr)
+	}
+}
+
+func TestCoreRunnerEngineHeartbeatDynamicSyncAndConcurrency(t *testing.T) {
+	routerServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/cluster/runners/heartbeat":
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{
+				"status": "alive",
+				"max_model_size_gb": 24,
+				"max_concurrent": 3,
+				"supported_models": ["gemma-4-4b", "gemma-4-26b"],
+				"assigned_clusters": ["cluster-prod-gpu"]
+			}`))
+		default:
+			w.WriteHeader(http.StatusNoContent)
+		}
+	}))
+	defer routerServer.Close()
+
+	runner := NewCoreRunnerEngine(routerServer.URL, []string{"gemma-4-4b"})
+	runner.sendHeartbeat()
+
+	runner.mu.RLock()
+	gotMaxModelSize := runner.MaxModelSizeGB
+	gotMaxConcurrent := runner.MaxConcurrent
+	gotClusterID := runner.ClusterID
+	gotModels := append([]string(nil), runner.SupportedModels...)
+	runner.mu.RUnlock()
+
+	if gotMaxModelSize != 24 || gotMaxConcurrent != 3 {
+		t.Fatalf("expected heartbeat to sync MaxModelSizeGB=24 and MaxConcurrent=3, got %d and %d", gotMaxModelSize, gotMaxConcurrent)
+	}
+	stats := runner.GetStats()
+	if stats.MaxModelSizeGB != 24 || stats.MaxConcurrent != 3 {
+		t.Fatalf("expected EngineStats to sync MaxModelSizeGB=24 and MaxConcurrent=3, got %d and %d", stats.MaxModelSizeGB, stats.MaxConcurrent)
+	}
+	if gotClusterID != "cluster-prod-gpu" {
+		t.Fatalf("expected heartbeat to sync ClusterID='cluster-prod-gpu', got %q", gotClusterID)
+	}
+	if len(gotModels) != 2 || gotModels[1] != "gemma-4-26b" {
+		t.Fatalf("expected heartbeat to sync SupportedModels=['gemma-4-4b', 'gemma-4-26b'], got %v", gotModels)
+	}
+}
+

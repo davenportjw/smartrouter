@@ -59,11 +59,13 @@ chmod +x deploy.sh
 
 1. **Environment Checks**: Validates `.env` file variables.
 2. **Firebase Provisioning**: Programmatically checks, links Firebase if necessary, registers the Web App, and updates `.env` with client SDK details.
-3. **Infrastructure Setup (Terraform)**:
+3. **Infrastructure & Secret Manager Containers (Terraform)**:
    * Enables APIs (Cloud Run, Firestore, Secret Manager, Cloud Build, Identity Toolkit).
-   * Provisions Firestore in Native mode.
-   * Configures IAM Roles.
-4. **Upstream Authentication Setup**: Governed dynamically by Google Cloud Application Default Credentials (ADC), meaning no manual API keys are stored or uploaded to Secret Manager.
+   * Provisions Firestore in Native mode and configures IAM Roles.
+   * Provisions `google_secret_manager_secret` containers (`JEV_API_KEY`, `FASTINO_API_KEY`, `CLM_API_KEY`, `BACKEND_SHARED_SECRET`) and grants `roles/secretmanager.secretAccessor` to the Cloud Run service account **without** reading `.env` or storing secret values in `terraform.tfstate`.
+4. **Out-of-Band Secret Sync & Upstream Auth**:
+   * Vertex AI / Gemini upstream inference uses Google Cloud Application Default Credentials (ADC).
+   * Optional decision engine and shared secret values (`JEV_API_KEY`, `FASTINO_API_KEY`, `CLM_API_KEY`, `BACKEND_SHARED_SECRET`) present in `.env` are synced directly to Google Cloud Secret Manager via `gcloud secrets versions add --data-file=-` and mounted into Cloud Run via `enabled_secret_mounts` (`value_source.secret_key_ref`).
 5. **Compilation & Deployment**:
    * Compiles HTML templates with `templ`.
    * Triggers Cloud Build to deploy Backend and Frontend services to Cloud Run.
@@ -77,7 +79,7 @@ chmod +x deploy.sh
 
 To maintain maximum security, the Smart Router backend on Cloud Run is deployed without public (`allUsers`) invoker permissions. Standard requests require OIDC identity token authentication matching the targeted audience (the backend service URL).
 
-Since standard user accounts (e.g., `@google.com` or `@gmail.com` accounts logged in via `gcloud`) cannot generate custom-audience OIDC tokens directly, the post-deployment verify utility (`cmd/verify/main.go`) implements a robust **ADC-Driven Service Account Impersonation** pattern.
+Since standard user accounts (e.g., `@mycompany.com` or `@gmail.com` accounts logged in via `gcloud`) cannot generate custom-audience OIDC tokens directly, the post-deployment verify utility (`cmd/verify/main.go`) implements a robust **ADC-Driven Service Account Impersonation** pattern.
 
 ### 🔄 Authentication & Verification Flow
 

@@ -1,8 +1,10 @@
 package templates
 
 import (
+	"fmt"
 	"strings"
 	"geminirouter/pkg/config"
+	"geminirouter/pkg/decision"
 )
 
 type ComplexityViewModel struct {
@@ -17,7 +19,7 @@ templ ComplexityTab(items []ComplexityViewModel) {
 			<div>
 				<h1 class="text-2xl font-bold tracking-tight text-gray-900">Dynamic Complexity Routing</h1>
 				<p class="mt-2 text-sm text-gray-700">
-					Configure semantic or heuristic routing to dynamically select models (Pro, Flash, or Flash-Lite) based on request complexity.
+					Configure semantic or fast decision models (Jev, Fastino, Contrastive-LM, LLM, or Heuristics) to dynamically select models based on request complexity and agent task.
 				</p>
 			</div>
 		</div>
@@ -32,146 +34,459 @@ templ ComplexityTab(items []ComplexityViewModel) {
 			<div>
 				<span class="font-semibold text-blue-950 block mb-1">🔄 How Dynamic Complexity Routing works in the Pipeline:</span>
 				<ul class="list-disc pl-4 space-y-1">
-					<li><strong>App-Scoped Classification (Stage 1)</strong>: Complexity-based routing acts as the first stage in the proxy routing loop. When a client requests the virtual model <code class="bg-blue-100 px-1 py-0.5 rounded font-mono text-[10px] text-blue-900">gemini-dynamic</code> (or any model if "Always Override" is enabled), the router classifies the prompt's complexity to select a base model (Simple, Medium, or Complex).</li>
-					<li><strong>Subsequent Declarative Routing (Stage 2)</strong>: Standard routing rules (from the <em>Routing Rules</em> tab) are matched <strong>after</strong> complexity routing resolves. This allows global policies or header-based overrides to take precedence and refine the final target model or location.</li>
+					<li><strong>Stage 0 (Per-Prompt Overrides)</strong>: Headers like <code class="bg-blue-100 px-1 py-0.5 rounded font-mono text-[10px] text-blue-900">X-Router-Model</code> or <code class="bg-blue-100 px-1 py-0.5 rounded font-mono text-[10px] text-blue-900">X-Router-Engine</code> immediately override dynamic decisions.</li>
+					<li><strong>Stage 1 (Session Affinity)</strong>: Multi-turn conversations locked via <code class="bg-blue-100 px-1 py-0.5 rounded font-mono text-[10px] text-blue-900">X-Session-ID</code> retain model consistency across turns.</li>
+					<li><strong>Stage 2 (Agent Task Switching)</strong>: Agent task signals via <code class="bg-blue-100 px-1 py-0.5 rounded font-mono text-[10px] text-blue-900">X-Agent-Task</code> (e.g. debugging vs summarization) route to task-optimized tiers.</li>
+					<li><strong>Stage 3 (Decision Engine)</strong>: Jev, Fastino, or Contrastive-LM (CLM) classifiers assign Simple, Medium, or Complex tiers in microseconds.</li>
 				</ul>
 			</div>
 		</div>
 
-		<!-- Apps Data Table -->
-		<div class="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
-			<div class="inline-block min-w-full align-middle">
-				<table class="min-w-full divide-y divide-gray-300">
-					<thead class="bg-gray-50">
-						<tr>
-							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Application Name</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Status</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Method</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Simple Model & Max Chars</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Medium Model & Max Chars</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Complex Model</th>
-							<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
-								<span class="sr-only">Actions</span>
-							</th>
-						</tr>
-					</thead>
-					<tbody class="divide-y divide-gray-200 bg-white">
-						if len(items) == 0 {
+		<!-- Master-Detail Split Layout: Applications Table (Left) + Contextual Complexity Inspector (Right) -->
+		<div data-layout="master-detail-split" class="flex flex-col lg:flex-row gap-6 items-start">
+			<div class="flex-1 min-w-0 w-full bg-white shadow-xs ring-1 ring-slate-900/5 sm:rounded-xl overflow-hidden">
+				<div class="overflow-x-auto">
+					<table class="min-w-full divide-y divide-gray-300">
+						<thead class="bg-gray-50">
 							<tr>
-								<td colspan="7" class="text-center py-8 text-sm text-gray-500 italic">
-									No logical applications configured. Register an application first under the Applications tab.
-								</td>
+								<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Application Name</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Status</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Engine / Method</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Simple Model & Max Chars</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Medium Model & Max Chars</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Complex Model</th>
+								<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
+									<span class="sr-only">Actions</span>
+								</th>
 							</tr>
-						} else {
-							for _, item := range items {
-								<tr class="hover:bg-gray-50 transition-colors">
-									<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
-										<div class="font-semibold text-gray-900">{ item.App.Name }</div>
-										<div class="text-xs font-mono text-gray-400">{ item.App.ID }</div>
-									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm">
-										if item.App.Complexity.Enabled {
-											if item.App.Complexity.AlwaysOverride {
-												<span class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
-													Always Override
-												</span>
-											} else {
-												<span class="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
-													SDK Virtual Model
-												</span>
-											}
-										} else {
-											<span class="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10">
-												Disabled
-											</span>
-										}
-									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-medium">
-										if item.App.Complexity.Enabled {
-											if item.App.Complexity.UseLLMClassifier {
-												<div class="text-xs">LLM Classifier</div>
-												<div class="text-[10px] font-mono text-gray-400">{ item.App.Complexity.ClassifierModel }</div>
-											} else {
-												<div class="text-xs">Static Heuristics</div>
-											}
-										} else {
-											<span class="text-gray-400">-</span>
-										}
-									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-mono text-xs">
-										<div>{ item.App.Complexity.SimpleModel }</div>
-										if item.App.Complexity.Enabled && !item.App.Complexity.UseLLMClassifier {
-											<div class="text-[10px] text-gray-400">&lt;= { intToString(item.App.Complexity.SimpleCharLimit) } chars</div>
-										}
-									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-mono text-xs">
-										<div>{ item.App.Complexity.MediumModel }</div>
-										if item.App.Complexity.Enabled && !item.App.Complexity.UseLLMClassifier {
-											<div class="text-[10px] text-gray-400">&lt;= { intToString(item.App.Complexity.MediumCharLimit) } chars</div>
-										}
-									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-mono text-xs">
-										{ item.App.Complexity.ComplexModel }
-									</td>
-									<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-										<button
-											hx-get={ "/admin/complexity/edit?app_id=" + item.App.ID }
-											hx-target="#modal-container"
-											class="text-blue-600 hover:text-blue-900 transition font-semibold"
-										>
-											Configure Settings
-										</button>
+						</thead>
+						<tbody class="divide-y divide-gray-200 bg-white">
+							if len(items) == 0 {
+								<tr>
+									<td colspan="7" class="text-center py-8 text-sm text-gray-500 italic">
+										No logical applications configured. Register an application first under the Applications tab.
 									</td>
 								</tr>
+							} else {
+								for _, item := range items {
+									<tr data-edit-row={ item.App.ID } class="hover:bg-gray-50 transition-colors">
+										<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
+											<div class="font-semibold text-gray-900">{ item.App.Name }</div>
+											<div class="text-xs font-mono text-gray-400">{ item.App.ID }</div>
+										</td>
+										<td class="whitespace-nowrap px-3 py-4 text-sm">
+											if item.App.Complexity.Enabled {
+												if item.App.Complexity.AlwaysOverride {
+													<span class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
+														Always Override
+													</span>
+												} else {
+													<span class="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
+														SDK Virtual Model
+													</span>
+												}
+											} else {
+												<span class="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10">
+													Disabled
+												</span>
+											}
+										</td>
+										<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-medium">
+											if item.App.Complexity.Enabled {
+												if item.App.Complexity.Engine == "fastino" {
+													<div class="text-xs font-medium text-slate-700">Fastino Sub-ms</div>
+												} else if item.App.Complexity.Engine == "clm" || item.App.Complexity.Engine == "contrastive-lm" {
+													<div class="text-xs font-medium text-slate-700">Contrastive-LM</div>
+												} else if item.App.Complexity.Engine == "llm" || item.App.Complexity.UseLLMClassifier {
+													<div class="text-xs font-medium text-blue-700">LLM Classifier</div>
+													<div class="text-[10px] font-mono text-gray-400">{ item.App.Complexity.ClassifierModel }</div>
+												} else if item.App.Complexity.Engine == "heuristics" {
+													<div class="text-xs font-medium text-slate-700">Heuristics</div>
+												} else {
+													<div class="text-xs font-medium text-slate-700">Jev Model</div>
+												}
+											} else {
+												<span class="text-gray-400">-</span>
+											}
+										</td>
+										<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-mono text-xs">
+											<div>{ item.App.Complexity.SimpleModel }</div>
+											if item.App.Complexity.Enabled && !item.App.Complexity.UseLLMClassifier {
+												<div class="text-[10px] text-gray-400">&lt;= { intToString(item.App.Complexity.SimpleCharLimit) } chars</div>
+											}
+										</td>
+										<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-mono text-xs">
+											<div>{ item.App.Complexity.MediumModel }</div>
+											if item.App.Complexity.Enabled && !item.App.Complexity.UseLLMClassifier {
+												<div class="text-[10px] text-gray-400">&lt;= { intToString(item.App.Complexity.MediumCharLimit) } chars</div>
+											}
+										</td>
+										<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-mono text-xs">
+											{ item.App.Complexity.ComplexModel }
+										</td>
+										<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+											<button
+												hx-get={ "/admin/complexity/edit?app_id=" + item.App.ID }
+												hx-target="#modal-container"
+												onclick="document.querySelectorAll('[data-edit-row]').forEach(r => r.classList.remove('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30')); this.closest('tr').classList.add('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30')"
+												class="text-blue-600 hover:text-blue-900 transition font-semibold"
+											>
+												Configure Settings
+											</button>
+										</td>
+									</tr>
+								}
 							}
-						}
-					</tbody>
-				</table>
+						</tbody>
+					</table>
+				</div>
 			</div>
+
+			<!-- Right Contextual Complexity Settings Inspector Pane -->
+			<aside id="modal-container" class="w-full lg:w-[460px] xl:w-[520px] shrink-0 lg:sticky lg:top-6 hidden [&:has(*)]:block"></aside>
 		</div>
 
-		<!-- Modal Target Anchor -->
-		<div id="modal-container"></div>
+		<!-- Decision Engine Providers & Cluster Setup -->
+		<div class="bg-white shadow-sm border border-gray-200 rounded-lg p-6 space-y-5">
+			<div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 pb-3 gap-2">
+				<div>
+					<h2 class="text-base font-bold text-gray-900">⚙️ Decision Engine Providers &amp; Cluster Setup</h2>
+					<p class="text-xs text-gray-500">Configure Contrastive-LM local/cluster runners (Gemma 4 / CLM rankers), external Jev &amp; Fastino APIs, runtime secrets, and live health probes.</p>
+				</div>
+			</div>
+
+			<!-- Master-Detail Split View: Compact Selectable Provider List (Left) + Inline Detail & Configuration Inspector (Right) -->
+			<div id="decision-providers-master-detail" class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+				<!-- Left Master Pane: Compact Selectable Provider List -->
+				<div class="lg:col-span-5 border border-slate-200 rounded-lg overflow-hidden bg-white shadow-xs">
+					<div class="bg-slate-50 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+						<span class="text-xs font-bold uppercase tracking-wider text-slate-700">Decision Engine Providers</span>
+						<span class="text-[11px] font-mono text-slate-500">Select to configure</span>
+					</div>
+					<div id="decision-provider-list" class="divide-y divide-slate-200" role="listbox" aria-label="Decision Engine Providers">
+						for idx, st := range decision.GetAllEngineSecretStatuses("") {
+							<div
+								id={ "provider-row-" + st.Engine }
+								data-provider-row={ st.Engine }
+								data-provider-name={ st.DisplayName }
+								data-provider-mode={ st.ConnectionMode }
+								data-provider-endpoint={ st.Endpoint }
+								data-provider-cluster={ st.ClusterID }
+								onclick="selectDecisionProvider(this.dataset.providerRow)"
+								role="option"
+								tabindex="0"
+								class={ "px-3.5 py-2.5 transition-colors cursor-pointer border-l-4 space-y-1.5", templ.KV("bg-blue-50/50 border-l-blue-600", idx == 0), templ.KV("hover:bg-slate-50 border-l-transparent", idx != 0) }
+							>
+								<div class="flex items-center justify-between gap-2">
+									<div class="flex items-center gap-1.5 min-w-0">
+										<span class="text-xs font-bold text-slate-900 truncate">{ st.DisplayName }</span>
+										<span class="text-[11px] font-mono text-slate-500">({ st.Engine })</span>
+									</div>
+									<div class="flex items-center gap-1.5 shrink-0">
+										if st.ConnectionMode == "cluster" || st.ConnectionMode == "direct" {
+											<span class="text-[11px] font-medium text-slate-500">Cluster Runner</span>
+										} else if st.ConnectionMode == "remote" {
+											<span class="text-[11px] font-medium text-slate-500">Remote API</span>
+										} else {
+											<span class="text-[11px] font-medium text-slate-500">Local Embedded</span>
+										}
+										<span class="text-xs text-slate-400 font-semibold">&rarr;</span>
+									</div>
+								</div>
+
+								<div class="flex items-center justify-between gap-2 text-[11px]">
+									<div class="font-mono text-slate-600 truncate">
+										if st.Endpoint != "" {
+											<span title={ st.Endpoint }>{ st.Endpoint }</span>
+										} else if st.ClusterID != "" {
+											<span>Cluster: { st.ClusterID }</span>
+										} else if st.Engine == "contrastive-lm" {
+											<span>Embedded Contrastive Prototypes (Local)</span>
+										} else {
+											<span>Default / Embedded</span>
+										}
+									</div>
+									<div class="flex items-center gap-1.5 shrink-0">
+										if st.Source == "secret_manager" {
+											<span class="text-[11px] text-slate-500">Secret Manager</span>
+										} else if st.Source == "dotenv" {
+											<span class="text-[11px] text-slate-500">Local .env</span>
+										} else if st.Source == "memory" {
+											<span class="text-[11px] text-slate-500">Runtime Vault</span>
+										} else if st.Source == "env" {
+											<span class="text-[11px] text-slate-500">Environment</span>
+										} else {
+											<span class="text-[11px] text-slate-400">No Secret</span>
+										}
+										if st.Configured {
+											<span class="inline-flex items-center rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-mono font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20">{ st.MaskedPreview }</span>
+										} else {
+											<span class="inline-flex items-center rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-mono text-gray-500">Unconfigured</span>
+										}
+									</div>
+								</div>
+							</div>
+						}
+					</div>
+				</div>
+
+				<!-- Right Detail & Configuration Inspector -->
+				<div id="provider-detail-inspector" class="lg:col-span-7 border border-slate-200 rounded-lg bg-slate-50/40 p-4 space-y-4">
+					<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200">
+						<div class="flex items-center gap-2">
+							<span class="text-xs font-bold text-slate-900" id="inspector-selected-name">Jev Decision Engine</span>
+							<span class="text-xs font-mono text-slate-500" id="inspector-selected-engine">jev</span>
+						</div>
+						<div class="flex items-center gap-3">
+							<button
+								id="inspector-probe-btn"
+								type="button"
+								hx-post="/admin/complexity/providers/probe"
+								hx-vals='{"engine": "jev"}'
+								hx-target="#provider-probe-result"
+								hx-swap="innerHTML"
+								class="inline-flex items-center gap-1 rounded bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 shadow-xs ring-1 ring-inset ring-slate-300 hover:bg-slate-50 cursor-pointer"
+							>
+								<span>⚡ Probe Selected Provider</span>
+							</button>
+							<a href="/admin/clusters" class="text-[11px] font-medium text-blue-600 hover:text-blue-800">Cluster Pool &rarr;</a>
+						</div>
+					</div>
+
+					<div id="provider-probe-result"></div>
+
+					<!-- Form B: External Provider Credentials & Endpoints (Synced with Selected Provider) -->
+					<form id="provider-credentials-form" method="POST" action="/admin/complexity/keys" class="bg-white border border-slate-200 rounded-lg p-4 space-y-3 shadow-2xs">
+						<div class="flex items-center justify-between">
+							<div>
+								<h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">Provider Credentials &amp; Remote Endpoints</h3>
+								<p class="text-[11px] text-slate-600">Hot-swap API keys and remote URLs in the runtime vault and sync with the backend proxy.</p>
+							</div>
+						</div>
+						<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+							<div>
+								<label for="secret-engine" class="block text-xs font-semibold text-gray-700 mb-1">Target Engine</label>
+								<select id="secret-engine" name="engine" onchange="selectDecisionProvider(this.value)" class="block w-full rounded-md border-gray-300 bg-white shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono">
+									<option value="jev">jev (JEV_API_KEY)</option>
+									<option value="fastino">fastino (FASTINO_API_KEY)</option>
+									<option value="contrastive-lm">contrastive-lm (CLM_API_KEY)</option>
+								</select>
+							</div>
+							<div>
+								<label for="secret-ref" class="block text-xs font-semibold text-gray-700 mb-1">Secret Manager Ref (Optional)</label>
+								<input type="text" id="secret-ref" name="secret_ref" placeholder="projects/*/secrets/FASTINO_API_KEY" class="block w-full rounded-md border-gray-300 bg-white shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono"/>
+							</div>
+							<div class="sm:col-span-2">
+								<label for="provider-endpoint" class="block text-xs font-semibold text-gray-700 mb-1">Remote Provider Endpoint Override (Optional)</label>
+								<input type="url" id="provider-endpoint" name="endpoint" placeholder="https://api.fastino.ai/v1/classify or https://jev.internal/v1/evaluate" class="block w-full rounded-md border-gray-300 bg-white shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono"/>
+							</div>
+							<div class="sm:col-span-2">
+								<label for="secret-api-key" class="block text-xs font-semibold text-gray-700 mb-1">Write-Only API Key / Bearer Token</label>
+								<input type="password" id="secret-api-key" name="api_key" placeholder="sk-..." class="block w-full rounded-md border-gray-300 bg-white shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono"/>
+							</div>
+						</div>
+						<div class="flex justify-end pt-1">
+							<button type="submit" class="inline-flex justify-center items-center rounded-md bg-slate-800 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-slate-700 transition cursor-pointer">
+								Store Provider Key &amp; Endpoint
+							</button>
+						</div>
+					</form>
+
+					<!-- Form A: Contrastive-LM Local / Cluster Runner Setup (Contextual to contrastive-lm selection) -->
+					<form id="clm-cluster-setup-form" method="POST" action="/admin/complexity/keys" class="hidden bg-indigo-50/40 border border-indigo-200 rounded-lg p-4 space-y-3 transition-all">
+						<input type="hidden" name="engine" value="contrastive-lm"/>
+						<div class="flex items-center justify-between">
+							<div>
+								<h3 class="text-xs font-bold text-indigo-950 uppercase tracking-wider">Contrastive-LM Cluster &amp; Local Runner Setup</h3>
+								<p class="text-[11px] text-indigo-700">Bind Contrastive-LM to an on-prem/project-local cluster endpoint (vLLM / Ollama / CLM Runner) or use embedded contrastive prototypes.</p>
+							</div>
+						</div>
+						<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+							<div>
+								<label for="clm-connection-mode" class="block text-xs font-semibold text-gray-700 mb-1">Execution Mode</label>
+								<select id="clm-connection-mode" name="connection_mode" class="block w-full rounded-md border-gray-300 bg-white shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono">
+									<option value="cluster">Cluster / Local Runner Endpoint</option>
+									<option value="remote">Remote Contrastive API</option>
+									<option value="local">Local Embedded Prototypes (Zero-Latency)</option>
+								</select>
+							</div>
+							<div>
+								<label for="clm-cluster-id" class="block text-xs font-semibold text-gray-700 mb-1">Cluster / Direct Endpoint ID</label>
+								<input type="text" id="clm-cluster-id" name="cluster_id" value="clm-cluster-default" placeholder="clm-cluster-default" class="block w-full rounded-md border-gray-300 bg-white shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono"/>
+							</div>
+							<div class="sm:col-span-2">
+								<label for="clm-cluster-endpoint" class="block text-xs font-semibold text-gray-700 mb-1">Cluster / Runner HTTP Endpoint (`CLM_ENDPOINT`)</label>
+								<input type="url" id="clm-cluster-endpoint" name="endpoint" placeholder="http://clm-runner.local:8090/rank or http://10.0.0.12:8000/v1/rank" class="block w-full rounded-md border-gray-300 bg-white shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono"/>
+							</div>
+							<div class="sm:col-span-2">
+								<label for="clm-cluster-api-key" class="block text-xs font-semibold text-gray-700 mb-1">Optional Cluster Bearer Token (`CLM_API_KEY`)</label>
+								<input type="password" id="clm-cluster-api-key" name="api_key" placeholder="Leave blank for unauthenticated local/VPC cluster runners" class="block w-full rounded-md border-gray-300 bg-white shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono"/>
+							</div>
+						</div>
+						<div class="flex justify-end pt-1">
+							<button type="submit" class="inline-flex justify-center items-center rounded-md bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition cursor-pointer">
+								Save Contrastive-LM Cluster Config
+							</button>
+						</div>
+					</form>
+				</div>
+			</div>
+
+			<script>
+				function selectDecisionProvider(engine) {
+					if (!engine) return;
+					const rows = document.querySelectorAll('#decision-provider-list [data-provider-row]');
+					let activeRow = null;
+					rows.forEach((row) => {
+						if (row.dataset.providerRow === engine) {
+							activeRow = row;
+							row.classList.add('bg-blue-50/50', 'border-l-blue-600');
+							row.classList.remove('hover:bg-slate-50', 'border-l-transparent');
+						} else {
+							row.classList.remove('bg-blue-50/50', 'border-l-blue-600');
+							row.classList.add('hover:bg-slate-50', 'border-l-transparent');
+						}
+					});
+					const selectEl = document.getElementById('secret-engine');
+					if (selectEl && selectEl.value !== engine) {
+						selectEl.value = engine;
+					}
+					const nameEl = document.getElementById('inspector-selected-name');
+					const badgeEl = document.getElementById('inspector-selected-engine');
+					if (activeRow) {
+						if (nameEl) nameEl.textContent = activeRow.dataset.providerName || engine;
+						if (badgeEl) badgeEl.textContent = engine;
+						const epInput = document.getElementById('provider-endpoint');
+						if (epInput) {
+							epInput.value = activeRow.dataset.providerEndpoint || '';
+						}
+					}
+					const probeBtn = document.getElementById('inspector-probe-btn');
+					if (probeBtn) {
+						probeBtn.setAttribute('hx-vals', JSON.stringify({ engine: engine }));
+					}
+					const clmForm = document.getElementById('clm-cluster-setup-form');
+					if (clmForm) {
+						clmForm.classList.toggle('hidden', engine !== 'contrastive-lm');
+					}
+				}
+			</script>
+
+			<details class="group border border-slate-200 rounded-md bg-slate-50/70">
+				<summary class="cursor-pointer px-3 py-2 text-xs font-semibold text-slate-700 flex items-center justify-between">
+					<span>Cloud Secret Manager &amp; .env CLI Reference</span>
+					<span class="text-[11px] font-mono text-slate-500">Click to expand</span>
+				</summary>
+				<div class="relative bg-slate-900 text-slate-100 rounded-b-md p-3 pr-10 text-[11px] font-mono overflow-x-auto space-y-1" data-code-snippet>
+					<button
+						type="button"
+						onclick="copyCodeSnippet(this)"
+						title="Copy to clipboard"
+						aria-label="Copy to clipboard"
+						class="copy-snippet-btn absolute top-2 right-2 p-1.5 rounded-md bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer"
+					>
+						<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+						</svg>
+					</button>
+					<code>
+						<span class="block text-slate-400"># 1. Local Development (.env is gitignored and auto-loaded on startup when K_SERVICE is unset):</span>
+						<span class="block">JEV_API_KEY="jev-live-..." FASTINO_API_KEY="pio-live-..." CLM_API_KEY="clm-live-..." CLM_ENDPOINT="http://clm-runner.local:8090/rank"</span>
+						<span class="block text-slate-400 pt-1"># 2. Production Secret Manager Sync (Terraform creates secret containers; push values with gcloud):</span>
+						<span class="block">gcloud secrets create FASTINO_API_KEY --replication-policy="automatic" &amp;&amp; gcloud run services update gemini-smart-router --set-secrets="FASTINO_API_KEY=FASTINO_API_KEY:latest,JEV_API_KEY=JEV_API_KEY:latest,CLM_API_KEY=CLM_API_KEY:latest"</span>
+					</code>
+				</div>
+			</details>
+		</div>
+
+		<!-- Smart Routing Inspector & Simulator -->
+		<div class="bg-white shadow-sm border border-gray-200 rounded-lg p-6 space-y-4">
+			<div class="flex items-center justify-between border-b border-gray-200 pb-3">
+				<div>
+					<h2 class="text-base font-bold text-gray-900">🔬 Smart Routing Inspector & Simulator</h2>
+					<p class="text-xs text-gray-500">Test prompt complexity in real-time through Jev, Fastino, and Contrastive-LM decision models to inspect features, logits, and rationales.</p>
+				</div>
+			</div>
+			<form
+				hx-post="/admin/complexity/inspect"
+				hx-target="#inspect-results"
+				hx-swap="innerHTML"
+				class="space-y-4"
+			>
+				<div>
+					<label for="inspect-prompt" class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">Test Prompt / Query</label>
+					<textarea
+						id="inspect-prompt"
+						name="prompt"
+						rows="3"
+						required
+						placeholder="Type or paste a test prompt (e.g. 'What is 2+2?' or 'Write a thread-safe LRU cache in Go with sync.RWMutex and benchmarks')..."
+						class="block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono focus:border-blue-500 focus:ring-blue-500"
+					></textarea>
+				</div>
+				<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+					<div>
+						<label for="inspect-engine" class="block text-xs font-semibold text-gray-700 mb-1">Decision Engine</label>
+						<select id="inspect-engine" name="engine" class="block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs">
+							<option value="jev" selected>Jev Decision Engine (Rule Logits)</option>
+							<option value="fastino">Fastino Decision Engine (Sub-ms Feature Scoring)</option>
+							<option value="contrastive-lm">Contrastive-LM (5D Euclidean Anchor Profiles)</option>
+							<option value="clm">CLM Contrastive Engine (Alias)</option>
+							<option value="heuristics">Static Heuristics</option>
+						</select>
+					</div>
+					<div>
+						<label for="inspect-task" class="block text-xs font-semibold text-gray-700 mb-1">Agent Task Context (Optional)</label>
+						<input type="text" id="inspect-task" name="task" placeholder="e.g. code_generation, debugging, triage" class="block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono" />
+					</div>
+					<div class="flex items-end">
+						<button
+							type="submit"
+							class="w-full inline-flex justify-center items-center rounded-md bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-500 transition cursor-pointer"
+						>
+							Analyze & Route Prompt
+						</button>
+					</div>
+				</div>
+			</form>
+			<div id="inspect-results">
+				<div class="p-4 border border-dashed border-gray-200 rounded-md text-center text-xs text-gray-400 italic">
+					Submit a prompt above to view real-time extracted signals, logit scores, and explainable decision rationales.
+				</div>
+			</div>
+		</div>
 	</div>
 }
 
 templ ComplexityModal(app config.App, activeModels []config.ModelConfig) {
-	<!-- Modal backdrop -->
-	<div id="edit-complexity-modal" class="relative z-50" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-		<div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
-		
-		<div class="fixed inset-0 z-50 w-screen overflow-y-auto">
-			<div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-				
-				<!-- Modal Panel -->
-				<div class="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl sm:p-6 border border-gray-200">
-					<div class="absolute right-0 top-0 hidden pr-4 pt-4 sm:block">
-						<button
-							type="button"
-							onclick="document.getElementById('edit-complexity-modal').remove()"
-							class="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none"
-						>
-							<span class="sr-only">Close</span>
-							<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-							</svg>
-						</button>
-					</div>
+	<!-- Contextual Complexity Configuration Inspector Panel -->
+	<div id="edit-complexity-modal" class="rounded-xl bg-white shadow-md border border-slate-200 overflow-hidden max-h-[calc(100vh-5rem)] flex flex-col" aria-labelledby="modal-title" role="region">
+		<div class="bg-slate-100/90 border-b border-slate-200 px-5 py-3.5 flex items-center justify-between gap-3">
+			<div>
+				<div class="text-[11px] font-semibold uppercase tracking-wider text-blue-600">Complexity Inspector</div>
+				<h3 class="text-sm font-bold text-slate-900" id="modal-title">
+					Complexity Routing Settings: <span class="text-blue-600">{ app.Name }</span>
+				</h3>
+				<p class="text-[11px] text-slate-500 font-mono">{ app.ID }</p>
+			</div>
+			<button
+				type="button"
+				onclick="document.querySelectorAll('[data-edit-row]').forEach(r => r.classList.remove('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30')); document.getElementById('edit-complexity-modal').remove()"
+				class="rounded-md p-1 text-slate-400 hover:bg-slate-200/60 hover:text-slate-600 focus:outline-none transition"
+			>
+				<span class="sr-only">Close</span>
+				<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+				</svg>
+			</button>
+		</div>
 
-					<div class="sm:flex sm:items-start">
-						<div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
-							<h3 class="text-lg font-bold leading-6 text-gray-900" id="modal-title">
-								Complexity Routing Settings: <span class="text-blue-600">{ app.Name }</span>
-							</h3>
-							<div class="mt-1">
-								<p class="text-xs text-gray-500 font-mono">{ app.ID }</p>
-							</div>
-
-							<!-- Settings Form -->
-							<form
-								hx-post="/admin/complexity/save"
-								class="mt-6 space-y-5"
-							>
+		<div class="p-5 overflow-y-auto">
+			<!-- Settings Form -->
+			<form
+				hx-post="/admin/complexity/save"
+				class="space-y-5"
+			>
 								<div id="error-alert-container"></div>
 								<input type="hidden" name="app_id" value={ app.ID } />
 
@@ -187,7 +502,7 @@ templ ComplexityModal(app config.App, activeModels []config.ModelConfig) {
 											name="enabled"
 											id="enabled"
 											value="true"
-											class="h-4.5 w-4.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+											class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
 											if app.Complexity.Enabled { checked }
 										/>
 									</div>
@@ -202,7 +517,7 @@ templ ComplexityModal(app config.App, activeModels []config.ModelConfig) {
 											name="always_override"
 											id="always_override"
 											value="true"
-											class="h-4.5 w-4.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+											class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
 											if app.Complexity.AlwaysOverride { checked }
 										/>
 									</div>
@@ -216,7 +531,7 @@ templ ComplexityModal(app config.App, activeModels []config.ModelConfig) {
 											<label for="simple_model" class="block text-xs font-medium text-gray-700">Simple Model</label>
 											<select name="simple_model" id="simple_model" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono">
 												for _, m := range activeModels {
-													<option value={ m.ID } if app.Complexity.SimpleModel == m.ID { selected }>{ m.DisplayName }</option>
+													<option value={ m.ID } if app.Complexity.SimpleModel == m.ID || (app.Complexity.SimpleModel == "" && m.ID == "gemini-3.5-flash-lite") { selected }>{ m.DisplayName }</option>
 												}
 											</select>
 										</div>
@@ -224,7 +539,7 @@ templ ComplexityModal(app config.App, activeModels []config.ModelConfig) {
 											<label for="medium_model" class="block text-xs font-medium text-gray-700">Medium Model</label>
 											<select name="medium_model" id="medium_model" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono">
 												for _, m := range activeModels {
-													<option value={ m.ID } if app.Complexity.MediumModel == m.ID { selected }>{ m.DisplayName }</option>
+													<option value={ m.ID } if app.Complexity.MediumModel == m.ID || (app.Complexity.MediumModel == "" && m.ID == "gemini-3.8-flash") { selected }>{ m.DisplayName }</option>
 												}
 											</select>
 										</div>
@@ -232,18 +547,141 @@ templ ComplexityModal(app config.App, activeModels []config.ModelConfig) {
 											<label for="complex_model" class="block text-xs font-medium text-gray-700">Complex Model</label>
 											<select name="complex_model" id="complex_model" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono">
 												for _, m := range activeModels {
-													<option value={ m.ID } if app.Complexity.ComplexModel == m.ID { selected }>{ m.DisplayName }</option>
+													<option value={ m.ID } if app.Complexity.ComplexModel == m.ID || (app.Complexity.ComplexModel == "" && m.ID == "gemini-3.1-pro") { selected }>{ m.DisplayName }</option>
 												}
 											</select>
 										</div>
 									</div>
 								</div>
 
-								<!-- Method Options: LLM Classifier vs Static Heuristics -->
+								<!-- Method Options: Jev vs Fastino vs Contrastive-LM vs LLM Classifier vs Static Heuristics -->
 								<div class="border-t border-gray-200 pt-4">
-									<h4 class="text-xs font-bold text-gray-950 tracking-wider uppercase mb-3">Classification Method</h4>
+									<h4 class="text-xs font-bold text-gray-950 tracking-wider uppercase mb-3">Classification &amp; Decision Engine</h4>
 									
 									<div class="space-y-4">
+										<div>
+											<label for="engine" class="block text-xs font-medium text-gray-700 mb-1">Routing Engine</label>
+											<select name="engine" id="engine" class="block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono">
+												<option value="jev" if app.Complexity.Engine == "jev" || (app.Complexity.Engine == "" && !app.Complexity.UseLLMClassifier) { selected }>Jev Structured Decision Model (Microsecond rule-based logit scoring)</option>
+												<option value="fastino" if app.Complexity.Engine == "fastino" { selected }>Fastino Decision Engine (Sub-millisecond structural &amp; lexical scoring)</option>
+												<option value="contrastive-lm" if app.Complexity.Engine == "contrastive-lm" { selected }>Contrastive-LM (5D Euclidean distance to anchor profiles)</option>
+												<option value="clm" if app.Complexity.Engine == "clm" { selected }>CLM Contrastive Language Model (Alias for Contrastive-LM)</option>
+												<option value="llm" if app.Complexity.Engine == "llm" || app.Complexity.UseLLMClassifier { selected }>LLM Semantic Classifier (Gemini 3.5 Flash-Lite semantic routing)</option>
+												<option value="heuristics" if app.Complexity.Engine == "heuristics" { selected }>Static Heuristics (Character length bounds)</option>
+											</select>
+										</div>
+
+										<div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+											<div>
+												<label for="jev_endpoint" class="block text-xs font-medium text-gray-700">Jev Endpoint (Optional)</label>
+												<input
+													type="text"
+													name="jev_endpoint"
+													id="jev_endpoint"
+													value={ app.Complexity.JevEndpoint }
+													placeholder="https://jev-model.internal/v1/systemone"
+													class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono"
+												/>
+											</div>
+											<div>
+												<label for="fastino_endpoint" class="block text-xs font-medium text-gray-700">Fastino Endpoint (Optional)</label>
+												<input
+													type="text"
+													name="fastino_endpoint"
+													id="fastino_endpoint"
+													value={ app.Complexity.FastinoEndpoint }
+													placeholder="https://fastino.internal/v1/systemone"
+													class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono"
+												/>
+											</div>
+											<div>
+												<label for="clm_endpoint" class="block text-xs font-medium text-gray-700">Contrastive-LM Endpoint (Optional)</label>
+												<input
+													type="text"
+													name="clm_endpoint"
+													id="clm_endpoint"
+													value={ app.Complexity.CLMEndpoint }
+													placeholder="https://clm.internal/rank"
+													class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono"
+												/>
+											</div>
+										</div>
+
+										<div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+											<div>
+												<label for="secret_ref" class="block text-xs font-medium text-gray-700">Secret Env / Vault Reference</label>
+												<input
+													type="text"
+													name="secret_ref"
+													id="secret_ref"
+													value={ app.Complexity.SecretRef }
+													placeholder="FASTINO_API_KEY"
+													class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono"
+												/>
+											</div>
+											<div>
+												<label for="api_key" class="block text-xs font-medium text-gray-700">Write-Only Engine API Key</label>
+												<input
+													type="password"
+													name="api_key"
+													id="api_key"
+													placeholder="Stored in memory vault only"
+													class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono"
+												/>
+											</div>
+											<div>
+												<label for="min_confidence" class="block text-xs font-medium text-gray-700">Min Confidence Threshold (0-1)</label>
+												<input
+													type="number"
+													step="0.01"
+													min="0"
+													max="1"
+													name="min_confidence"
+													id="min_confidence"
+													value={ fmt.Sprintf("%.2f", app.Complexity.MinConfidence) }
+													class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono"
+												/>
+											</div>
+										</div>
+
+										<!-- Custom Tier Criteria -->
+										<div class="bg-slate-50 p-3 rounded-md border border-slate-200 space-y-2">
+											<div class="text-xs font-bold text-slate-800">Custom Tier Keyword Criteria (Comma-Separated)</div>
+											<div class="grid grid-cols-3 gap-3">
+												<div>
+													<label for="simple_criteria" class="block text-[11px] font-medium text-slate-600">Simple Criteria</label>
+													<input type="text" name="simple_criteria" id="simple_criteria" value={ app.Complexity.SimpleCriteria } placeholder="faq, greeting, lookup" class="mt-1 block w-full rounded border-slate-300 bg-white p-1.5 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300" />
+												</div>
+												<div>
+													<label for="medium_criteria" class="block text-[11px] font-medium text-slate-600">Medium Criteria</label>
+													<input type="text" name="medium_criteria" id="medium_criteria" value={ app.Complexity.MediumCriteria } placeholder="summarize, draft, explain" class="mt-1 block w-full rounded border-slate-300 bg-white p-1.5 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300" />
+												</div>
+												<div>
+													<label for="complex_criteria" class="block text-[11px] font-medium text-slate-600">Complex Criteria</label>
+													<input type="text" name="complex_criteria" id="complex_criteria" value={ app.Complexity.ComplexCriteria } placeholder="distributed, theorem, formal" class="mt-1 block w-full rounded border-slate-300 bg-white p-1.5 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300" />
+												</div>
+											</div>
+										</div>
+
+										<!-- Agent Task Mappings (Stage 2) -->
+										<div class="bg-slate-50 p-3 rounded-md border border-slate-200 space-y-2">
+											<div class="text-xs font-bold text-slate-800">Agent Task-to-Model Overrides (X-Agent-Task)</div>
+											<div class="grid grid-cols-3 gap-3">
+												<div>
+													<label for="task_code" class="block text-[11px] font-medium text-slate-600">Task: code</label>
+													<input type="text" name="task_code" id="task_code" value={ app.Complexity.TaskMapping["code"] } placeholder="gemini-3.1-pro" class="mt-1 block w-full rounded border-slate-300 bg-white p-1.5 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300" />
+												</div>
+												<div>
+													<label for="task_triage" class="block text-[11px] font-medium text-slate-600">Task: triage</label>
+													<input type="text" name="task_triage" id="task_triage" value={ app.Complexity.TaskMapping["triage"] } placeholder="gemini-3.5-flash-lite" class="mt-1 block w-full rounded border-slate-300 bg-white p-1.5 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300" />
+												</div>
+												<div>
+													<label for="task_summarization" class="block text-[11px] font-medium text-slate-600">Task: summarization</label>
+													<input type="text" name="task_summarization" id="task_summarization" value={ app.Complexity.TaskMapping["summarization"] } placeholder="gemini-3.8-flash" class="mt-1 block w-full rounded border-slate-300 bg-white p-1.5 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300" />
+												</div>
+											</div>
+										</div>
+
 										<!-- LLM Toggle -->
 										<div class="flex items-center justify-between bg-blue-50/50 p-3 rounded-md border border-blue-100">
 											<div class="flex flex-col">
@@ -255,7 +693,7 @@ templ ComplexityModal(app config.App, activeModels []config.ModelConfig) {
 												name="use_llm_classifier"
 												id="use_llm_classifier"
 												value="true"
-												class="h-4.5 w-4.5 rounded border-blue-300 text-blue-600 focus:ring-blue-500"
+												class="h-4 w-4 rounded border-blue-300 text-blue-600 focus:ring-blue-500"
 												if app.Complexity.UseLLMClassifier { checked }
 											/>
 										</div>
@@ -266,7 +704,7 @@ templ ComplexityModal(app config.App, activeModels []config.ModelConfig) {
 												<select name="classifier_model" id="classifier_model" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono">
 													for _, m := range activeModels {
 														if m.Type == "foundation" && !strings.Contains(m.ID, "embedding") {
-															<option value={ m.ID } if app.Complexity.ClassifierModel == m.ID || (app.Complexity.ClassifierModel == "" && m.ID == "gemini-3.1-flash-lite") { selected }>{ m.DisplayName }</option>
+															<option value={ m.ID } if app.Complexity.ClassifierModel == m.ID || (app.Complexity.ClassifierModel == "" && m.ID == "gemini-3.5-flash-lite") { selected }>{ m.DisplayName }</option>
 														}
 													}
 												</select>
@@ -274,7 +712,7 @@ templ ComplexityModal(app config.App, activeModels []config.ModelConfig) {
 											
 											<!-- Heuristic Fast-Bypasses -->
 											<div class="bg-gray-50 p-3 rounded-md border border-gray-200 space-y-2 text-xs">
-												<div class="font-bold text-gray-750 mb-1">Fast-Bypasses (Force Complex)</div>
+												<div class="font-bold text-slate-700 mb-1">Fast-Bypasses (Force Complex)</div>
 												<div class="flex items-center justify-between">
 													<label for="force_complex_multimodal" class="text-gray-700">Multimodal Payloads</label>
 													<input
@@ -286,7 +724,7 @@ templ ComplexityModal(app config.App, activeModels []config.ModelConfig) {
 														if app.Complexity.ForceComplexMultimodal { checked }
 													/>
 												</div>
-												<div class="flex items-center justify-between border-t border-gray-150 pt-1">
+												<div class="flex items-center justify-between border-t border-slate-200 pt-1">
 													<label for="force_complex_tools" class="text-gray-700">Tools / Function Calls</label>
 													<input
 														type="checkbox"
@@ -341,25 +779,107 @@ templ ComplexityModal(app config.App, activeModels []config.ModelConfig) {
 									</div>
 								</div>
 
-								<!-- Action Buttons -->
-								<div class="mt-6 sm:mt-4 sm:flex sm:flex-row-reverse gap-3 border-t border-gray-200 pt-4">
-									<button type="submit" class="inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:w-auto transition">
-										Save Settings
-									</button>
-									<button
-										type="button"
-										onclick="document.getElementById('edit-complexity-modal').remove()"
-										class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto transition"
-									>
-										Cancel
-									</button>
-								</div>
-							</form>
-						</div>
-					</div>
+				<!-- Action Buttons -->
+				<div class="mt-6 sm:mt-4 sm:flex sm:flex-row-reverse gap-3 border-t border-gray-200 pt-4">
+					<button type="submit" class="inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:w-auto transition">
+						Save Settings
+					</button>
+					<button
+						type="button"
+						onclick="document.querySelectorAll('[data-edit-row]').forEach(r => r.classList.remove('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30')); document.getElementById('edit-complexity-modal').remove()"
+						class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto transition"
+					>
+						Cancel
+					</button>
 				</div>
-				
-			</div>
+			</form>
 		</div>
 	</div>
 }
+
+templ ComplexityInspectResult(res decision.DecisionResult) {
+	<div class="mt-4 p-4 rounded-lg border border-gray-200 bg-gray-50/70 space-y-4">
+		<!-- Summary Header Badges -->
+		<div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 pb-3">
+			<div class="flex items-center gap-2">
+				<span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Target Model:</span>
+				<span class="inline-flex items-center rounded-md bg-purple-50 px-2.5 py-1 text-xs font-bold text-purple-700 ring-1 ring-inset ring-purple-700/20 font-mono">
+					{ res.TargetModel }
+				</span>
+			</div>
+			<div class="flex items-center gap-2">
+				if res.Tier == "simple" {
+					<span class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20">Tier: Simple</span>
+				} else if res.Tier == "medium" {
+					<span class="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-600/20">Tier: Medium</span>
+				} else {
+					<span class="inline-flex items-center rounded-full bg-purple-50 px-2.5 py-0.5 text-xs font-semibold text-purple-700 ring-1 ring-inset ring-purple-600/20">Tier: Complex</span>
+				}
+				<span class="text-xs font-mono text-slate-600">
+					Engine: { res.Engine }
+				</span>
+				<span class="text-xs font-mono text-slate-600">
+					Conf: { fmt.Sprintf("%.1f%%", res.Confidence * 100) }
+				</span>
+			</div>
+		</div>
+
+		<!-- Explainable Rationale -->
+		<div>
+			<h4 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-1">Decision Rationale</h4>
+			<p class="text-xs text-gray-700 bg-white p-3 rounded border border-gray-200 leading-relaxed font-sans">
+				{ res.Rationale }
+			</p>
+		</div>
+
+		<!-- Extracted Prompt Features Grid -->
+		<div>
+			<h4 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-2">Extracted Feature Signals</h4>
+			<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+				<div class="bg-white p-2.5 rounded border border-gray-200">
+					<span class="text-gray-400 block text-[10px] uppercase">Length / Words</span>
+					<span class="font-semibold text-gray-800">{ fmt.Sprintf("%d chars / %d words", res.Features.Length, res.Features.WordCount) }</span>
+				</div>
+				<div class="bg-white p-2.5 rounded border border-gray-200">
+					<span class="text-gray-400 block text-[10px] uppercase">Code Syntax</span>
+					if res.Features.HasCode {
+						<span class="font-semibold text-emerald-600">{ fmt.Sprintf("Yes (%d lines, %.0f%%)", res.Features.CodeLines, res.Features.CodeRatio*100) }</span>
+					} else {
+						<span class="font-semibold text-gray-500">None detected</span>
+					}
+				</div>
+				<div class="bg-white p-2.5 rounded border border-gray-200">
+					<span class="text-gray-400 block text-[10px] uppercase">Math / Algorithm</span>
+					if res.Features.HasMath {
+						<span class="font-semibold text-purple-600">Yes (Formulas/O-notation)</span>
+					} else {
+						<span class="font-semibold text-gray-500">None detected</span>
+					}
+				</div>
+				<div class="bg-white p-2.5 rounded border border-gray-200">
+					<span class="text-gray-400 block text-[10px] uppercase">Task Context</span>
+					if res.Features.ExtractedTask != "" {
+						<span class="font-semibold text-blue-600 font-mono">{ res.Features.ExtractedTask }</span>
+					} else {
+						<span class="font-semibold text-gray-500">General</span>
+					}
+				</div>
+			</div>
+		</div>
+
+		<!-- Scores Breakdown (if present) -->
+		if len(res.Scores) > 0 {
+			<div>
+				<h4 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-1">Tier Scores</h4>
+				<div class="flex flex-wrap gap-2">
+					for tier, score := range res.Scores {
+						<span class="inline-flex items-center gap-1 bg-white px-2.5 py-1 rounded border border-gray-200 text-xs font-mono text-gray-700">
+							<span class="font-semibold">{ tier }:</span> { fmt.Sprintf("%.3f", score) }
+						</span>
+					}
+				</div>
+			</div>
+		}
+	</div>
+}
+

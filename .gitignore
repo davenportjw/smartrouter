@@ -24,8 +24,8 @@ dist/
 scratch/
 
 # Local Database
-data/local_db.json
-data/local_logs.jsonl
+data/
+**/data/
 
 # OS Metadata
 .DS_Store

@@ -13,10 +13,6 @@ templ MetricsTab(vm MetricsViewModel) {
 				</p>
 			</div>
 			<div class="flex items-center gap-2 self-start md:self-center">
-				<span class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
-					<span class="h-1.5 w-1.5 mr-1.5 rounded-full bg-green-500 animate-pulse"></span>
-					Live Connection
-				</span>
 				<button onclick="window.location.reload()" class="rounded-md bg-white px-3 py-1.5 text-xs font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition">
 					Refresh
 				</button>
@@ -26,7 +22,7 @@ templ MetricsTab(vm MetricsViewModel) {
 		<!-- KPI Grid -->
 		<div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
 			<!-- Total Requests -->
-			<div class="relative overflow-hidden rounded-2xl bg-white px-6 pb-6 pt-5 border border-gray-200/80 shadow-sm hover:shadow-md transition-shadow duration-200">
+			<div class="relative overflow-hidden rounded-lg bg-white px-6 pb-6 pt-5 border border-gray-200/80 shadow-sm hover:shadow-md transition-shadow duration-200">
 				<dt>
 					<div class="absolute rounded-lg bg-blue-50 p-2 text-blue-600">
 						<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -42,7 +38,7 @@ templ MetricsTab(vm MetricsViewModel) {
 			</div>
 
 			<!-- Peak Rate -->
-			<div class="relative overflow-hidden rounded-2xl bg-white px-6 pb-6 pt-5 border border-gray-200/80 shadow-sm hover:shadow-md transition-shadow duration-200">
+			<div class="relative overflow-hidden rounded-lg bg-white px-6 pb-6 pt-5 border border-gray-200/80 shadow-sm hover:shadow-md transition-shadow duration-200">
 				<dt>
 					<div class="absolute rounded-lg bg-indigo-50 p-2 text-indigo-600">
 						<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -59,7 +55,7 @@ templ MetricsTab(vm MetricsViewModel) {
 			</div>
 
 			<!-- P95 Latency -->
-			<div class="relative overflow-hidden rounded-2xl bg-white px-6 pb-6 pt-5 border border-gray-200/80 shadow-sm hover:shadow-md transition-shadow duration-200">
+			<div class="relative overflow-hidden rounded-lg bg-white px-6 pb-6 pt-5 border border-gray-200/80 shadow-sm hover:shadow-md transition-shadow duration-200">
 				<dt>
 					<div class="absolute rounded-lg bg-orange-50 p-2 text-orange-600">
 						<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -75,7 +71,7 @@ templ MetricsTab(vm MetricsViewModel) {
 			</div>
 
 			<!-- Error Rate -->
-			<div class="relative overflow-hidden rounded-2xl bg-white px-6 pb-6 pt-5 border border-gray-200/80 shadow-sm hover:shadow-md transition-shadow duration-200">
+			<div class="relative overflow-hidden rounded-lg bg-white px-6 pb-6 pt-5 border border-gray-200/80 shadow-sm hover:shadow-md transition-shadow duration-200">
 				<dt>
 					<div class="absolute rounded-lg bg-rose-50 p-2 text-rose-600">
 						<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -93,15 +89,12 @@ templ MetricsTab(vm MetricsViewModel) {
 		<!-- Charts Layout -->
 		<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
 			<!-- Volume Bar Chart -->
-			<div class="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm">
+			<div class="rounded-lg border border-gray-200/80 bg-white p-6 shadow-sm">
 				<div class="flex items-center justify-between border-b border-gray-100 pb-4 mb-6">
 					<div>
 						<h3 class="text-base font-semibold text-gray-900">Proxy Throughput Volume</h3>
 						<p class="text-xs text-gray-500 mt-0.5">Hourly request counts over the last 24 hours</p>
 					</div>
-					<span class="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
-						Bar Chart
-					</span>
 				</div>
 				<div class="aspect-[16/7] w-full">
 					@templ.Raw(vm.VolumeChartSVG)
@@ -109,7 +102,7 @@ templ MetricsTab(vm MetricsViewModel) {
 			</div>
 
 			<!-- Latency Line Chart -->
-			<div class="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm">
+			<div class="rounded-lg border border-gray-200/80 bg-white p-6 shadow-sm">
 				<div class="flex items-center justify-between border-b border-gray-100 pb-4 mb-6">
 					<div>
 						<h3 class="text-base font-semibold text-gray-900">Response Latency Percentiles</h3>

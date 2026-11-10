@@ -74,6 +74,10 @@ func (rl *RateLimiterRegistry) UpdateLimiter(clientID string, rpm, tpm int, prio
 
 // AdjustLimiter dynamically corrects the token count balance.
 func (rl *RateLimiterRegistry) AdjustLimiter(clientID string, tokenCorrection int) {
+	if tokenCorrection == 0 {
+		return
+	}
+
 	rl.mu.RLock()
 	limiter, exists := rl.limiters[clientID]
 	rl.mu.RUnlock()
@@ -82,8 +86,36 @@ func (rl *RateLimiterRegistry) AdjustLimiter(clientID string, tokenCorrection in
 		return
 	}
 
-	// Consume or refund tokens based on correction count
-	_ = limiter.tpmLimiter.AllowN(time.Now(), tokenCorrection)
+	now := time.Now()
+	if tokenCorrection < 0 {
+		// Refund tokens without exceeding the configured burst capacity
+		current := limiter.tpmLimiter.TokensAt(now)
+		headroom := int(float64(limiter.tpm) - current)
+		if headroom <= 0 {
+			return
+		}
+		refund := -tokenCorrection
+		if refund > headroom {
+			refund = headroom
+		}
+		_ = limiter.tpmLimiter.AllowN(now, -refund)
+		return
+	}
+
+	// Positive correction: deduct extra tokens in chunks of at most burst (limiter.tpm)
+	remaining := tokenCorrection
+	burst := limiter.tpm
+	if burst <= 0 {
+		burst = 1
+	}
+	for remaining > 0 {
+		chunk := remaining
+		if chunk > burst {
+			chunk = burst
+		}
+		_ = limiter.tpmLimiter.ReserveN(now, chunk)
+		remaining -= chunk
+	}
 }
 
 // RemoveLimiter removes a client rate limiter on deletion.
@@ -93,7 +125,7 @@ func (rl *RateLimiterRegistry) RemoveLimiter(clientID string) {
 	delete(rl.limiters, clientID)
 }
 
-// EvaluateLimit checks rate limits and applies priority-based delaying for lower priority requests under load.
+// EvaluateLimit checks rate limits and applies priority-based delaying for higher priority requests under load.
 func (rl *RateLimiterRegistry) EvaluateLimit(ctx context.Context, clientID string, tokensRequested int) (bool, time.Duration) {
 	rl.mu.RLock()
 	limiter, exists := rl.limiters[clientID]
@@ -104,77 +136,63 @@ func (rl *RateLimiterRegistry) EvaluateLimit(ctx context.Context, clientID strin
 		return true, 0
 	}
 
-	// Check RPM (1 request token)
-	rpmAllowed := limiter.rpmLimiter.Allow()
-	
-	// Check TPM (tokensRequested tokens)
-	tpmAllowed := true
-	if !limiter.optOutTPM && limiter.tpmLimiter != nil {
-		tpmAllowed = limiter.tpmLimiter.AllowN(time.Now(), tokensRequested)
+	now := time.Now()
+	resRPM := limiter.rpmLimiter.ReserveN(now, 1)
+	if !resRPM.OK() {
+		return false, 0
 	}
 
-	if rpmAllowed && tpmAllowed {
+	var resTPM *rate.Reservation
+	if !limiter.optOutTPM && limiter.tpmLimiter != nil {
+		if tokensRequested <= 0 {
+			tokensRequested = 1
+		}
+		resTPM = limiter.tpmLimiter.ReserveN(now, tokensRequested)
+		if !resTPM.OK() {
+			resRPM.CancelAt(now)
+			return false, 0
+		}
+	}
+
+	maxDelay := resRPM.DelayFrom(now)
+	if resTPM != nil {
+		if delayTPM := resTPM.DelayFrom(now); delayTPM > maxDelay {
+			maxDelay = delayTPM
+		}
+	}
+
+	if maxDelay <= 0 {
 		return true, 0
 	}
 
-	// Priority-based buffering: if rate limits are exceeded, instead of immediate rejection,
-	// we can delay/queue the request if it has higher priority, or reject immediately if low priority.
-	if limiter.priority == "high" {
-		// High-priority requests can wait/queue up to 5 seconds to get a token instead of failing immediately
-		reservationRPM := limiter.rpmLimiter.Reserve()
-		delayRPM := reservationRPM.Delay()
-
-		var reservationTPM *rate.Reservation
-		delayTPM := time.Duration(0)
-		if !limiter.optOutTPM && limiter.tpmLimiter != nil {
-			reservationTPM = limiter.tpmLimiter.ReserveN(time.Now(), tokensRequested)
-			delayTPM = reservationTPM.Delay()
-		}
-
-		maxDelay := delayRPM
-		if delayTPM > maxDelay {
-			maxDelay = delayTPM
-		}
-
-		if maxDelay > 0 && maxDelay < 5*time.Second {
-			// Allow the request but tell the proxy to sleep for the delay duration before executing
-			return true, maxDelay
-		}
-
-		// Cancel reservations if delay is too long to avoid starvation
-		reservationRPM.Cancel()
-		if reservationTPM != nil {
-			reservationTPM.Cancel()
-		}
+	var threshold time.Duration
+	switch limiter.priority {
+	case "high":
+		threshold = 5 * time.Second
+	case "medium":
+		threshold = 2 * time.Second
+	default:
+		threshold = 0
 	}
 
-	// Medium-priority requests can wait up to 2 seconds
-	if limiter.priority == "medium" {
-		reservationRPM := limiter.rpmLimiter.Reserve()
-		delayRPM := reservationRPM.Delay()
-
-		var reservationTPM *rate.Reservation
-		delayTPM := time.Duration(0)
-		if !limiter.optOutTPM && limiter.tpmLimiter != nil {
-			reservationTPM = limiter.tpmLimiter.ReserveN(time.Now(), tokensRequested)
-			delayTPM = reservationTPM.Delay()
+	if threshold <= 0 || maxDelay >= threshold {
+		resRPM.CancelAt(now)
+		if resTPM != nil {
+			resTPM.CancelAt(now)
 		}
-
-		maxDelay := delayRPM
-		if delayTPM > maxDelay {
-			maxDelay = delayTPM
-		}
-
-		if maxDelay > 0 && maxDelay < 2*time.Second {
-			return true, maxDelay
-		}
-
-		reservationRPM.Cancel()
-		if reservationTPM != nil {
-			reservationTPM.Cancel()
-		}
+		return false, 0
 	}
 
-	// Low-priority requests are rejected immediately on rate limit breach (no queueing)
-	return false, 0
+	select {
+	case <-ctx.Done():
+		cancelNow := time.Now()
+		resRPM.CancelAt(cancelNow)
+		if resTPM != nil {
+			resTPM.CancelAt(cancelNow)
+		}
+		return false, 0
+	case <-time.After(maxDelay):
+		return true, maxDelay
+	}
 }
+

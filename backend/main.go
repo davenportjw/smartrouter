@@ -14,6 +14,7 @@ import (
 	"geminirouter/backend/api"
 	store "geminirouter/backend/config"
 	"geminirouter/backend/proxy"
+	"geminirouter/pkg/decision"
 )
 
 // getGCPRegion queries the local GCP metadata server to fetch the current Cloud Run/GCE region.
@@ -45,6 +46,10 @@ func getGCPRegion() string {
 }
 
 func main() {
+	if os.Getenv("K_SERVICE") == "" {
+		_ = decision.LoadDotEnv()
+	}
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -89,12 +94,28 @@ func main() {
 
 	// Initialize Backend REST API Controller
 	apiController := api.NewAPIController(configStore, geminiProxy.Scheduler, geminiProxy.Queue, sharedSecret)
+	apiController.Sessions = geminiProxy.Sessions
+	apiController.JevEngine = geminiProxy.JevEngine
+	apiController.FastinoEngine = geminiProxy.FastinoEngine
+	apiController.CLMEngine = geminiProxy.CLMEngine
 
 	mux := http.NewServeMux()
 
-	// Gemini API Endpoints (routed through the proxy)
+	// Gemini & OpenAI Spec Compatible API Endpoints (routed through the proxy)
 	mux.Handle("/v1beta/models/", geminiProxy)
+	mux.Handle("/v1beta/models", geminiProxy)
 	mux.Handle("/v1/models/", geminiProxy)
+	mux.Handle("/v1/models", geminiProxy)
+	mux.Handle("/v1/chat/completions", geminiProxy)
+	mux.Handle("/v1/chat/completions/", geminiProxy)
+	mux.Handle("/v1beta/openai/chat/completions", geminiProxy)
+	mux.Handle("/v1beta/openai/chat/completions/", geminiProxy)
+	mux.Handle("/v1beta/openai/models", geminiProxy)
+	mux.Handle("/v1beta/openai/models/", geminiProxy)
+	mux.Handle("/v1/openai/chat/completions", geminiProxy)
+	mux.Handle("/v1/openai/models", geminiProxy)
+	mux.Handle("/v1/openai/models/", geminiProxy)
+	mux.Handle("/chat/completions", geminiProxy)
 	mux.Handle("/v1beta/reasoningEngines/", geminiProxy)
 	mux.Handle("/v1beta1/reasoningEngines/", geminiProxy)
 	mux.Handle("/v1/reasoningEngines/", geminiProxy)
@@ -107,7 +128,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              ":" + port,
-		Handler:           injectSimulationContext(mux),
+		Handler:           mux,
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
@@ -126,6 +147,9 @@ func main() {
 	<-stop
 
 	log.Println("Shutting down backend server gracefully...")
+	if geminiProxy.Queue != nil {
+		geminiProxy.Queue.Close()
+	}
 
 	// Allow up to 30 seconds for active in-flight requests to complete
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -136,16 +160,4 @@ func main() {
 	}
 
 	log.Println("Backend server exiting cleanly.")
-}
-
-// injectSimulationContext extracts the simulate_metrics cookie and injects its value into the request context.
-func injectSimulationContext(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		simulate := false
-		if cookie, err := r.Cookie("simulate_metrics"); err == nil && cookie.Value == "true" {
-			simulate = true
-		}
-		ctx := context.WithValue(r.Context(), "simulate_metrics", simulate)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
 }

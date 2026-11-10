@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"geminirouter/pkg/config"
@@ -65,7 +64,7 @@ func TestIsValidModelName(t *testing.T) {
 
 func TestFirstStartModelSeedingEmpty(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
-	defer os.RemoveAll("data/local_db.json")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 
 	ctx := context.Background()
 	store, err := NewConfigStore(ctx, "test-project")
@@ -85,7 +84,7 @@ func TestFirstStartModelSeedingEmpty(t *testing.T) {
 
 func TestConfigStoreClientsCRUD(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
-	defer os.RemoveAll("data/local_db.json")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 
 	ctx := context.Background()
 	store, err := NewConfigStore(ctx, "test-project")
@@ -170,4 +169,119 @@ func TestNewConfigStoreFirestore(t *testing.T) {
 		t.Errorf("expected firestore client to be instantiated")
 	}
 }
+
+func TestMatchRuleCaseInsensitiveHeaderAndModelPatternRegex(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
+
+	ctx := context.Background()
+	store, err := NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to initialize config store: %v", err)
+	}
+
+	// Rule 1: lowercase header name and slash-delimited regex ModelPattern
+	ruleRegex := config.RoutingRule{
+		ID:             "rule-regex",
+		ModelPattern:   `/^gemini-3\.[0-9]+-pro$/`,
+		ClientTier:     "all",
+		HeaderName:     "x-custom-env",
+		HeaderValue:    "staging",
+		TargetModel:    "gemini-3.8-flash",
+		PriorityWeight: 100,
+	}
+	// Rule 2: glob ModelPattern
+	ruleGlob := config.RoutingRule{
+		ID:             "rule-glob",
+		ModelPattern:   "gemini-2.5-*",
+		ClientTier:     "all",
+		HeaderName:     "X-ROUTING-TAG",
+		HeaderValue:    "/^canary-[0-9]+$/",
+		TargetModel:    "gemini-3.5-flash-lite",
+		PriorityWeight: 90,
+	}
+
+	if err := store.SaveRule(ctx, ruleRegex); err != nil {
+		t.Fatalf("failed to save regex rule: %v", err)
+	}
+	if err := store.SaveRule(ctx, ruleGlob); err != nil {
+		t.Fatalf("failed to save glob rule: %v", err)
+	}
+
+	// Match Rule 1 with canonicalized header "X-Custom-Env" and model "gemini-3.1-pro"
+	matched, ok := store.MatchRule("gemini-3.1-pro", "standard", "app-1", map[string]string{
+		"X-Custom-Env": "staging",
+	})
+	if !ok || matched.ID != "rule-regex" {
+		t.Fatalf("expected rule-regex to match case-insensitive header X-Custom-Env and regex ModelPattern, got ok=%v rule=%+v", ok, matched)
+	}
+
+	// Match Rule 2 with mixed-case header "X-Routing-Tag" and glob model "gemini-2.5-flash-lite"
+	matched, ok = store.MatchRule("gemini-2.5-flash-lite", "standard", "app-1", map[string]string{
+		"X-Routing-Tag": "canary-42",
+	})
+	if !ok || matched.ID != "rule-glob" {
+		t.Fatalf("expected rule-glob to match case-insensitive header X-Routing-Tag and glob ModelPattern, got ok=%v rule=%+v", ok, matched)
+	}
+}
+
+func TestConfigStoreRunnerPersistence(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+	dataDir := t.TempDir()
+	t.Setenv("LOCAL_DATA_DIR", dataDir)
+
+	ctx := context.Background()
+	store, err := NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to initialize config store: %v", err)
+	}
+
+	runner := config.RunnerResponse{
+		Node: config.Node{
+			ID:              "node-persist-1",
+			Name:            "Apple Silicon Runner 1",
+			Status:          "online",
+			SupportedModels: []string{"gemma-4-4b"},
+		},
+		AssignedClusters: []string{},
+	}
+
+	if err := store.SaveRegisteredRunner(ctx, runner); err != nil {
+		t.Fatalf("SaveRegisteredRunner failed: %v", err)
+	}
+
+	if err := store.AttachRunnerToClusters(ctx, "node-persist-1", []string{"cluster-a", "cluster-b"}); err != nil {
+		t.Fatalf("AttachRunnerToClusters failed: %v", err)
+	}
+
+	// Re-instantiate store from same dataDir to verify persistence on disk
+	storeReloaded, err := NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to reload config store: %v", err)
+	}
+
+	runners, err := storeReloaded.GetRegisteredRunners(ctx)
+	if err != nil {
+		t.Fatalf("GetRegisteredRunners failed: %v", err)
+	}
+	if len(runners) != 1 {
+		t.Fatalf("expected 1 persisted runner, got %d", len(runners))
+	}
+	if runners[0].Node.ID != "node-persist-1" || len(runners[0].AssignedClusters) != 2 {
+		t.Errorf("unexpected persisted runner state: %+v", runners[0])
+	}
+
+	// Deregister and verify removal
+	if err := storeReloaded.DeregisterRunner(ctx, "node-persist-1"); err != nil {
+		t.Fatalf("DeregisterRunner failed: %v", err)
+	}
+	runnersAfter, err := storeReloaded.GetRegisteredRunners(ctx)
+	if err != nil {
+		t.Fatalf("GetRegisteredRunners after deregister failed: %v", err)
+	}
+	if len(runnersAfter) != 0 {
+		t.Errorf("expected 0 runners after deregister, got %d", len(runnersAfter))
+	}
+}
+
 

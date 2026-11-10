@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """
-Gemini Smart Router - Dynamic Complexity Routing Example
+Gemini Smart Router - Dynamic Complexity & Adaptive Smart Routing Example
 
-This script demonstrates how to use the Virtual Model 'gemini-dynamic' to 
-automatically classify prompt complexity and route requests to the most 
-cost-effective model (gemini-2.5-flash-lite, gemini-2.5-flash, or gemini-2.5-pro).
+Demonstrates:
+1. Fast Decision Models (Jev Structured Rules & CLM Contrastive Language Model) via 'gemini-dynamic'
+2. Per-Prompt Routing Overrides (X-Router-Model, X-Router-Complexity, X-Router-Engine)
+3. Sticky Multi-Turn Session Continuation (X-Session-ID, X-Session-Policy: lock)
+4. Autonomous Agent Task Switching (X-Agent-Task: debugging, code_generation, triage)
 """
 
 import os
@@ -14,23 +16,21 @@ import httpx
 
 # Configuration
 ROUTER_URL = os.getenv("ROUTER_URL", "http://localhost:8080").rstrip("/")
-# In local development (LOCAL_DEV=true), the server uses local db credentials.
-# The pre-seeded key hash is for 'gr_key_enterprise_123456789' or similar.
 API_KEY = os.getenv("ROUTER_API_KEY", "gr_key_enterprise_123456789")
 
-def send_dynamic_request(prompt: str, description: str):
-    print("-" * 70)
-    print(f"Prompt Type: {description}")
-    print(f"Prompt: \"{prompt[:60]}...\" (Length: {len(prompt)} chars)")
+def send_router_request(prompt: str, description: str, custom_headers: dict = None, model: str = "gemini-dynamic"):
+    print("-" * 75)
+    print(f"Scenario: {description}")
+    print(f"Prompt  : \"{prompt[:60]}...\" (Length: {len(prompt)} chars)")
 
-    url = f"{ROUTER_URL}/v1/models/gemini-dynamic:generateContent"
+    url = f"{ROUTER_URL}/v1/models/{model}:generateContent"
     headers = {
         "Content-Type": "application/json",
-        "x-goog-api-key": API_KEY
+        "x-goog-api-key": API_KEY,
+        "X-Client-App-ID": "prod-app-main",
     }
-
-    # Set default client app ID for declarative custom headers in local db
-    headers["X-Client-App-ID"] = "prod-app-main"
+    if custom_headers:
+        headers.update(custom_headers)
 
     data = {
         "contents": [
@@ -46,10 +46,9 @@ def send_dynamic_request(prompt: str, description: str):
     try:
         with httpx.Client() as client:
             response = client.post(url, json=data, headers=headers, timeout=45.0)
-            
+
             if response.status_code == 400 and "dynamic complexity routing is not enabled" in response.text:
                 print("❌ Error: Dynamic complexity routing is not enabled for this application.")
-                print("Please enable complexity routing in the admin panel or update local_db.json.")
                 return
 
             if response.status_code != 200:
@@ -57,15 +56,18 @@ def send_dynamic_request(prompt: str, description: str):
                 return
 
             res_json = response.json()
-            
-            # Extract response metadata injected by the router
-            requested_model = response.headers.get("X-Requested-Model", "gemini-dynamic")
-            routed_model = response.headers.get("X-Routed-Model", "Unknown")
-            routed_loc = response.headers.get("X-Routed-Model-Location", "global")
-            client_tier = response.headers.get("X-Client-Tier", "Unknown")
-            app_id = response.headers.get("X-App-ID", "Unknown")
 
-            # Get output text
+            # Extract response metadata injected by the router
+            requested_model = response.headers.get("X-Requested-Model", model)
+            routed_model = response.headers.get("X-Routed-Model", "Unknown")
+            engine_used = response.headers.get("X-Router-Engine-Used", "heuristics")
+            tier = response.headers.get("X-Router-Complexity-Tier", "standard")
+            session_id = response.headers.get("X-Session-ID", "none")
+            turn = response.headers.get("X-Session-Turn", "0")
+            agent_task = response.headers.get("X-Agent-Task", "none")
+            routed_loc = response.headers.get("X-Routed-Model-Location", "global")
+
+            # Extract output text snippet
             try:
                 text = res_json["candidates"][0]["content"]["parts"][0]["text"]
             except (KeyError, IndexError):
@@ -74,39 +76,72 @@ def send_dynamic_request(prompt: str, description: str):
             print(f"✅ Success!")
             print(f"👉 Requested Model : {requested_model}")
             print(f"👉 Routed Model    : \033[1;32m{routed_model}\033[0m")
-            print(f"👉 Routed Location : \033[1;34m{routed_loc}\033[0m")
-            print(f"👉 Client Tier      : {client_tier}")
-            print(f"👉 App ID          : {app_id}")
-            print(f"👉 Response Snippet: \"{text.strip()[:100].replace(chr(10), ' ')}...\"")
+            print(f"👉 Engine Used     : \033[1;35m{engine_used}\033[0m (Tier: {tier})")
+            if session_id != "none":
+                print(f"👉 Session Lock    : \033[1;36m{session_id}\033[0m (Turn: {turn})")
+            if agent_task != "none":
+                print(f"👉 Agent Task      : \033[1;33m{agent_task}\033[0m")
+            print(f"👉 Routed Location : {routed_loc}")
+            print(f"👉 Output Snippet  : \"{text.strip()[:90].replace(chr(10), ' ')}...\"")
 
     except httpx.RequestError as exc:
         print(f"❌ Request failed: {exc}")
 
 def main():
-    print("======================================================================")
+    print("==========================================================================")
     print("     G E M I N I   S M A R T   R O U T E R   -   D Y N A M I C   R O U T I N G")
-    print("======================================================================")
+    print("==========================================================================")
     print(f"Targeting Router URL: {ROUTER_URL}")
     print(f"Using API Key       : {API_KEY[:10]}...")
-    
-    # 1. Simple greeting - should route to gemini-2.5-flash-lite
-    simple_prompt = "Hello! Quick question: what is the chemical symbol for gold?"
-    send_dynamic_request(simple_prompt, "Simple / Factual lookup")
 
-    # 2. Medium task - should route to gemini-2.5-flash
-    medium_prompt = (
-        "Please summarize the core benefits of microservices architectures compared "
-        "to monolithic codebases. Write a summary of about 40 to 50 words."
+    # 1. Fast Jev Decision Model Classification
+    send_router_request(
+        "Hi, what is the capital of Japan?",
+        "1. Jev Model -> Simple Query (Target: gemini-3.8-flash-lite)",
+        custom_headers={"X-Router-Engine": "jev"}
     )
-    send_dynamic_request(medium_prompt, "Medium / Summarization task")
 
-    complex_prompt = (
-        "Solve this algorithmic problem and optimize it for O(N) time complexity. "
-        "Return only a 1-sentence explanation and complete clean Go code. "
-        "Problem: Given an array of integers, find the contiguous subarray which has "
-        "the largest sum and return its sum."
+    # 2. Fast CLM Contrastive Model Classification
+    send_router_request(
+        "Compare the memory layout and allocation strategies of slice vs array in Go.",
+        "2. CLM Contrastive Model -> Medium Reasoning (Target: gemini-3.8-flash)",
+        custom_headers={"X-Router-Engine": "clm"}
     )
-    send_dynamic_request(complex_prompt, "Complex / Algorithmic reasoning task")
+
+    # 3. Per-Prompt Override (Immediate model pinning)
+    send_router_request(
+        "Calculate 1+1",
+        "3. Per-Prompt Override -> Force gemini-3.8-pro via X-Router-Model",
+        custom_headers={"X-Router-Model": "gemini-3.8-pro"}
+    )
+
+    # 4. Multi-Turn Session Continuation (Sticky Session Lock)
+    session_id = "session-agent-interactive-001"
+    send_router_request(
+        "```go\nfunc DeepAlgorithm(matrix [][]int) int { return 42 }\n```\nAnalyze performance.",
+        "4a. Session Turn 1 -> Classifies as complex and locks model to session",
+        custom_headers={
+            "X-Session-ID": session_id,
+            "X-Session-Policy": "lock"
+        }
+    )
+    send_router_request(
+        "Thanks! Can you add unit tests for that?",
+        "4b. Session Turn 2 -> Short prompt inherits locked gemini-3.8-pro model",
+        custom_headers={
+            "X-Session-ID": session_id,
+            "X-Session-Policy": "lock"
+        }
+    )
+
+    # 5. Autonomous Agent Task Switching
+    send_router_request(
+        "Inspect this stack trace and identify why the goroutine leaked.",
+        "5. Agent Task Switching -> X-Agent-Task: debugging routes to complex tier",
+        custom_headers={
+            "X-Agent-Task": "debugging"
+        }
+    )
 
 if __name__ == "__main__":
     main()

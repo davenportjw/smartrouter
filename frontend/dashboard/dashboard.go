@@ -11,33 +11,40 @@ import (
 	"io"
 	"log"
 	"math"
-	mathrand "math/rand"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"geminirouter/frontend/dashboard/templates"
 	"geminirouter/pkg/config"
+	"geminirouter/pkg/decision"
 
 	"github.com/yuin/goldmark"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
 
+// ModelRefreshStatus aliases templates.ModelRefreshStatus for dashboard callers and tests.
+type ModelRefreshStatus = templates.ModelRefreshStatus
+
 // DashboardController handles the administration dashboard HTTP routes.
 type DashboardController struct {
-	Store       config.AdminStore
-	Firebase    templates.FirebaseConfig
-	ProjectID   string
-	Location    string
-	TokenSource oauth2.TokenSource
-	HTTPClient  *http.Client
+	Store           config.AdminStore
+	Firebase        templates.FirebaseConfig
+	ProjectID       string
+	Location        string
+	TokenSource     oauth2.TokenSource
+	HTTPClient      *http.Client
+	SessionVerifier func(r *http.Request) bool
+
+	refreshMu     sync.RWMutex
+	refreshStatus ModelRefreshStatus
 }
 
 // NewDashboardController initializes a new dashboard controller.
@@ -46,20 +53,37 @@ func NewDashboardController(store config.AdminStore, projectID, location string)
 	if err != nil {
 		log.Printf("[Warning] Failed to initialize live Google Cloud DefaultTokenSource: %v", err)
 	}
-	// Pull Firebase client configs from environment variables
+	// Pull Firebase client configs from environment variables with fallback and project-derived defaults
+	apiKey := strings.TrimSpace(os.Getenv("FIREBASE_API_KEY"))
+	if apiKey == "" || apiKey == "AIzaSyYourFirebaseWebApiKey" {
+		apiKey = strings.TrimSpace(os.Getenv("FIREBASE_WEB_API_KEY"))
+	}
+	fbProjectID := strings.TrimSpace(os.Getenv("FIREBASE_PROJECT_ID"))
+	if fbProjectID == "" || fbProjectID == "your-gcp-project-id" {
+		fbProjectID = strings.TrimSpace(projectID)
+	}
+	authDomain := strings.TrimSpace(os.Getenv("FIREBASE_AUTH_DOMAIN"))
+	if (authDomain == "" || authDomain == "your-project-id.firebaseapp.com") && fbProjectID != "" {
+		authDomain = fbProjectID + ".firebaseapp.com"
+	}
+	storageBucket := strings.TrimSpace(os.Getenv("FIREBASE_STORAGE_BUCKET"))
+	if (storageBucket == "" || storageBucket == "your-project-id.appspot.com") && fbProjectID != "" {
+		storageBucket = fbProjectID + ".firebasestorage.app"
+	}
+
 	return &DashboardController{
-		Store:     store,
-		ProjectID: projectID,
-		Location:  location,
+		Store:       store,
+		ProjectID:   projectID,
+		Location:    location,
 		TokenSource: ts,
 		HTTPClient:  &http.Client{Timeout: 15 * time.Second},
 		Firebase: templates.FirebaseConfig{
-			APIKey:            os.Getenv("FIREBASE_API_KEY"),
-			AuthDomain:        os.Getenv("FIREBASE_AUTH_DOMAIN"),
-			ProjectID:         os.Getenv("FIREBASE_PROJECT_ID"),
-			StorageBucket:     os.Getenv("FIREBASE_STORAGE_BUCKET"),
-			MessagingSenderID: os.Getenv("FIREBASE_MESSAGING_SENDER_ID"),
-			AppID:             os.Getenv("FIREBASE_APP_ID"),
+			APIKey:            apiKey,
+			AuthDomain:        authDomain,
+			ProjectID:         fbProjectID,
+			StorageBucket:     storageBucket,
+			MessagingSenderID: strings.TrimSpace(os.Getenv("FIREBASE_MESSAGING_SENDER_ID")),
+			AppID:             strings.TrimSpace(os.Getenv("FIREBASE_APP_ID")),
 			IsLocalDev:        os.Getenv("LOCAL_DEV") == "true",
 		},
 	}
@@ -72,12 +96,33 @@ func (dc *DashboardController) getHTTPClient() *http.Client {
 	return dc.HTTPClient
 }
 
+func (dc *DashboardController) renderFormError(w http.ResponseWriter, r *http.Request, msg string, code int) {
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Retarget", "#error-alert-container")
+		w.Header().Set("HX-Reswap", "innerHTML")
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(http.StatusOK)
+		_ = templates.FormErrorAlert(msg).Render(r.Context(), w)
+		return
+	}
+	http.Error(w, msg, code)
+}
+
 // ServeLogin renders the Firebase-enabled login view.
 func (dc *DashboardController) ServeLogin(w http.ResponseWriter, r *http.Request) {
 	// If session cookie already exists and is valid, bypass login
 	if cookie, err := r.Cookie("session"); err == nil && cookie.Value != "" {
-		http.Redirect(w, r, "/admin/keys", http.StatusFound)
-		return
+		if dc.SessionVerifier == nil || dc.SessionVerifier(r) {
+			http.Redirect(w, r, "/admin/apps", http.StatusFound)
+			return
+		}
+		http.SetCookie(w, &http.Cookie{
+			Name:     "session",
+			Value:    "",
+			Path:     "/",
+			MaxAge:   -1,
+			HttpOnly: true,
+		})
 	}
 
 	w.Header().Set("Content-Type", "text/html")
@@ -183,15 +228,15 @@ func (dc *DashboardController) CreateKey(w http.ResponseWriter, r *http.Request)
 
 	ctx := r.Context()
 
-	appID := r.FormValue("app_id")
+	appID := strings.TrimSpace(r.FormValue("app_id"))
 	if appID == "" {
-		http.Error(w, "Missing target app selection", http.StatusBadRequest)
+		dc.renderFormError(w, r, "Missing target app selection", http.StatusBadRequest)
 		return
 	}
 
 	app, ok := dc.Store.LookupApp(appID)
 	if !ok {
-		http.Error(w, "Application profile not found", http.StatusNotFound)
+		dc.renderFormError(w, r, "Application profile not found", http.StatusNotFound)
 		return
 	}
 
@@ -199,7 +244,7 @@ func (dc *DashboardController) CreateKey(w http.ResponseWriter, r *http.Request)
 	rawKey, err := generateSecureKey()
 	if err != nil {
 		log.Printf("[Dashboard] Error generating key: %v", err)
-		http.Error(w, "Failed to generate key", http.StatusInternalServerError)
+		dc.renderFormError(w, r, "Failed to generate key", http.StatusInternalServerError)
 		return
 	}
 
@@ -215,7 +260,7 @@ func (dc *DashboardController) CreateKey(w http.ResponseWriter, r *http.Request)
 	})
 	if err != nil {
 		log.Printf("[Dashboard] Error saving api_key: %v", err)
-		http.Error(w, "Failed to save API key profile", http.StatusInternalServerError)
+		dc.renderFormError(w, r, "Failed to save API key profile", http.StatusInternalServerError)
 		return
 	}
 
@@ -224,9 +269,9 @@ func (dc *DashboardController) CreateKey(w http.ResponseWriter, r *http.Request)
 	_ = templates.KeyCreatedAlert(rawKey, app.Name).Render(ctx, w)
 }
 
-// RevokeKey marks an API key as inactive dynamically and returns empty block for HTMX replacement.
+// RevokeKey marks an API key as inactive dynamically and triggers an HTMX refresh.
 func (dc *DashboardController) RevokeKey(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
+	if r.Method != http.MethodPost && r.Method != http.MethodDelete {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -246,8 +291,8 @@ func (dc *DashboardController) RevokeKey(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	w.Header().Set("HX-Refresh", "true")
 	w.WriteHeader(http.StatusOK)
-	// Simply return nothing to HTMX to clear/remove closest element or let table refresh
 	w.Write([]byte(""))
 }
 
@@ -299,19 +344,19 @@ func (dc *DashboardController) SaveKeyDetails(w http.ResponseWriter, r *http.Req
 	}
 
 	ctx := r.Context()
-	hash := r.FormValue("hash")
-	appID := r.FormValue("app_id")
-	status := r.FormValue("status")
+	hash := strings.TrimSpace(r.FormValue("hash"))
+	appID := strings.TrimSpace(r.FormValue("app_id"))
+	status := strings.TrimSpace(r.FormValue("status"))
 
 	if hash == "" || appID == "" || status == "" {
-		http.Error(w, "Missing required key fields", http.StatusBadRequest)
+		dc.renderFormError(w, r, "Missing required key fields", http.StatusBadRequest)
 		return
 	}
 
 	keys, err := dc.Store.GetAllKeys(ctx)
 	if err != nil {
 		log.Printf("[Dashboard] Error loading keys: %v", err)
-		http.Error(w, "Failed to load keys", http.StatusInternalServerError)
+		dc.renderFormError(w, r, "Failed to load keys", http.StatusInternalServerError)
 		return
 	}
 
@@ -324,13 +369,13 @@ func (dc *DashboardController) SaveKeyDetails(w http.ResponseWriter, r *http.Req
 	}
 
 	if targetKey == nil {
-		http.Error(w, "API Key not found", http.StatusNotFound)
+		dc.renderFormError(w, r, "API Key not found", http.StatusNotFound)
 		return
 	}
 
 	app, ok := dc.Store.LookupApp(appID)
 	if !ok {
-		http.Error(w, "Target Application not found", http.StatusNotFound)
+		dc.renderFormError(w, r, "Target Application not found", http.StatusNotFound)
 		return
 	}
 
@@ -342,7 +387,7 @@ func (dc *DashboardController) SaveKeyDetails(w http.ResponseWriter, r *http.Req
 	err = dc.Store.SaveKey(ctx, *targetKey)
 	if err != nil {
 		log.Printf("[Dashboard] Error saving api_key: %v", err)
-		http.Error(w, "Failed to save API Key profile", http.StatusInternalServerError)
+		dc.renderFormError(w, r, "Failed to save API Key profile", http.StatusInternalServerError)
 		return
 	}
 
@@ -445,6 +490,11 @@ func (dc *DashboardController) ServeRulesEditModal(w http.ResponseWriter, r *htt
 	_ = templates.RuleModal(apps, activeCompatibleModels, targetRule).Render(ctx, w)
 }
 
+// SaveRule is an alias for CreateRule to support /admin/rules/save form submissions.
+func (dc *DashboardController) SaveRule(w http.ResponseWriter, r *http.Request) {
+	dc.CreateRule(w, r)
+}
+
 // CreateRule handles dynamic routing rule submission form.
 func (dc *DashboardController) CreateRule(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -459,6 +509,10 @@ func (dc *DashboardController) CreateRule(w http.ResponseWriter, r *http.Request
 	clientTier := strings.TrimSpace(r.FormValue("client_tier"))
 	headerName := strings.TrimSpace(r.FormValue("header_name"))
 	headerValue := strings.TrimSpace(r.FormValue("header_value"))
+	complexityTier := strings.TrimSpace(r.FormValue("complexity_tier"))
+	decisionEngine := strings.TrimSpace(r.FormValue("decision_engine"))
+	minConfidenceStr := strings.TrimSpace(r.FormValue("min_confidence"))
+	taskKind := strings.TrimSpace(r.FormValue("task_kind"))
 	targetModel := strings.TrimSpace(r.FormValue("target_model"))
 	targetLocation := strings.TrimSpace(r.FormValue("target_location"))
 	fallbackModel := strings.TrimSpace(r.FormValue("fallback_model"))
@@ -511,6 +565,16 @@ func (dc *DashboardController) CreateRule(w http.ResponseWriter, r *http.Request
 		priorityWeight = pw
 	}
 
+	var minConfidence float64
+	if minConfidenceStr != "" {
+		mc, err := strconv.ParseFloat(minConfidenceStr, 64)
+		if err != nil || mc < 0 || mc > 1 {
+			showError("Minimum Confidence must be between 0.0 and 1.0.", http.StatusBadRequest)
+			return
+		}
+		minConfidence = mc
+	}
+
 	// If editing an existing rule, it will pass the rule ID in the form
 	id := strings.TrimSpace(r.FormValue("id"))
 	if id == "" {
@@ -527,6 +591,10 @@ func (dc *DashboardController) CreateRule(w http.ResponseWriter, r *http.Request
 		ClientTier:     clientTier,
 		HeaderName:     headerName,
 		HeaderValue:    headerValue,
+		ComplexityTier: complexityTier,
+		DecisionEngine: decisionEngine,
+		MinConfidence:  minConfidence,
+		TaskKind:       taskKind,
 		TargetModel:    targetModel,
 		TargetLocation: targetLocation,
 		FallbackModel:  fallbackModel,
@@ -661,21 +729,21 @@ func (dc *DashboardController) CreateHeader(w http.ResponseWriter, r *http.Reque
 	valuePattern := strings.TrimSpace(r.FormValue("value_pattern"))
 
 	if name == "" {
-		http.Error(w, "Header Name cannot be empty.", http.StatusBadRequest)
+		dc.renderFormError(w, r, "Header Name cannot be empty.", http.StatusBadRequest)
 		return
 	}
 	if appID == "" {
-		http.Error(w, "Application boundary (App ID) must be specified (or 'global').", http.StatusBadRequest)
+		dc.renderFormError(w, r, "Application boundary (App ID) must be specified (or 'global').", http.StatusBadRequest)
 		return
 	}
 	if validation == "regex" {
 		if valuePattern == "" {
-			http.Error(w, "Regex validation requires a non-empty pattern value.", http.StatusBadRequest)
+			dc.renderFormError(w, r, "Regex validation requires a non-empty pattern value.", http.StatusBadRequest)
 			return
 		}
 		_, err := regexp.Compile(valuePattern)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Invalid regular expression pattern: %v", err), http.StatusBadRequest)
+			dc.renderFormError(w, r, fmt.Sprintf("Invalid regular expression pattern: %v", err), http.StatusBadRequest)
 			return
 		}
 	}
@@ -702,7 +770,7 @@ func (dc *DashboardController) CreateHeader(w http.ResponseWriter, r *http.Reque
 	})
 	if err != nil {
 		log.Printf("[Dashboard] Error saving custom header: %v", err)
-		http.Error(w, "Failed to save custom header rule", http.StatusInternalServerError)
+		dc.renderFormError(w, r, "Failed to save custom header rule", http.StatusInternalServerError)
 		return
 	}
 
@@ -752,47 +820,75 @@ func generateSecureKey() (string, error) {
 	return "gr_key_" + hex.EncodeToString(bytes), nil
 }
 
-// aggregateModelStats compiles real-time or high-fidelity simulated metrics per active model.
-func (dc *DashboardController) aggregateModelStats(ctx context.Context, simulate bool) map[string]templates.ModelStats {
+// aggregateModelStats compiles real-time telemetry metrics per active model from logs.
+func (dc *DashboardController) aggregateModelStats(ctx context.Context) map[string]templates.ModelStats {
 	stats := make(map[string]templates.ModelStats)
 
-	costsVM, err := dc.fetchCostAnalyticsData(ctx, simulate)
+	costsVM, err := dc.fetchCostAnalyticsData(ctx)
 	var sessions []templates.CostTransaction
 	if err == nil && len(costsVM.RecentSessions) > 0 {
 		sessions = costsVM.RecentSessions
-	} else if simulate {
-		sessions = dc.generateMockCosts().RecentSessions
 	}
 
-	// Pre-populate standard realistic latency lists per model for display variety
-	latencies := map[string][]int64{
-		"gemini-2.5-flash":      {210, 250, 190, 320},
-		"gemini-2.5-pro":        {650, 800, 720, 910},
-		"gemini-2.5-flash-lite": {110, 140, 125, 150},
-		"gemini-3.0-flash":      {180, 220, 170, 260},
-		"gemini-3.0-pro":        {580, 710, 630, 800},
-		"gemini-3.1-flash":      {160, 190, 150, 230},
-		"gemini-3.1-pro":        {510, 620, 550, 700},
-		"gemini-3.5-flash":      {130, 160, 120, 180},
-		"gemini-3.5-pro":        {420, 500, 440, 550},
-		"gemini-3.5-flash-lite": {70, 90, 80, 100},
+	latencySums := make(map[string]int64)
+	latencyCounts := make(map[string]int64)
+	loadedFromLocalLogs := false
+	if os.Getenv("LOCAL_DEV") == "true" {
+		if file, err := os.Open(localLogsPath()); err == nil {
+			loadedFromLocalLogs = true
+			defer file.Close()
+			scanner := bufio.NewScanner(file)
+			for scanner.Scan() {
+				line := scanner.Bytes()
+				if len(line) == 0 {
+					continue
+				}
+				var entry struct {
+					ModelRouted string `json:"model_routed"`
+					LatencyMs   int64  `json:"latency_ms"`
+				}
+				if err := json.Unmarshal(line, &entry); err == nil && entry.ModelRouted != "" {
+					latencySums[entry.ModelRouted] += entry.LatencyMs
+					latencyCounts[entry.ModelRouted]++
+				}
+			}
+		}
+	}
+
+	if !loadedFromLocalLogs {
+		for _, s := range sessions {
+			if s.ModelRouted != "" && s.LatencyMs > 0 {
+				latencySums[s.ModelRouted] += s.LatencyMs
+				latencyCounts[s.ModelRouted]++
+			}
+		}
 	}
 
 	for _, s := range sessions {
 		mStats := stats[s.ModelRouted]
 		mStats.RequestCount++
 		mStats.TotalCost += s.EstimatedCost
-
-		lList := latencies[s.ModelRouted]
-		if len(lList) > 0 {
-			mStats.AvgLatencyMs = lList[mStats.RequestCount%len(lList)]
-		} else {
-			mStats.AvgLatencyMs = 200
+		if cnt := latencyCounts[s.ModelRouted]; cnt > 0 {
+			mStats.AvgLatencyMs = latencySums[s.ModelRouted] / cnt
 		}
 		stats[s.ModelRouted] = mStats
 	}
 
 	return stats
+}
+
+// GetRefreshStatus returns a thread-safe snapshot of the background model discovery state.
+func (dc *DashboardController) GetRefreshStatus() ModelRefreshStatus {
+	dc.refreshMu.RLock()
+	defer dc.refreshMu.RUnlock()
+	return dc.refreshStatus
+}
+
+func (dc *DashboardController) updateRefreshStatus(fn func(*ModelRefreshStatus)) {
+	dc.refreshMu.Lock()
+	defer dc.refreshMu.Unlock()
+	fn(&dc.refreshStatus)
+	dc.refreshStatus.UpdatedAt = time.Now().UTC()
 }
 
 // ServeModels serves the real-time Google Cloud Project models screen.
@@ -807,12 +903,8 @@ func (dc *DashboardController) ServeModels(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	simulate := false
-	if cookie, err := r.Cookie("simulate_metrics"); err == nil && cookie.Value == "true" {
-		simulate = true
-	}
 	// Fetch dynamic logs stats per model
-	modelStats := dc.aggregateModelStats(ctx, simulate)
+	modelStats := dc.aggregateModelStats(ctx)
 
 	var generativeModels []templates.ModelInfo
 	var embeddingModels []templates.ModelInfo
@@ -823,8 +915,13 @@ func (dc *DashboardController) ServeModels(w http.ResponseWriter, r *http.Reques
 			continue
 		}
 
-		// Resolve dynamic stats
+		baseModelID := config.StripLocationSuffix(m.ID)
+
+		// Resolve dynamic stats (try exact compound ID first, then stripped base model ID)
 		stats, exists := modelStats[m.ID]
+		if !exists {
+			stats, exists = modelStats[baseModelID]
+		}
 		if !exists {
 			// Seed a healthy minimal default baseline if no requests recorded yet
 			stats = templates.ModelStats{
@@ -834,22 +931,42 @@ func (dc *DashboardController) ServeModels(w http.ResponseWriter, r *http.Reques
 			}
 		}
 
-		info := templates.ModelInfo{
-			ID:          m.ID,
-			DisplayName: m.DisplayName,
-			Location:    m.Location,
-			Type:        m.Type,
-			Active:      m.Active,
-			Obsolete:    strings.Contains(m.DisplayName, "(Obsolete)"),
-			Stats:       stats,
+		displayName := strings.TrimSpace(m.DisplayName)
+		if displayName == "" {
+			displayName = baseModelID
 		}
 
-		baseModelID := config.StripLocationSuffix(m.ID)
+		pricingID := m.ID
+		if (m.Location == "local" || m.Type == "local") && !strings.Contains(pricingID, "@") {
+			pricingID = pricingID + "@local"
+		}
+		inCostPer1M, outCostPer1M := GetModelPricing(pricingID)
+
+		info := templates.ModelInfo{
+			ID:              m.ID,
+			DisplayName:     displayName,
+			Location:        m.Location,
+			Type:            m.Type,
+			Active:          m.Active,
+			Obsolete:        strings.Contains(displayName, "(Obsolete)"),
+			InputCostPer1M:  inCostPer1M,
+			OutputCostPer1M: outCostPer1M,
+			Stats:           stats,
+		}
+
 		if strings.Contains(strings.ToLower(baseModelID), "embedding") {
 			embeddingModels = append(embeddingModels, info)
 		} else {
 			generativeModels = append(generativeModels, info)
 		}
+	}
+
+	refreshStatus := dc.GetRefreshStatus()
+	if r.URL.Query().Get("refresh") == "started" && refreshStatus.Phase == "" {
+		refreshStatus.Running = true
+		refreshStatus.Phase = "discovering"
+		refreshStatus.Percent = 5
+		refreshStatus.Message = "Starting background model discovery across local clusters and Vertex AI regions..."
 	}
 
 	vm := templates.ModelsViewModel{
@@ -858,6 +975,7 @@ func (dc *DashboardController) ServeModels(w http.ResponseWriter, r *http.Reques
 		ParentLocation:   config.GetMultiRegionParent(dc.Location),
 		GenerativeModels: generativeModels,
 		EmbeddingModels:  embeddingModels,
+		RefreshStatus:    refreshStatus,
 	}
 
 	w.Header().Set("Content-Type", "text/html")
@@ -943,19 +1061,93 @@ func (dc *DashboardController) verifyModel(ctx context.Context, model config.Mod
 	return nil
 }
 
-// DiscoverAndCacheModels queries Vertex AI APIs and caches all discovered models and endpoints.
+// DiscoverAndCacheModels queries local clusters and Vertex AI APIs and caches all discovered models and endpoints.
 func (dc *DashboardController) DiscoverAndCacheModels(ctx context.Context) error {
+	now := time.Now().UTC()
+	dc.updateRefreshStatus(func(st *ModelRefreshStatus) {
+		st.Running = true
+		st.Phase = "discovering"
+		st.Percent = 5
+		st.CompletedSteps = 0
+		st.TotalSteps = 4
+		st.VerifiedCount = 0
+		st.Error = ""
+		if st.StartedAt.IsZero() {
+			st.StartedAt = now
+		}
+		st.Message = "Stage 1/4: Discovering compatible Vertex AI regions and local clusters..."
+	})
+
 	// Fetch currently configured models to avoid resetting their active statuses
 	currentModels, err := dc.Store.GetAllModels(ctx)
 	if err != nil {
+		dc.updateRefreshStatus(func(st *ModelRefreshStatus) {
+			st.Running = false
+			st.Phase = "failed"
+			st.Error = err.Error()
+			st.Message = fmt.Sprintf("Failed to load existing models: %v", err)
+		})
 		return fmt.Errorf("GetAllModels failed: %w", err)
 	}
 	activeStatus := make(map[string]bool)
 	for _, m := range currentModels {
 		activeStatus[m.ID] = m.Active
+		activeStatus[config.StripLocationSuffix(m.ID)] = m.Active
 	}
 
 	discoveredModelsMap := make(map[string]config.ModelConfig)
+
+	// Discover local cluster & direct endpoint models
+	if providers, provErr := dc.Store.GetAllProviders(ctx); provErr == nil {
+		for _, p := range providers {
+			if p.ID != config.ProviderLocal {
+				continue
+			}
+			for _, reg := range p.Regions {
+				if reg.LocalConfig == nil {
+					continue
+				}
+				for _, ep := range reg.LocalConfig.DirectEndpoints {
+					mName := strings.TrimSpace(ep.ModelName)
+					if mName == "" || ep.Role == "decision_engine" || !config.IsValidModelName(mName) {
+						continue
+					}
+					active := true
+					if exists, present := activeStatus[mName+"@local"]; present {
+						active = exists
+					}
+					discoveredModelsMap[mName+"@local"] = config.ModelConfig{
+						ID:          mName,
+						DisplayName: mName,
+						Location:    "local",
+						Type:        "local",
+						Active:      active,
+					}
+				}
+			}
+		}
+	}
+	if runners, runErr := dc.Store.GetRegisteredRunners(ctx); runErr == nil {
+		for _, r := range runners {
+			for _, mName := range r.Node.SupportedModels {
+				mName = strings.TrimSpace(mName)
+				if mName == "" || !config.IsValidModelName(mName) {
+					continue
+				}
+				active := true
+				if exists, present := activeStatus[mName+"@local"]; present {
+					active = exists
+				}
+				discoveredModelsMap[mName+"@local"] = config.ModelConfig{
+					ID:          mName,
+					DisplayName: mName,
+					Location:    "local",
+					Type:        "local",
+					Active:      active,
+				}
+			}
+		}
+	}
 
 	var locationsToFetch []string
 	locations, fetchLocErr := dc.fetchLocations(ctx)
@@ -971,32 +1163,38 @@ func (dc *DashboardController) DiscoverAndCacheModels(ctx context.Context) error
 		locationsToFetch = []string{dc.Location}
 	}
 
-	for _, loc := range locationsToFetch {
+	dc.updateRefreshStatus(func(st *ModelRefreshStatus) {
+		st.Phase = "discovering"
+		st.Percent = 15
+		st.CompletedSteps = 1
+		st.TotalSteps = 1 + len(locationsToFetch)
+		st.Message = fmt.Sprintf("Stage 2/4: Querying Vertex AI model catalogs across %d compatible location(s)...", len(locationsToFetch))
+	})
+
+	for idx, loc := range locationsToFetch {
 		log.Printf("[Discovery] Refreshing discovered models from Vertex AI in location: %q...", loc)
-		
+		dc.updateRefreshStatus(func(st *ModelRefreshStatus) {
+			st.Message = fmt.Sprintf("Stage 2/4: Fetching publisher & custom models in %s (%d/%d)...", loc, idx+1, len(locationsToFetch))
+		})
+
 		// 1. Fetch custom models from API (only if not global)
 		if loc != "global" {
 			custom, err := dc.fetchCustomModels(ctx, loc)
 			if err == nil {
 				for _, m := range custom {
-					// Skip if invalid name
 					if !config.IsValidModelName(m.Name) {
 						continue
 					}
-					
-					// Discovered custom models default to inactive unless already present and active
 					active := false
 					if exists, present := activeStatus[m.Name]; present {
 						active = exists
 					}
 
-					// Extract specific location and resolve smallest compatible location
 					modelLoc := loc
 					if extLoc := config.ExtractLocationFromResourceName(m.Name); extLoc != "" {
 						modelLoc = config.GetSmallestCompatibleLocation(loc, extLoc)
 					}
 
-					// Resolve smallest location against previous iterations or pre-existing database models
 					if prev, alreadyDiscovered := discoveredModelsMap[m.Name]; alreadyDiscovered {
 						modelLoc = config.GetSmallestCompatibleLocation(prev.Location, modelLoc)
 					} else {
@@ -1008,9 +1206,13 @@ func (dc *DashboardController) DiscoverAndCacheModels(ctx context.Context) error
 						}
 					}
 
+					disp := strings.TrimSpace(m.DisplayName)
+					if disp == "" {
+						disp = config.StripLocationSuffix(m.Name)
+					}
 					discoveredModelsMap[m.Name] = config.ModelConfig{
 						ID:          m.Name,
-						DisplayName: m.DisplayName,
+						DisplayName: disp,
 						Location:    modelLoc,
 						Type:        "custom",
 						Active:      active,
@@ -1030,23 +1232,23 @@ func (dc *DashboardController) DiscoverAndCacheModels(ctx context.Context) error
 						continue
 					}
 					displayName := ep.DisplayName
-					if len(ep.DeployedModels) > 0 {
+					if len(ep.DeployedModels) > 0 && ep.DeployedModels[0].DisplayName != "" {
 						displayName = ep.DeployedModels[0].DisplayName
 					}
-					
-					// Discovered endpoints default to inactive unless already present and active
+					if strings.TrimSpace(displayName) == "" {
+						displayName = config.StripLocationSuffix(ep.Name)
+					}
+
 					active := false
 					if exists, present := activeStatus[ep.Name]; present {
 						active = exists
 					}
 
-					// Extract specific location and resolve smallest compatible location
 					modelLoc := loc
 					if extLoc := config.ExtractLocationFromResourceName(ep.Name); extLoc != "" {
 						modelLoc = config.GetSmallestCompatibleLocation(loc, extLoc)
 					}
 
-					// Resolve smallest location against previous iterations or pre-existing database models
 					if prev, alreadyDiscovered := discoveredModelsMap[ep.Name]; alreadyDiscovered {
 						modelLoc = config.GetSmallestCompatibleLocation(prev.Location, modelLoc)
 					} else {
@@ -1071,7 +1273,7 @@ func (dc *DashboardController) DiscoverAndCacheModels(ctx context.Context) error
 			}
 		}
 
-		// 3. Fetch Google foundation/publisher models from API (for all queried regions, parent multiregion, and global)
+		// 3. Fetch Google foundation/publisher models from API
 		pubModels, err := dc.fetchPublisherModels(ctx, loc)
 		if err == nil {
 			for _, pm := range pubModels {
@@ -1079,19 +1281,16 @@ func (dc *DashboardController) DiscoverAndCacheModels(ctx context.Context) error
 					continue
 				}
 
-				// All newly discovered foundation models default to inactive (Active = false)
 				active := false
 				if exists, present := activeStatus[pm.Name]; present {
 					active = exists
 				}
 
-				// Extract specific location and resolve smallest compatible location
 				modelLoc := loc
 				if extLoc := config.ExtractLocationFromResourceName(pm.Name); extLoc != "" {
 					modelLoc = config.GetSmallestCompatibleLocation(loc, extLoc)
 				}
 
-				// Resolve smallest location against previous iterations or pre-existing database models
 				if prev, alreadyDiscovered := discoveredModelsMap[pm.Name]; alreadyDiscovered {
 					modelLoc = config.GetSmallestCompatibleLocation(prev.Location, modelLoc)
 				} else {
@@ -1103,9 +1302,14 @@ func (dc *DashboardController) DiscoverAndCacheModels(ctx context.Context) error
 					}
 				}
 
+				disp := strings.TrimSpace(pm.DisplayName)
+				if disp == "" {
+					disp = config.StripLocationSuffix(pm.Name)
+				}
+
 				discoveredModelsMap[pm.Name] = config.ModelConfig{
 					ID:          pm.Name,
-					DisplayName: pm.DisplayName,
+					DisplayName: disp,
 					Location:    modelLoc,
 					Type:        "foundation",
 					Active:      active,
@@ -1116,37 +1320,50 @@ func (dc *DashboardController) DiscoverAndCacheModels(ctx context.Context) error
 		}
 	}
 
-	// Track successfully verified compound IDs
-	verifiedIDs := make(map[string]bool)
+	// Build candidate verification list
+	var candidateOptions []config.ModelConfig
+	for key, modelToSave := range discoveredModelsMap {
+		if strings.HasSuffix(key, "@local") || modelToSave.Location == "local" || modelToSave.Type == "local" {
+			baseID := config.StripLocationSuffix(modelToSave.ID)
+			modelOption := modelToSave
+			modelOption.Location = "local"
+			modelOption.Type = "local"
+			modelOption.ID = baseID + "@local"
+			if modelOption.DisplayName == "" {
+				modelOption.DisplayName = baseID
+			}
+			candidateOptions = append(candidateOptions, modelOption)
+			continue
+		}
 
-	// Save all resolved discovered models for each of their compatible locations separately
-	for _, modelToSave := range discoveredModelsMap {
 		var candidates []string
-		// 1. If custom model/endpoint has fixed location embedded in ID, test only that
 		if strings.HasPrefix(modelToSave.ID, "projects/") {
 			if extLoc := config.ExtractLocationFromResourceName(modelToSave.ID); extLoc != "" {
 				candidates = []string{extLoc}
 			}
 		}
-		// 2. Otherwise, test all compatible locations (local, parent multi-region, and global)
 		if len(candidates) == 0 {
 			routerLoc := dc.Location
 			if routerLoc == "" {
 				routerLoc = "us-central1"
 			}
 			candidates = append(candidates, routerLoc)
-			if parent := config.GetMultiRegionParent(routerLoc); parent != "" {
+			if parent := config.GetMultiRegionParent(routerLoc); parent != "" && parent != routerLoc {
 				candidates = append(candidates, parent)
 			}
-			candidates = append(candidates, "global")
+			if routerLoc != "global" {
+				candidates = append(candidates, "global")
+			}
 		}
 
 		for _, candidateLoc := range candidates {
 			modelOption := modelToSave
 			modelOption.Location = candidateLoc
 			modelOption.ID = modelToSave.ID + "@" + candidateLoc
+			if strings.TrimSpace(modelOption.DisplayName) == "" {
+				modelOption.DisplayName = config.StripLocationSuffix(modelToSave.ID)
+			}
 
-			// Check if this specific compound model was already registered and active
 			active := false
 			if exists, present := activeStatus[modelOption.ID]; present {
 				active = exists
@@ -1154,17 +1371,76 @@ func (dc *DashboardController) DiscoverAndCacheModels(ctx context.Context) error
 				active = exists
 			}
 			modelOption.Active = active
-
-			err := dc.verifyModel(ctx, modelOption)
-			if err == nil {
-				log.Printf("[Discovery] Successfully verified model %s at location %s.", modelToSave.ID, candidateLoc)
-				_ = dc.Store.SaveModel(ctx, modelOption)
-				verifiedIDs[modelOption.ID] = true
-			} else {
-				log.Printf("[Discovery] Verification failed for model %s at candidate location %s: %v. Skipping registration.", modelToSave.ID, candidateLoc, err)
-			}
+			candidateOptions = append(candidateOptions, modelOption)
 		}
 	}
+
+	totalSteps := len(candidateOptions)
+	if totalSteps == 0 {
+		totalSteps = 1
+	}
+	dc.updateRefreshStatus(func(st *ModelRefreshStatus) {
+		st.Phase = "verifying"
+		st.CompletedSteps = 0
+		st.TotalSteps = totalSteps
+		st.Percent = 20
+		st.Message = fmt.Sprintf("Stage 3/4: Probing %d candidate model location endpoint(s)...", len(candidateOptions))
+	})
+
+	verifiedIDs := make(map[string]bool)
+	var verifyMu sync.Mutex
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 4) // 4-worker bounded concurrency pool
+	completedCount := 0
+	verifiedCount := 0
+
+	for _, opt := range candidateOptions {
+		wg.Add(1)
+		go func(modelOption config.ModelConfig) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			var err error
+			if modelOption.Location != "local" && modelOption.Type != "local" {
+				err = dc.verifyModel(ctx, modelOption)
+			}
+
+			verifyMu.Lock()
+			completedCount++
+			if err == nil {
+				verifiedCount++
+				verifiedIDs[modelOption.ID] = true
+				_ = dc.Store.SaveModel(ctx, modelOption)
+				log.Printf("[Discovery] Successfully verified model %s at location %s.", config.StripLocationSuffix(modelOption.ID), modelOption.Location)
+			} else {
+				log.Printf("[Discovery] Verification failed for model %s at candidate location %s: %v. Skipping registration.", config.StripLocationSuffix(modelOption.ID), modelOption.Location, err)
+			}
+			curCompleted := completedCount
+			curVerified := verifiedCount
+			verifyMu.Unlock()
+
+			pct := 20 + int((float64(curCompleted)/float64(totalSteps))*70.0)
+			if pct > 90 {
+				pct = 90
+			}
+			dc.updateRefreshStatus(func(st *ModelRefreshStatus) {
+				st.Phase = "verifying"
+				st.CompletedSteps = curCompleted
+				st.TotalSteps = totalSteps
+				st.VerifiedCount = curVerified
+				st.Percent = pct
+				st.Message = fmt.Sprintf("Stage 3/4: Verified %s (%d/%d endpoints checked, %d active)...", modelOption.ID, curCompleted, totalSteps, curVerified)
+			})
+		}(opt)
+	}
+	wg.Wait()
+
+	dc.updateRefreshStatus(func(st *ModelRefreshStatus) {
+		st.Phase = "cleanup"
+		st.Percent = 95
+		st.Message = "Stage 4/4: Scrubbing unverified regional duplicates and obsolete keys..."
+	})
 
 	// Clean up legacy keys and obsolete/failed models
 	for _, m := range currentModels {
@@ -1179,24 +1455,23 @@ func (dc *DashboardController) DiscoverAndCacheModels(ctx context.Context) error
 			continue
 		}
 
-		// Extract base model ID from compound key (part before '@')
-		baseID := m.ID
-		if idx := strings.Index(m.ID, "@"); idx != -1 {
-			baseID = m.ID[:idx]
-		}
+		baseID := config.StripLocationSuffix(m.ID)
 
-		// If the base model was returned by Vertex AI API but this specific location failed verification,
-		// we should delete this compound key option because it doesn't exist in this location!
 		if _, discovered := discoveredModelsMap[baseID]; discovered {
 			if !verifiedIDs[m.ID] {
 				log.Printf("[Discovery] Deleting unverified location option %s from registry...", m.ID)
 				_ = dc.Store.DeleteModel(ctx, m.ID)
 			}
+		} else if _, discoveredLocal := discoveredModelsMap[m.ID]; discoveredLocal {
+			if !verifiedIDs[m.ID] {
+				_ = dc.Store.DeleteModel(ctx, m.ID)
+			}
 		} else {
-			// If the base model is completely obsolete (no longer returned by Vertex AI API at all),
-			// we keep it but soft-disable it and append "(Obsolete)" to its DisplayName as before!
 			log.Printf("[Discovery] Soft-disabling obsolete model %s...", m.ID)
 			m.Active = false
+			if strings.TrimSpace(m.DisplayName) == "" {
+				m.DisplayName = baseID
+			}
 			if !strings.Contains(m.DisplayName, " (Obsolete)") {
 				m.DisplayName = m.DisplayName + " (Obsolete)"
 			}
@@ -1204,25 +1479,85 @@ func (dc *DashboardController) DiscoverAndCacheModels(ctx context.Context) error
 		}
 	}
 
+	dc.updateRefreshStatus(func(st *ModelRefreshStatus) {
+		st.Running = false
+		st.Phase = "completed"
+		st.CompletedSteps = totalSteps
+		st.TotalSteps = totalSteps
+		st.VerifiedCount = verifiedCount
+		st.Percent = 100
+		st.Message = fmt.Sprintf("Model discovery complete: %d compatible model endpoint(s) verified across %d probed options.", verifiedCount, len(candidateOptions))
+	})
+
 	return nil
 }
 
-// RefreshModels queries GCP's Vertex AI API for the local location and parent multiregion, loading new models.
+// RefreshModels starts an asynchronous background job to query Vertex AI and local clusters for models.
 func (dc *DashboardController) RefreshModels(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	ctx := r.Context()
 
-	if err := dc.DiscoverAndCacheModels(ctx); err != nil {
-		log.Printf("[Dashboard] DiscoverAndCacheModels failed: %v", err)
-		http.Error(w, "Failed to discover models from Google Cloud", http.StatusInternalServerError)
+	dc.refreshMu.Lock()
+	alreadyRunning := dc.refreshStatus.Running
+	if !alreadyRunning {
+		now := time.Now().UTC()
+		dc.refreshStatus = ModelRefreshStatus{
+			Running:        true,
+			Phase:          "discovering",
+			Message:        "Starting background model discovery across local clusters and Vertex AI regions...",
+			CompletedSteps: 0,
+			TotalSteps:     4,
+			Percent:        5,
+			VerifiedCount:  0,
+			StartedAt:      now,
+			UpdatedAt:      now,
+		}
+	}
+	statusSnapshot := dc.refreshStatus
+	dc.refreshMu.Unlock()
+
+	if !alreadyRunning {
+		go func() {
+			if err := dc.DiscoverAndCacheModels(context.Background()); err != nil {
+				log.Printf("[Dashboard] Background DiscoverAndCacheModels failed: %v", err)
+			}
+		}()
+	}
+
+	if strings.Contains(r.Header.Get("Accept"), "application/json") || r.Header.Get("X-Requested-With") == "fetch" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusAccepted)
+		_ = json.NewEncoder(w).Encode(statusSnapshot)
 		return
 	}
 
-	// Redirect back to the models administration screen
-	http.Redirect(w, r, "/admin/models", http.StatusSeeOther)
+	// Redirect back to the models administration screen with status banner active
+	http.Redirect(w, r, "/admin/models?refresh=started", http.StatusSeeOther)
+}
+
+// RefreshModelsStatus returns the current JSON progress status for background model discovery.
+func (dc *DashboardController) RefreshModelsStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	_ = json.NewEncoder(w).Encode(dc.GetRefreshStatus())
+}
+
+// WaitForRefresh waits until an active background model refresh completes or the timeout expires.
+func (dc *DashboardController) WaitForRefresh(timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if !dc.GetRefreshStatus().Running {
+			return true
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	return !dc.GetRefreshStatus().Running
 }
 
 // ToggleModel enables or disables a model's availability for routing dynamically.
@@ -1527,10 +1862,14 @@ func (dc *DashboardController) fetchPublisherModels(ctx context.Context, loc str
 	for _, m := range resp.PublisherModels {
 		parts := strings.Split(m.Name, "/")
 		modelName := parts[len(parts)-1]
+		displayName := strings.TrimSpace(m.DisplayName)
+		if displayName == "" {
+			displayName = modelName
+		}
 
 		list = append(list, templates.CustomModelInfo{
 			Name:            modelName,
-			DisplayName:     m.DisplayName,
+			DisplayName:     displayName,
 			Version:         "",
 			CreateTime:      "",
 			PublicModelName: modelName,
@@ -1581,6 +1920,60 @@ func (dc *DashboardController) gcpPost(ctx context.Context, url string, body int
 	return respBody, nil
 }
 
+// GetModelPricing returns the input and output cost per 1,000,000 tokens for a given model ID.
+// It uses a deterministic ordered tier table so more specific substrings (e.g. flash-lite) match first.
+func GetModelPricing(modelID string) (inPer1M float64, outPer1M float64) {
+	lower := strings.ToLower(strings.TrimSpace(modelID))
+
+	// Local models or @local suffixes incur $0.00 cloud API spend
+	if strings.HasSuffix(lower, "@local") {
+		return 0.00, 0.00
+	}
+
+	base := config.StripLocationSuffix(lower)
+
+	if strings.Contains(base, "embedding") {
+		return 0.025, 0.00
+	}
+
+	if strings.HasPrefix(base, "gemma-4") || strings.Contains(base, "gemma-4") {
+		return 0.15, 0.60
+	}
+
+	type pricingRule struct {
+		match  string
+		in1M   float64
+		out1M  float64
+	}
+
+	orderedRules := []pricingRule{
+		{match: "gemini-4-argon", in1M: 2.00, out1M: 10.00},
+		{match: "gemini-4-pro", in1M: 2.00, out1M: 10.00},
+		{match: "gemini-4", in1M: 2.00, out1M: 10.00},
+		{match: "gemini-3.8-flash", in1M: 0.15, out1M: 0.60},
+		{match: "gemini-3.5-flash-lite", in1M: 0.05, out1M: 0.20},
+		{match: "gemini-3.1-flash-lite", in1M: 0.05, out1M: 0.20},
+		{match: "gemini-3.7-flash", in1M: 0.10, out1M: 0.40},
+		{match: "gemini-3.6-flash", in1M: 0.10, out1M: 0.40},
+		{match: "gemini-3.5-flash", in1M: 0.10, out1M: 0.40},
+		{match: "gemini-3-flash", in1M: 0.10, out1M: 0.40},
+		{match: "gemini-3.1-pro", in1M: 1.50, out1M: 6.00},
+		{match: "gemini-3-pro", in1M: 1.50, out1M: 6.00},
+		{match: "gemini-2.5-flash-lite", in1M: 0.0375, out1M: 0.15},
+		{match: "gemini-2.5-pro", in1M: 1.25, out1M: 5.00},
+		{match: "gemini-2.5-flash", in1M: 0.075, out1M: 0.30},
+	}
+
+	for _, rule := range orderedRules {
+		if strings.Contains(base, rule.match) {
+			return rule.in1M, rule.out1M
+		}
+	}
+
+	// Default fallback to gemini-2.5-flash pricing
+	return 0.075, 0.30
+}
+
 // estimateTokensAndCost calculates input/output tokens and total spend based on model pricing.
 func estimateTokensAndCost(model string, bytesSent int64) (int, int, float64) {
 	outTokens := int(bytesSent / 3)
@@ -1592,47 +1985,149 @@ func estimateTokensAndCost(model string, bytesSent int64) (int, int, float64) {
 		inTokens = 100
 	}
 
-	// Model specific pricing map (Prices per token)
-	type pricing struct {
-		inPrice  float64
-		outPrice float64
-	}
-
-	// Pricing per 1,000,000 tokens
-	pricingMap := map[string]pricing{
-		"gemini-2.5-pro":          {inPrice: 1.25 / 1e6, outPrice: 5.00 / 1e6},
-		"gemini-2.5-flash":        {inPrice: 0.075 / 1e6, outPrice: 0.30 / 1e6},
-		"gemini-2.5-flash-lite":   {inPrice: 0.0375 / 1e6, outPrice: 0.15 / 1e6},
-		"text-embedding-004":      {inPrice: 0.025 / 1e6, outPrice: 0.0},
-		"multimodal-embedding-001":{inPrice: 0.025 / 1e6, outPrice: 0.0},
-	}
-
-	var inPrice, outPrice float64
-	matched := false
-
-	// Check for prefix matches (e.g., model versions/aliases)
-	modelLower := strings.ToLower(model)
-	for key, val := range pricingMap {
-		if strings.Contains(modelLower, key) {
-			inPrice = val.inPrice
-			outPrice = val.outPrice
-			matched = true
-			break
-		}
-	}
-
-	// Fallback to gemini-2.5-flash if no specific pricing model matched
-	if !matched {
-		inPrice = 0.075 / 1e6
-		outPrice = 0.30 / 1e6
-	}
+	inPer1M, outPer1M := GetModelPricing(model)
+	inPrice := inPer1M / 1e6
+	outPrice := outPer1M / 1e6
 
 	cost := (float64(inTokens) * inPrice) + (float64(outTokens) * outPrice)
 	return inTokens, outTokens, cost
 }
 
+func localLogsPath() string {
+	if dataDir := os.Getenv("LOCAL_DATA_DIR"); dataDir != "" {
+		p := filepath.Join(dataDir, "local_logs.jsonl")
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	return "data/local_logs.jsonl"
+}
+
+func (dc *DashboardController) resolveBackendServiceName() string {
+	if svc := strings.TrimSpace(os.Getenv("BACKEND_SERVICE_NAME")); svc != "" {
+		return svc
+	}
+	if svc := strings.TrimSpace(os.Getenv("K_SERVICE")); svc != "" {
+		svc = strings.TrimSuffix(svc, "-ui")
+		if svc != "" {
+			return svc
+		}
+	}
+	return "gemini-smart-router"
+}
+
+type logMetricEntry struct {
+	Time      string `json:"time"`
+	Status    int    `json:"status"`
+	LatencyMs int64  `json:"latency_ms"`
+}
+
+func computeMetricsFromEntries(entries []logMetricEntry, now time.Time) templates.MetricsViewModel {
+	counts := make([]int, 24)
+	p50 := make([]int, 24)
+	p95 := make([]int, 24)
+	labels := make([]string, 24)
+
+	for i := 0; i < 24; i++ {
+		t := now.Add(-time.Duration(23-i) * time.Hour)
+		labels[i] = t.Format("15:00")
+	}
+
+	hourlyLatencies := make([][]int64, 24)
+	var allLatencies []int64
+	totalReqs := 0
+	peakRate := 0
+	errorCount := 0
+
+	for _, entry := range entries {
+		t, err := time.Parse(time.RFC3339, entry.Time)
+		if err != nil {
+			t, err = time.Parse(time.RFC3339Nano, entry.Time)
+			if err != nil {
+				continue
+			}
+		}
+
+		diffHours := now.Sub(t).Hours()
+		if diffHours < 0 || diffHours >= 24 {
+			continue
+		}
+		hrIndex := 23 - int(diffHours)
+		if hrIndex >= 0 && hrIndex < 24 {
+			counts[hrIndex]++
+			totalReqs++
+			if entry.Status >= 400 {
+				errorCount++
+			}
+			hourlyLatencies[hrIndex] = append(hourlyLatencies[hrIndex], entry.LatencyMs)
+			allLatencies = append(allLatencies, entry.LatencyMs)
+		}
+	}
+
+	for _, c := range counts {
+		if c > peakRate {
+			peakRate = c
+		}
+	}
+
+	for i := 0; i < 24; i++ {
+		lats := hourlyLatencies[i]
+		n := len(lats)
+		if n == 0 {
+			p50[i] = 0
+			p95[i] = 0
+			continue
+		}
+
+		sort.Slice(lats, func(x, y int) bool {
+			return lats[x] < lats[y]
+		})
+
+		p50Idx := (n - 1) / 2
+		p95Idx := int(math.Ceil(float64(n)*0.95)) - 1
+		if p95Idx < 0 {
+			p95Idx = 0
+		}
+		if p95Idx >= n {
+			p95Idx = n - 1
+		}
+
+		p50[i] = int(lats[p50Idx])
+		p95[i] = int(lats[p95Idx])
+	}
+
+	overallP95 := 0
+	if n := len(allLatencies); n > 0 {
+		sort.Slice(allLatencies, func(x, y int) bool {
+			return allLatencies[x] < allLatencies[y]
+		})
+		p95Idx := int(math.Ceil(float64(n)*0.95)) - 1
+		if p95Idx < 0 {
+			p95Idx = 0
+		}
+		if p95Idx >= n {
+			p95Idx = n - 1
+		}
+		overallP95 = int(allLatencies[p95Idx])
+	}
+
+	errRate := 0.0
+	if totalReqs > 0 {
+		errRate = (float64(errorCount) / float64(totalReqs)) * 100.0
+	}
+
+	return templates.MetricsViewModel{
+		TotalRequests:   totalReqs,
+		PeakRate:        peakRate,
+		P95LatencyMs:    overallP95,
+		ErrorRate:       errRate,
+		VolumeChartSVG:  generateVolumeSVG(counts, labels),
+		LatencyChartSVG: generateLatencySVG(p50, p95, labels),
+	}
+}
+
 func (dc *DashboardController) fetchLocalLogsCosts() (templates.CostsViewModel, error) {
-	file, err := os.Open("data/local_logs.jsonl")
+	file, err := os.Open(localLogsPath())
 	if err != nil {
 		if os.IsNotExist(err) {
 			return templates.CostsViewModel{}, nil
@@ -1709,6 +2204,7 @@ func (dc *DashboardController) fetchLocalLogsCosts() (templates.CostsViewModel, 
 			InputTokens:   inT,
 			OutputTokens:  outT,
 			EstimatedCost: cost,
+			LatencyMs:     entry.LatencyMs,
 		}
 
 		sessions = append(sessions, tx)
@@ -1768,7 +2264,7 @@ func (dc *DashboardController) fetchLocalLogsCosts() (templates.CostsViewModel, 
 }
 
 func (dc *DashboardController) fetchLocalLogsMetrics() (templates.MetricsViewModel, error) {
-	file, err := os.Open("data/local_logs.jsonl")
+	file, err := os.Open(localLogsPath())
 	if err != nil {
 		if os.IsNotExist(err) {
 			return templates.MetricsViewModel{}, nil
@@ -1777,11 +2273,7 @@ func (dc *DashboardController) fetchLocalLogsMetrics() (templates.MetricsViewMod
 	}
 	defer file.Close()
 
-	var entries []struct {
-		Time      string `json:"time"`
-		Status    int    `json:"status"`
-		LatencyMs int64  `json:"latency_ms"`
-	}
+	var entries []logMetricEntry
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -1789,11 +2281,7 @@ func (dc *DashboardController) fetchLocalLogsMetrics() (templates.MetricsViewMod
 		if len(line) == 0 {
 			continue
 		}
-		var entry struct {
-			Time      string `json:"time"`
-			Status    int    `json:"status"`
-			LatencyMs int64  `json:"latency_ms"`
-		}
+		var entry logMetricEntry
 		if err := json.Unmarshal(line, &entry); err == nil {
 			entries = append(entries, entry)
 		}
@@ -1802,152 +2290,81 @@ func (dc *DashboardController) fetchLocalLogsMetrics() (templates.MetricsViewMod
 		log.Printf("[Dashboard] Error scanning local logs for metrics: %v", err)
 	}
 
-	counts := make([]int, 24)
-	p50 := make([]int, 24)
-	p95 := make([]int, 24)
-	labels := make([]string, 24)
-
-	now := time.Now()
-	for i := 0; i < 24; i++ {
-		t := now.Add(-time.Duration(23-i) * time.Hour)
-		labels[i] = t.Format("15:00")
-	}
-
-	hourlyLatencies := make([][]int64, 24)
-	totalReqs := 0
-	peakRate := 0
-	errorCount := 0
-
-	for _, entry := range entries {
-		t, err := time.Parse(time.RFC3339, entry.Time)
-		if err != nil {
-			continue
-		}
-
-		hrIndex := 23 - int(now.Sub(t).Hours())
-		if hrIndex >= 0 && hrIndex < 24 {
-			counts[hrIndex]++
-			totalReqs++
-			if entry.Status >= 400 {
-				errorCount++
-			}
-			hourlyLatencies[hrIndex] = append(hourlyLatencies[hrIndex], entry.LatencyMs)
-		}
-	}
-
-	for _, c := range counts {
-		if c > peakRate {
-			peakRate = c
-		}
-	}
-
-	for i := 0; i < 24; i++ {
-		lats := hourlyLatencies[i]
-		if len(lats) == 0 {
-			p50[i] = 0
-			p95[i] = 0
-			continue
-		}
-
-		sort.Slice(lats, func(x, y int) bool {
-			return lats[x] < lats[y]
-		})
-
-		p50Idx := len(lats) / 2
-		p95Idx := int(float64(len(lats)) * 0.95)
-		if p95Idx >= len(lats) {
-			p95Idx = len(lats) - 1
-		}
-
-		p50[i] = int(lats[p50Idx])
-		p95[i] = int(lats[p95Idx])
-	}
-
-	avgP95 := 0
-	activeCount := 0
-	for _, v := range p95 {
-		if v > 0 {
-			avgP95 += v
-			activeCount++
-		}
-	}
-	if activeCount > 0 {
-		avgP95 /= activeCount
-	}
-
-	errRate := 0.0
-	if totalReqs > 0 {
-		errRate = (float64(errorCount) / float64(totalReqs)) * 100.0
-	}
-
-	return templates.MetricsViewModel{
-		TotalRequests:   totalReqs,
-		PeakRate:        peakRate,
-		P95LatencyMs:    avgP95,
-		ErrorRate:       errRate,
-		VolumeChartSVG:  generateVolumeSVG(counts, labels),
-		LatencyChartSVG: generateLatencySVG(p50, p95, labels),
-	}, nil
+	return computeMetricsFromEntries(entries, time.Now()), nil
 }
 
-// fetchCloudMonitoringMetrics collects revision volume and latency details from Cloud Monitoring.
-func (dc *DashboardController) fetchCloudMonitoringMetrics(ctx context.Context, simulate bool) (templates.MetricsViewModel, error) {
-	if simulate {
-		return dc.generateMockMetrics(), nil
-	}
+// fetchCloudMonitoringMetrics collects proxy request volume, error rate, and P50/P95 latency from Cloud Logging StructuredLogs.
+func (dc *DashboardController) fetchCloudMonitoringMetrics(ctx context.Context) (templates.MetricsViewModel, error) {
 	if os.Getenv("LOCAL_DEV") == "true" {
 		return dc.fetchLocalLogsMetrics()
 	}
-	// If running locally without real project or GCP token is not initialized, serve empty state
-	if dc.ProjectID == "dev-project" || dc.TokenSource == nil {
-		return templates.MetricsViewModel{}, nil
+	if dc.ProjectID == "" || dc.ProjectID == "dev-project" || dc.TokenSource == nil {
+		return templates.MetricsViewModel{}, fmt.Errorf("google cloud monitoring credentials not initialized for project %q", dc.ProjectID)
 	}
 
-	serviceName := os.Getenv("BACKEND_SERVICE_NAME")
-	if serviceName == "" {
-		serviceName = os.Getenv("K_SERVICE")
-		if serviceName == "" {
-			serviceName = "gemini-smart-router" // standard fallback
-		}
-	}
-
-	// Query time-series for request_count
+	serviceName := dc.resolveBackendServiceName()
 	now := time.Now()
-	startTime := now.Add(-24 * time.Hour)
-	
-	// Time interval formats
-	startStr := startTime.UTC().Format(time.RFC3339)
-	endStr := now.UTC().Format(time.RFC3339)
+	startTime := now.Add(-24 * time.Hour).UTC().Format(time.RFC3339)
 
-	// 1. Fetch Volume Metrics
-	volURL := fmt.Sprintf("https://monitoring.googleapis.com/v3/projects/%s/timeSeries?filter=%s&interval.startTime=%s&interval.endTime=%s&aggregation.alignmentPeriod=3600s&aggregation.perSeriesAligner=ALIGN_SUM",
-		dc.ProjectID,
-		url.QueryEscape(fmt.Sprintf(`metric.type="run.googleapis.com/request_count" AND resource.type="cloud_run_revision" AND resource.labels.service_name="%s"`, serviceName)),
-		startStr,
-		endStr,
-	)
+	urlStr := "https://logging.googleapis.com/v2/entries:list"
+	filter := fmt.Sprintf(`resource.type="cloud_run_revision" AND resource.labels.service_name="%s" AND jsonPayload.path:* AND jsonPayload.latency_ms:* AND timestamp>="%s"`, serviceName, startTime)
 
-	volBody, err := dc.gcpGet(ctx, volURL)
-	if err != nil {
-		log.Printf("[Monitoring] Error querying request count: %v", err)
-		return dc.generateMockMetrics(), nil
+	type gcpMetricLogEntry struct {
+		Timestamp   string `json:"timestamp"`
+		JSONPayload struct {
+			Time      string `json:"time"`
+			Status    int    `json:"status"`
+			LatencyMs int64  `json:"latency_ms"`
+		} `json:"jsonPayload"`
+	}
+	type gcpMetricLogsResponse struct {
+		Entries       []gcpMetricLogEntry `json:"entries"`
+		NextPageToken string              `json:"nextPageToken"`
 	}
 
-	// 2. Fetch Latency Metrics
-	latURL := fmt.Sprintf("https://monitoring.googleapis.com/v3/projects/%s/timeSeries?filter=%s&interval.startTime=%s&interval.endTime=%s&aggregation.alignmentPeriod=3600s&aggregation.perSeriesAligner=ALIGN_PERCENTILE_95",
-		dc.ProjectID,
-		url.QueryEscape(fmt.Sprintf(`metric.type="run.googleapis.com/request_latencies" AND resource.type="cloud_run_revision" AND resource.labels.service_name="%s"`, serviceName)),
-		startStr,
-		endStr,
-	)
+	var entries []logMetricEntry
+	pageToken := ""
+	for page := 0; page < 10; page++ {
+		bodyReq := map[string]interface{}{
+			"resourceNames": []string{fmt.Sprintf("projects/%s", dc.ProjectID)},
+			"filter":        filter,
+			"orderBy":       "timestamp desc",
+			"pageSize":      1000,
+		}
+		if pageToken != "" {
+			bodyReq["pageToken"] = pageToken
+		}
 
-	latBody, err := dc.gcpGet(ctx, latURL)
-	if err != nil {
-		log.Printf("[Monitoring] Error querying latencies: %v", err)
-		return dc.generateMockMetrics(), nil
+		respBody, err := dc.gcpPost(ctx, urlStr, bodyReq)
+		if err != nil {
+			log.Printf("[Monitoring] Error querying Cloud Logging metrics: %v", err)
+			return templates.MetricsViewModel{}, err
+		}
+
+		var parsed gcpMetricLogsResponse
+		if err := json.Unmarshal(respBody, &parsed); err != nil {
+			return templates.MetricsViewModel{}, fmt.Errorf("failed to unmarshal cloud logging metrics: %w", err)
+		}
+
+		for _, e := range parsed.Entries {
+			ts := e.JSONPayload.Time
+			if ts == "" {
+				ts = e.Timestamp
+			}
+			entries = append(entries, logMetricEntry{
+				Time:      ts,
+				Status:    e.JSONPayload.Status,
+				LatencyMs: e.JSONPayload.LatencyMs,
+			})
+		}
+
+		if parsed.NextPageToken == "" {
+			break
+		}
+		pageToken = parsed.NextPageToken
 	}
 
-	return dc.parseGCPMetrics(volBody, latBody)
+	return computeMetricsFromEntries(entries, now), nil
 }
 
 // parseGCPMetrics parses the REST JSON responses and computes SVG charts.
@@ -1975,8 +2392,12 @@ func (dc *DashboardController) parseGCPMetrics(volBody, latBody []byte) (templat
 	var volData TSResponse
 	var latData TSResponse
 
-	_ = json.Unmarshal(volBody, &volData)
-	_ = json.Unmarshal(latBody, &latData)
+	if err := json.Unmarshal(volBody, &volData); err != nil {
+		return templates.MetricsViewModel{}, fmt.Errorf("failed to unmarshal volume metrics: %w", err)
+	}
+	if err := json.Unmarshal(latBody, &latData); err != nil {
+		return templates.MetricsViewModel{}, fmt.Errorf("failed to unmarshal latency metrics: %w", err)
+	}
 
 	// Process last 24 hourly intervals
 	counts := make([]int, 24)
@@ -1988,19 +2409,20 @@ func (dc *DashboardController) parseGCPMetrics(volBody, latBody []byte) (templat
 	for i := 0; i < 24; i++ {
 		t := now.Add(-time.Duration(23-i) * time.Hour)
 		labels[i] = t.Format("15:00")
-		
-		// Seed baseline fallbacks
-		p50[i] = 150 + mathrand.Intn(80)
-		p95[i] = 450 + mathrand.Intn(150)
 	}
 
 	totalReqs := 0
 	peakRate := 0
 	errorCount := 0
+	classHourVol := make(map[string][]int)
 
 	if len(volData.TimeSeries) > 0 {
 		for _, series := range volData.TimeSeries {
-			isError := series.Metric.Labels["response_code_class"] != "2xx"
+			rcClass := series.Metric.Labels["response_code_class"]
+			isError := rcClass == "4xx" || rcClass == "5xx"
+			if _, ok := classHourVol[rcClass]; !ok {
+				classHourVol[rcClass] = make([]int, 24)
+			}
 			for _, pt := range series.Points {
 				t, err := time.Parse(time.RFC3339, pt.Interval.EndTime)
 				if err != nil {
@@ -2010,6 +2432,7 @@ func (dc *DashboardController) parseGCPMetrics(volBody, latBody []byte) (templat
 				if hrIndex >= 0 && hrIndex < 24 {
 					val, _ := strconv.Atoi(pt.Value.Int64Value)
 					counts[hrIndex] += val
+					classHourVol[rcClass][hrIndex] += val
 					totalReqs += val
 					if isError {
 						errorCount += val
@@ -2026,9 +2449,17 @@ func (dc *DashboardController) parseGCPMetrics(volBody, latBody []byte) (templat
 		}
 	}
 
-	// Fetch Latencies
+	// Aggregate latencies per hour weighted by series volume
+	p95WeightedSum := make([]float64, 24)
+	p95WeightTotal := make([]int, 24)
+	p50WeightedSum := make([]float64, 24)
+	p50WeightTotal := make([]int, 24)
+	hasExplicitP50 := false
+
 	if len(latData.TimeSeries) > 0 {
 		for _, series := range latData.TimeSeries {
+			rcClass := series.Metric.Labels["response_code_class"]
+			pctLabel := series.Metric.Labels["percentile"]
 			for _, pt := range series.Points {
 				t, err := time.Parse(time.RFC3339, pt.Interval.EndTime)
 				if err != nil {
@@ -2036,28 +2467,58 @@ func (dc *DashboardController) parseGCPMetrics(volBody, latBody []byte) (templat
 				}
 				hrIndex := 23 - int(now.Sub(t).Hours())
 				if hrIndex >= 0 && hrIndex < 24 {
-					val := int(pt.Value.DoubleValue)
+					val := pt.Value.DoubleValue
 					if val > 0 {
-						p95[hrIndex] = val
-						p50[hrIndex] = int(float64(val) * 0.4) // approximate median
+						weight := 1
+						if vols, ok := classHourVol[rcClass]; ok && vols[hrIndex] > 0 {
+							weight = vols[hrIndex]
+						}
+						if pctLabel == "50" || pctLabel == "p50" {
+							hasExplicitP50 = true
+							p50WeightedSum[hrIndex] += val * float64(weight)
+							p50WeightTotal[hrIndex] += weight
+						} else {
+							p95WeightedSum[hrIndex] += val * float64(weight)
+							p95WeightTotal[hrIndex] += weight
+						}
 					}
 				}
 			}
 		}
 	}
 
-	avgP95 := 0
-	activeCount := 0
-	for _, v := range p95 {
-		if v > 0 {
-			avgP95 += v
-			activeCount++
+	for i := 0; i < 24; i++ {
+		if p95WeightTotal[i] > 0 {
+			p95[i] = int(math.Round(p95WeightedSum[i] / float64(p95WeightTotal[i])))
+		}
+		if hasExplicitP50 {
+			if p50WeightTotal[i] > 0 {
+				p50[i] = int(math.Round(p50WeightedSum[i] / float64(p50WeightTotal[i])))
+			}
+		} else {
+			p50[i] = p95[i]
 		}
 	}
-	if activeCount > 0 {
-		avgP95 /= activeCount
-	} else {
-		avgP95 = 350
+
+	avgP95 := 0
+	weightedLatencySum := 0
+	totalLatencyWeight := 0
+	unweightedSum := 0
+	activeCount := 0
+	for i, v := range p95 {
+		if v > 0 {
+			unweightedSum += v
+			activeCount++
+			if counts[i] > 0 {
+				weightedLatencySum += v * counts[i]
+				totalLatencyWeight += counts[i]
+			}
+		}
+	}
+	if totalLatencyWeight > 0 {
+		avgP95 = int(math.Round(float64(weightedLatencySum) / float64(totalLatencyWeight)))
+	} else if activeCount > 0 {
+		avgP95 = unweightedSum / activeCount
 	}
 
 	errRate := 0.0
@@ -2075,92 +2536,21 @@ func (dc *DashboardController) parseGCPMetrics(volBody, latBody []byte) (templat
 	}, nil
 }
 
-// generateMockMetrics provides high-fidelity simulated monitoring values for local dev.
-func (dc *DashboardController) generateMockMetrics() templates.MetricsViewModel {
-	counts := make([]int, 24)
-	p50 := make([]int, 24)
-	p95 := make([]int, 24)
-	labels := make([]string, 24)
-
-	now := time.Now()
-	totalRequests := 0
-	peakRate := 0
-	errorCount := 0
-
-	for i := 0; i < 24; i++ {
-		t := now.Add(-time.Duration(23-i) * time.Hour)
-		labels[i] = t.Format("15:00")
-
-		// Beautiful wave simulation for traffic
-		hour := t.Hour()
-		wave := math.Sin(float64(hour-6)*math.Pi/12.0)*0.4 + 0.6 // peak around afternoon
-		baseVal := 50 + int(wave*120)
-		noise := mathrand.Intn(30)
-		c := baseVal + noise
-		if c < 0 {
-			c = 0
-		}
-		counts[i] = c
-		totalRequests += c
-		if c > peakRate {
-			peakRate = c
-		}
-
-		// Simulate occasional error spikes
-		if hour == 14 || hour == 20 {
-			errorCount += int(float64(c) * 0.08)
-		} else {
-			errorCount += int(float64(c) * 0.01)
-		}
-
-		// Latency simulations
-		p50[i] = 110 + mathrand.Intn(60)
-		p95[i] = 320 + mathrand.Intn(140)
-		if hour == 14 || hour == 20 {
-			p50[i] += 80
-			p95[i] += 250
-		}
-	}
-
-	errRate := 0.0
-	if totalRequests > 0 {
-		errRate = (float64(errorCount) / float64(totalRequests)) * 100.0
-	}
-
-	return templates.MetricsViewModel{
-		TotalRequests:   totalRequests,
-		PeakRate:        peakRate,
-		P95LatencyMs:    380,
-		ErrorRate:       errRate,
-		VolumeChartSVG:  generateVolumeSVG(counts, labels),
-		LatencyChartSVG: generateLatencySVG(p50, p95, labels),
-	}
-}
-
-// fetchCostAnalyticsData queries Cloud Logging logs or mocks billing transactions.
-func (dc *DashboardController) fetchCostAnalyticsData(ctx context.Context, simulate bool) (templates.CostsViewModel, error) {
-	if simulate {
-		return dc.generateMockCosts(), nil
-	}
+// fetchCostAnalyticsData queries Cloud Logging logs or local telemetry logs.
+func (dc *DashboardController) fetchCostAnalyticsData(ctx context.Context) (templates.CostsViewModel, error) {
 	if os.Getenv("LOCAL_DEV") == "true" {
 		return dc.fetchLocalLogsCosts()
 	}
-	if dc.ProjectID == "dev-project" || dc.TokenSource == nil {
-		return templates.CostsViewModel{}, nil
+	if dc.ProjectID == "" || dc.ProjectID == "dev-project" || dc.TokenSource == nil {
+		return templates.CostsViewModel{}, fmt.Errorf("google cloud logging credentials not initialized for project %q", dc.ProjectID)
 	}
 
-	serviceName := os.Getenv("BACKEND_SERVICE_NAME")
-	if serviceName == "" {
-		serviceName = os.Getenv("K_SERVICE")
-		if serviceName == "" {
-			serviceName = "gemini-smart-router"
-		}
-	}
+	serviceName := dc.resolveBackendServiceName()
 
 	// Retrieve raw proxy StructuredLogs from Cloud Logging
 	urlStr := "https://logging.googleapis.com/v2/entries:list"
 	filter := fmt.Sprintf(`resource.type="cloud_run_revision" AND resource.labels.service_name="%s" AND jsonPayload.model_routed:*`, serviceName)
-	
+
 	bodyReq := map[string]interface{}{
 		"resourceNames": []string{fmt.Sprintf("projects/%s", dc.ProjectID)},
 		"filter":        filter,
@@ -2171,7 +2561,7 @@ func (dc *DashboardController) fetchCostAnalyticsData(ctx context.Context, simul
 	respBody, err := dc.gcpPost(ctx, urlStr, bodyReq)
 	if err != nil {
 		log.Printf("[Cost Analytics] Error querying Cloud Logging: %v", err)
-		return dc.generateMockCosts(), nil
+		return templates.CostsViewModel{}, err
 	}
 
 	return dc.parseGCPCosts(respBody)
@@ -2183,9 +2573,10 @@ func (dc *DashboardController) parseGCPCosts(payload []byte) (templates.CostsVie
 		Timestamp   string `json:"timestamp"`
 		InsertID    string `json:"insertId"`
 		JSONPayload struct {
-			ClientID      string `json:"client_id"`
-			ModelRouted   string `json:"model_routed"`
-			BytesSent     int64  `json:"bytes_sent"`
+			ClientID    string `json:"client_id"`
+			ModelRouted string `json:"model_routed"`
+			BytesSent   int64  `json:"bytes_sent"`
+			LatencyMs   int64  `json:"latency_ms"`
 		} `json:"jsonPayload"`
 	}
 	type GCPLogsResponse struct {
@@ -2194,7 +2585,7 @@ func (dc *DashboardController) parseGCPCosts(payload []byte) (templates.CostsVie
 
 	var resp GCPLogsResponse
 	if err := json.Unmarshal(payload, &resp); err != nil {
-		return dc.generateMockCosts(), nil
+		return templates.CostsViewModel{}, fmt.Errorf("failed to unmarshal cloud logging entries: %w", err)
 	}
 
 	var sessions []templates.CostTransaction
@@ -2215,21 +2606,27 @@ func (dc *DashboardController) parseGCPCosts(payload []byte) (templates.CostsVie
 		}
 
 		inT, outT, cost := estimateTokensAndCost(model, entry.JSONPayload.BytesSent)
-		
+
 		t, err := time.Parse(time.RFC3339, entry.Timestamp)
 		timeStr := entry.Timestamp
 		if err == nil {
 			timeStr = t.Local().Format("2006-01-02 15:04:05")
 		}
 
+		sessionID := entry.InsertID
+		if len(sessionID) > 8 {
+			sessionID = sessionID[:8]
+		}
+
 		tx := templates.CostTransaction{
 			Time:          timeStr,
-			SessionID:     entry.InsertID[:8],
+			SessionID:     sessionID,
 			ClientID:      clientID,
 			ModelRouted:   model,
 			InputTokens:   inT,
 			OutputTokens:  outT,
 			EstimatedCost: cost,
+			LatencyMs:     entry.JSONPayload.LatencyMs,
 		}
 
 		sessions = append(sessions, tx)
@@ -2290,137 +2687,13 @@ func (dc *DashboardController) parseGCPCosts(payload []byte) (templates.CostsVie
 	}, nil
 }
 
-// generateMockCosts populates a detailed transaction mock bill database for offline dev.
-func (dc *DashboardController) generateMockCosts() templates.CostsViewModel {
-	clients := []string{"enterprise-app", "internal-dev-portal", "analytics-service", "startup-sandbox"}
-	models := []string{"gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite"}
-	
-	var sessions []templates.CostTransaction
-	modelSpend := make(map[string]float64)
-	clientSpend := make(map[string]float64)
-	totalSpend := 0.0
-	totalIn := 0
-	totalOut := 0
-
-	now := time.Now()
-
-	for i := 0; i < 100; i++ {
-		cIndex := mathrand.Intn(len(clients))
-		mIndex := mathrand.Intn(len(models))
-		client := clients[cIndex]
-		model := models[mIndex]
-
-		// Standard token volume
-		inT := 400 + mathrand.Intn(8000)
-		outT := 150 + mathrand.Intn(3000)
-		
-		// Premium model multiplier
-		if strings.Contains(model, "pro") {
-			inT += 1000
-			outT += 800
-		}
-
-		var inPrice, outPrice float64
-		if strings.Contains(model, "pro") {
-			inPrice = 1.25 / 1000000.0
-			outPrice = 5.00 / 1000000.0
-		} else {
-			inPrice = 0.075 / 1000000.0
-			outPrice = 0.30 / 1000000.0
-		}
-
-		cost := (float64(inT) * inPrice) + (float64(outT) * outPrice)
-		
-		t := now.Add(-time.Duration(mathrand.Intn(24)) * time.Hour).Add(-time.Duration(mathrand.Intn(60)) * time.Minute)
-
-		tx := templates.CostTransaction{
-			Time:          t.Format("2006-01-02 15:04:05"),
-			SessionID:     fmt.Sprintf("sess_%x", 1000000+i),
-			ClientID:      client,
-			ModelRouted:   model,
-			InputTokens:   inT,
-			OutputTokens:  outT,
-			EstimatedCost: cost,
-		}
-
-		sessions = append(sessions, tx)
-		modelSpend[model] += cost
-		clientSpend[client] += cost
-		totalSpend += cost
-		totalIn += inT
-		totalOut += outT
-	}
-
-	// Construct ViewModels
-	var modelBreakdowns []templates.ModelCostBreakdown
-	for m, val := range modelSpend {
-		pct := 0.0
-		if totalSpend > 0 {
-			pct = (val / totalSpend) * 100.0
-		}
-		modelBreakdowns = append(modelBreakdowns, templates.ModelCostBreakdown{
-			ModelName: m,
-			Cost:      val,
-			Percent:   pct,
-		})
-	}
-
-	var clientBreakdowns []templates.ClientCostBreakdown
-	for c, val := range clientSpend {
-		pct := 0.0
-		if totalSpend > 0 {
-			pct = (val / totalSpend) * 100.0
-		}
-		clientBreakdowns = append(clientBreakdowns, templates.ClientCostBreakdown{
-			ClientID: c,
-			Cost:     val,
-			Percent:  pct,
-		})
-	}
-
-	avgCost := 0.0
-	if len(sessions) > 0 {
-		avgCost = (totalSpend / float64(len(sessions))) * 1000.0
-	}
-
-	// Sort sessions chronologically desc
-	for idx := 0; idx < len(sessions); idx++ {
-		for j := idx + 1; j < len(sessions); j++ {
-			if sessions[idx].Time < sessions[j].Time {
-				sessions[idx], sessions[j] = sessions[j], sessions[idx]
-			}
-		}
-	}
-
-	// Keep 50 recent
-	if len(sessions) > 50 {
-		sessions = sessions[:50]
-	}
-
-	return templates.CostsViewModel{
-		TotalSpend:        totalSpend,
-		TotalTokensInput:  totalIn,
-		TotalTokensOutput: totalOut,
-		AvgCostPer1K:      avgCost,
-		ModelBreakdowns:   modelBreakdowns,
-		ClientBreakdowns:  clientBreakdowns,
-		RecentSessions:    sessions,
-		ModelCostSVG:      generateModelCostPieSVG(modelBreakdowns),
-		ClientCostSVG:     generateClientCostBarSVG(clientBreakdowns),
-	}
-}
-
 // ServeCosts handles cost breakouts and analytics.
 func (dc *DashboardController) ServeCosts(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	simulate := false
-	if cookie, err := r.Cookie("simulate_metrics"); err == nil && cookie.Value == "true" {
-		simulate = true
-	}
-	vm, err := dc.fetchCostAnalyticsData(ctx, simulate)
+	vm, err := dc.fetchCostAnalyticsData(ctx)
 	if err != nil {
 		log.Printf("[Costs] Error fetching analytics data: %v", err)
-		http.Error(w, "Internal Server Error loading cost analytics", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Failed to load cost analytics: %v", err), http.StatusInternalServerError)
 		return
 	}
 
@@ -2432,14 +2705,10 @@ func (dc *DashboardController) ServeCosts(w http.ResponseWriter, r *http.Request
 // ServeMetrics renders the Cloud Monitoring charts tab.
 func (dc *DashboardController) ServeMetrics(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	simulate := false
-	if cookie, err := r.Cookie("simulate_metrics"); err == nil && cookie.Value == "true" {
-		simulate = true
-	}
-	vm, err := dc.fetchCloudMonitoringMetrics(ctx, simulate)
+	vm, err := dc.fetchCloudMonitoringMetrics(ctx)
 	if err != nil {
 		log.Printf("[Monitoring] Error loading system monitoring metrics: %v", err)
-		http.Error(w, "Internal Server Error loading system metrics", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Failed to load system metrics: %v", err), http.StatusInternalServerError)
 		return
 	}
 
@@ -2749,44 +3018,82 @@ func (dc *DashboardController) CreateApp(w http.ResponseWriter, r *http.Request)
 	tpmStr := strings.TrimSpace(r.FormValue("tpm"))
 
 	if appID == "" {
-		http.Error(w, "Application ID (Slug) cannot be empty.", http.StatusBadRequest)
+		dc.renderFormError(w, r, "Application ID (Slug) cannot be empty.", http.StatusBadRequest)
 		return
 	}
 	// Support email slugs (for Google service accounts) or standard alphanumeric slugs
 	if strings.Contains(appID, "@") {
 		if !strings.Contains(appID, ".") {
-			http.Error(w, "Application ID email structure is invalid.", http.StatusBadRequest)
+			dc.renderFormError(w, r, "Application ID email structure is invalid.", http.StatusBadRequest)
 			return
 		}
 	} else {
 		for _, char := range appID {
 			if !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9') || char == '-' || char == '.') {
-				http.Error(w, "Application ID must be a valid slug (alphanumeric, hyphens, and dots only).", http.StatusBadRequest)
+				dc.renderFormError(w, r, "Application ID must be a valid slug (alphanumeric, hyphens, and dots only).", http.StatusBadRequest)
 				return
 			}
 		}
 	}
 
 	if appName == "" {
-		http.Error(w, "Application Name cannot be empty.", http.StatusBadRequest)
+		dc.renderFormError(w, r, "Application Name cannot be empty.", http.StatusBadRequest)
 		return
 	}
 
 	if clientID == "" {
-		http.Error(w, "Parent Client Organization selection is required.", http.StatusBadRequest)
+		dc.renderFormError(w, r, "Parent Client Organization selection is required.", http.StatusBadRequest)
 		return
 	}
 
-	rpm, err := strconv.Atoi(rpmStr)
-	if err != nil || rpm <= 0 {
-		http.Error(w, "Requests Per Minute (RPM) limit must be a positive integer.", http.StatusBadRequest)
-		return
+	var parentClient config.Client
+	if allClients, err := dc.Store.GetAllClients(ctx); err == nil {
+		for _, c := range allClients {
+			if c.ID == clientID {
+				parentClient = c
+				break
+			}
+		}
 	}
 
-	tpm, err := strconv.Atoi(tpmStr)
-	if err != nil || tpm <= 0 {
-		http.Error(w, "Tokens Per Minute (TPM) limit must be a positive integer.", http.StatusBadRequest)
-		return
+	if priority == "" {
+		if parentClient.Priority != "" {
+			priority = parentClient.Priority
+		} else {
+			priority = "medium"
+		}
+	}
+
+	var rpm int
+	if rpmStr == "" {
+		if parentClient.RPM > 0 {
+			rpm = parentClient.RPM
+		} else {
+			rpm = 60
+		}
+	} else {
+		var err error
+		rpm, err = strconv.Atoi(rpmStr)
+		if err != nil || rpm <= 0 {
+			dc.renderFormError(w, r, "Requests Per Minute (RPM) limit must be a positive integer.", http.StatusBadRequest)
+			return
+		}
+	}
+
+	var tpm int
+	if tpmStr == "" {
+		if parentClient.TPM > 0 {
+			tpm = parentClient.TPM
+		} else {
+			tpm = 40000
+		}
+	} else {
+		var err error
+		tpm, err = strconv.Atoi(tpmStr)
+		if err != nil || tpm <= 0 {
+			dc.renderFormError(w, r, "Tokens Per Minute (TPM) limit must be a positive integer.", http.StatusBadRequest)
+			return
+		}
 	}
 
 	optOutDynamicRouting := r.FormValue("opt_out_dynamic_routing") == "true"
@@ -2800,19 +3107,19 @@ func (dc *DashboardController) CreateApp(w http.ResponseWriter, r *http.Request)
 		complexity = config.ComplexityRouting{
 			Enabled:                false,
 			AlwaysOverride:         false,
-			SimpleModel:            "gemini-2.5-flash-lite",
-			MediumModel:            "gemini-2.5-flash",
-			ComplexModel:           "gemini-2.5-pro",
+			SimpleModel:            "gemini-3.5-flash-lite",
+			MediumModel:            "gemini-3.8-flash",
+			ComplexModel:           "gemini-3.1-pro",
 			SimpleCharLimit:        200,
 			MediumCharLimit:        1000,
 			ForceComplexMultimodal: true,
 			ForceComplexTools:      true,
 			UseLLMClassifier:       false,
-			ClassifierModel:        "gemini-3.1-flash-lite",
+			ClassifierModel:        "gemini-3.5-flash-lite",
 		}
 	}
 
-	err = dc.Store.SaveApp(ctx, config.App{
+	err := dc.Store.SaveApp(ctx, config.App{
 		ID:                   appID,
 		ClientID:             clientID,
 		Name:                 appName,
@@ -3014,6 +3321,14 @@ func (dc *DashboardController) DeleteClient(w http.ResponseWriter, r *http.Reque
 func (dc *DashboardController) ServeComplexity(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	if dc.Store != nil {
+		if providers, err := dc.Store.GetAllProviders(ctx); err == nil {
+			for _, p := range providers {
+				decision.SyncDecisionProvidersFromLocalConfig(p)
+			}
+		}
+	}
+
 	apps, err := dc.Store.GetAllApps(ctx)
 	if err != nil {
 		log.Printf("[Dashboard] Error loading apps for complexity routing: %v", err)
@@ -3106,6 +3421,16 @@ func (dc *DashboardController) SaveComplexitySettings(w http.ResponseWriter, r *
 
 	enabled := r.FormValue("enabled") == "true"
 	alwaysOverride := r.FormValue("always_override") == "true"
+	engine := strings.TrimSpace(r.FormValue("engine"))
+	jevEndpoint := strings.TrimSpace(r.FormValue("jev_endpoint"))
+	fastinoEndpoint := strings.TrimSpace(r.FormValue("fastino_endpoint"))
+	clmEndpoint := strings.TrimSpace(r.FormValue("clm_endpoint"))
+	secretRef := strings.TrimSpace(r.FormValue("secret_ref"))
+	minConfidenceStr := strings.TrimSpace(r.FormValue("min_confidence"))
+	simpleCriteria := strings.TrimSpace(r.FormValue("simple_criteria"))
+	mediumCriteria := strings.TrimSpace(r.FormValue("medium_criteria"))
+	complexCriteria := strings.TrimSpace(r.FormValue("complex_criteria"))
+	apiKey := strings.TrimSpace(r.FormValue("api_key"))
 	simpleModel := strings.TrimSpace(r.FormValue("simple_model"))
 	mediumModel := strings.TrimSpace(r.FormValue("medium_model"))
 	complexModel := strings.TrimSpace(r.FormValue("complex_model"))
@@ -3117,16 +3442,58 @@ func (dc *DashboardController) SaveComplexitySettings(w http.ResponseWriter, r *
 	classifierModel := strings.TrimSpace(r.FormValue("classifier_model"))
 	additionalInstructions := strings.TrimSpace(r.FormValue("additional_instructions"))
 
-	simpleCharLimit, err := strconv.Atoi(simpleCharLimitStr)
-	if err != nil || simpleCharLimit < 0 {
-		http.Error(w, "Simple text limit must be a non-negative integer.", http.StatusBadRequest)
-		return
+	if simpleModel == "" {
+		simpleModel = "gemini-3.5-flash-lite"
+	}
+	if mediumModel == "" {
+		mediumModel = "gemini-3.8-flash"
+	}
+	if complexModel == "" {
+		complexModel = "gemini-3.1-pro"
+	}
+	if classifierModel == "" {
+		classifierModel = "gemini-3.5-flash-lite"
 	}
 
-	mediumCharLimit, err := strconv.Atoi(mediumCharLimitStr)
-	if err != nil || mediumCharLimit < 0 {
-		http.Error(w, "Medium text limit must be a non-negative integer.", http.StatusBadRequest)
-		return
+	if engine == "" {
+		if useLLMClassifier {
+			engine = "llm"
+		} else {
+			engine = "jev"
+		}
+	}
+
+	if apiKey != "" {
+		decision.SetEngineSecret(engine, apiKey)
+		if secretRef != "" {
+			decision.SetEngineSecret(secretRef, apiKey)
+		}
+	}
+
+	simpleCharLimit := app.Complexity.SimpleCharLimit
+	if simpleCharLimit <= 0 {
+		simpleCharLimit = 200
+	}
+	if simpleCharLimitStr != "" {
+		parsed, err := strconv.Atoi(simpleCharLimitStr)
+		if err != nil || parsed < 0 {
+			http.Error(w, "Simple text limit must be a non-negative integer.", http.StatusBadRequest)
+			return
+		}
+		simpleCharLimit = parsed
+	}
+
+	mediumCharLimit := app.Complexity.MediumCharLimit
+	if mediumCharLimit <= 0 {
+		mediumCharLimit = 800
+	}
+	if mediumCharLimitStr != "" {
+		parsed, err := strconv.Atoi(mediumCharLimitStr)
+		if err != nil || parsed < 0 {
+			http.Error(w, "Medium text limit must be a non-negative integer.", http.StatusBadRequest)
+			return
+		}
+		mediumCharLimit = parsed
 	}
 
 	if simpleCharLimit > mediumCharLimit {
@@ -3134,10 +3501,46 @@ func (dc *DashboardController) SaveComplexitySettings(w http.ResponseWriter, r *
 		return
 	}
 
+	minConfidence := app.Complexity.MinConfidence
+	if minConfidenceStr != "" {
+		mc, err := strconv.ParseFloat(minConfidenceStr, 64)
+		if err != nil || mc < 0 || mc > 1 {
+			http.Error(w, "Minimum confidence must be between 0.0 and 1.0.", http.StatusBadRequest)
+			return
+		}
+		minConfidence = mc
+	}
+
+	taskMapping := app.Complexity.TaskMapping
+	if taskMapping == nil {
+		taskMapping = make(map[string]string)
+	}
+	taskKeys := map[string]string{
+		"code":          strings.TrimSpace(r.FormValue("task_code")),
+		"triage":        strings.TrimSpace(r.FormValue("task_triage")),
+		"summarization": strings.TrimSpace(r.FormValue("task_summarization")),
+	}
+	for k, v := range taskKeys {
+		if v != "" {
+			taskMapping[k] = v
+		} else {
+			delete(taskMapping, k)
+		}
+	}
+
 	// Update Complexity fields
 	app.Complexity = config.ComplexityRouting{
 		Enabled:                enabled,
 		AlwaysOverride:         alwaysOverride,
+		Engine:                 engine,
+		JevEndpoint:            jevEndpoint,
+		FastinoEndpoint:        fastinoEndpoint,
+		CLMEndpoint:            clmEndpoint,
+		SecretRef:              secretRef,
+		MinConfidence:          minConfidence,
+		SimpleCriteria:         simpleCriteria,
+		MediumCriteria:         mediumCriteria,
+		ComplexCriteria:        complexCriteria,
 		SimpleModel:            simpleModel,
 		MediumModel:            mediumModel,
 		ComplexModel:           complexModel,
@@ -3148,9 +3551,10 @@ func (dc *DashboardController) SaveComplexitySettings(w http.ResponseWriter, r *
 		UseLLMClassifier:       useLLMClassifier,
 		ClassifierModel:        classifierModel,
 		AdditionalInstructions: additionalInstructions,
+		TaskMapping:            taskMapping,
 	}
 
-	err = dc.Store.SaveApp(ctx, app)
+	err := dc.Store.SaveApp(ctx, app)
 	if err != nil {
 		log.Printf("[Dashboard] Error saving complexity settings: %v", err)
 		http.Error(w, "Failed to save complexity settings", http.StatusInternalServerError)
@@ -3165,38 +3569,311 @@ func (dc *DashboardController) SaveComplexitySettings(w http.ResponseWriter, r *
 	http.Redirect(w, r, "/admin/complexity", http.StatusSeeOther)
 }
 
-// ServeLocationsTestHelper is an exported test helper wrapper to execute fetchLocations in unit tests.
-func (dc *DashboardController) ServeLocationsTestHelper(ctx context.Context) ([]templates.LocationInfo, error) {
-	return dc.fetchLocations(ctx)
+// HandleComplexityKeys manages decision engine secret keys, endpoints, and Contrastive-LM cluster bindings.
+func (dc *DashboardController) HandleComplexityKeys(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	switch r.Method {
+	case http.MethodGet:
+		if dc.Store != nil {
+			if providers, err := dc.Store.GetAllProviders(ctx); err == nil {
+				for _, p := range providers {
+					decision.SyncDecisionProvidersFromLocalConfig(p)
+				}
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(decision.GetAllEngineSecretStatuses(""))
+		return
+	case http.MethodPost:
+		engine := strings.TrimSpace(r.FormValue("engine"))
+		apiKey := strings.TrimSpace(r.FormValue("api_key"))
+		secretRef := strings.TrimSpace(r.FormValue("secret_ref"))
+		endpoint := strings.TrimSpace(r.FormValue("endpoint"))
+		connectionMode := strings.TrimSpace(r.FormValue("connection_mode"))
+		clusterID := strings.TrimSpace(r.FormValue("cluster_id"))
+
+		if engine == "" && secretRef != "" {
+			engine = secretRef
+		}
+		if engine == "" || (apiKey == "" && endpoint == "" && connectionMode == "" && clusterID == "") {
+			http.Error(w, "Both engine and api_key (or endpoint/cluster configuration) are required", http.StatusBadRequest)
+			return
+		}
+		if apiKey != "" {
+			decision.SetEngineSecret(engine, apiKey)
+			if secretRef != "" {
+				decision.SetEngineSecret(secretRef, apiKey)
+			}
+		}
+		if connectionMode == "local" && endpoint == "" {
+			decision.SetEngineEndpoint(engine, "")
+			decision.SetEngineClusterConfig(engine, "", "local", clusterID)
+		} else if endpoint != "" || connectionMode != "" || clusterID != "" {
+			decision.SetEngineClusterConfig(engine, endpoint, connectionMode, clusterID)
+		}
+
+		// Persist cluster/endpoint config to local provider in store
+		if dc.Store != nil && (endpoint != "" || connectionMode != "" || clusterID != "" || secretRef != "") {
+			providers, _ := dc.Store.GetAllProviders(ctx)
+			var localProv config.ProviderConfig
+			found := false
+			for _, p := range providers {
+				if p.ID == config.ProviderLocal {
+					localProv = p
+					found = true
+					break
+				}
+			}
+			if !found {
+				localProv = config.ProviderConfig{
+					ID:      config.ProviderLocal,
+					Enabled: true,
+					Regions: make(map[string]config.RegionConfig),
+				}
+			}
+			decision.ApplyDecisionProviderToLocalConfig(&localProv, engine, endpoint, connectionMode, clusterID, secretRef)
+			_ = dc.Store.SaveProvider(ctx, localProv)
+		}
+
+		// Sync with backend API if using APIConfigStore
+		if apiStore, ok := dc.Store.(*config.APIConfigStore); ok {
+			_ = apiStore.SyncDecisionProvider(ctx, engine, apiKey, secretRef, endpoint, connectionMode, clusterID)
+		}
+
+		if r.Header.Get("HX-Request") == "true" {
+			w.Header().Set("HX-Redirect", "/admin/complexity")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		http.Redirect(w, r, "/admin/complexity", http.StatusSeeOther)
+		return
+	case http.MethodDelete:
+		engine := strings.TrimSpace(r.URL.Query().Get("engine"))
+		if engine == "" {
+			engine = strings.TrimSpace(r.FormValue("engine"))
+		}
+		secretRef := strings.TrimSpace(r.URL.Query().Get("secret_ref"))
+		if secretRef == "" {
+			secretRef = strings.TrimSpace(r.FormValue("secret_ref"))
+		}
+		if engine != "" {
+			decision.DeleteEngineSecret(engine)
+		}
+		if secretRef != "" {
+			decision.DeleteEngineSecret(secretRef)
+		}
+		if apiStore, ok := dc.Store.(*config.APIConfigStore); ok {
+			_ = apiStore.DeleteDecisionSecret(ctx, engine, secretRef)
+		}
+		if r.Header.Get("HX-Request") == "true" {
+			w.Header().Set("HX-Redirect", "/admin/complexity")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		return
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
-// ToggleSimulation toggles the simulate_metrics cookie and redirects back to the caller's page.
-func (dc *DashboardController) ToggleSimulation(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
+// HandleComplexityProviderProbe executes a live health & classification probe against a decision engine provider.
+func (dc *DashboardController) HandleComplexityProviderProbe(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost && r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	ctx := r.Context()
+	if dc.Store != nil {
+		if providers, err := dc.Store.GetAllProviders(ctx); err == nil {
+			for _, p := range providers {
+				decision.SyncDecisionProvidersFromLocalConfig(p)
+			}
+		}
+	}
+
+	engine := strings.TrimSpace(r.FormValue("engine"))
+	if engine == "" {
+		engine = strings.TrimSpace(r.URL.Query().Get("engine"))
+	}
+	if engine == "" {
+		engine = "contrastive-lm"
+	}
+	endpoint := strings.TrimSpace(r.FormValue("endpoint"))
+	if endpoint == "" {
+		endpoint = strings.TrimSpace(r.URL.Query().Get("endpoint"))
+	}
+
+	res, elapsed, target, probeErr := decision.ProbeDecisionProvider(ctx, engine, endpoint)
+	_, mode, _ := decision.GetEngineClusterConfig(engine)
+	if strings.Contains(r.Header.Get("Accept"), "application/json") || r.URL.Query().Get("format") == "json" {
+		w.Header().Set("Content-Type", "application/json")
+		payload := map[string]interface{}{
+			"ok":              probeErr == nil,
+			"engine":          decision.NormalizeEngineName(engine),
+			"connection_mode": mode,
+			"endpoint":        target,
+			"tier":            res.Tier,
+			"confidence":      res.Confidence,
+			"rationale":       res.Rationale,
+			"latency_ms":      elapsed.Milliseconds(),
+		}
+		if probeErr != nil {
+			payload["error"] = probeErr.Error()
+		}
+		_ = json.NewEncoder(w).Encode(payload)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	badgeClass := "bg-emerald-50 border-emerald-200 text-emerald-900"
+	statusLabel := "Healthy"
+	msg := res.Rationale
+	if probeErr != nil {
+		badgeClass = "bg-red-50 border-red-200 text-red-900"
+		statusLabel = "Unreachable"
+		msg = probeErr.Error()
+	}
+	if target == "" {
+		target = "embedded-local-prototypes"
+	}
+	_, _ = fmt.Fprintf(w, `<div class="rounded-lg border p-3.5 text-xs %s flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+		<div>
+			<span class="font-bold uppercase font-mono">%s</span>
+			<span class="mx-1.5">&bull;</span>
+			<span class="font-semibold">%s (%s)</span>
+			<span class="mx-1.5">&bull;</span>
+			<span class="font-mono">Tier: %s (%d ms)</span>
+			<div class="text-[11px] mt-1 opacity-90">%s</div>
+		</div>
+		<span class="font-mono text-[11px] px-2 py-0.5 rounded bg-white/80 border border-current/20 shrink-0">%s</span>
+	</div>`,
+		badgeClass,
+		decision.NormalizeEngineName(engine),
+		statusLabel,
+		mode,
+		res.Tier,
+		elapsed.Milliseconds(),
+		msg,
+		target,
+	)
+}
+
+// HandleComplexityInspect tests prompt complexity against decision models (Jev, Fastino, CLM/Contrastive-LM, heuristics) and returns inspection explainability.
+func (dc *DashboardController) HandleComplexityInspect(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost && r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	active := r.FormValue("simulate") == "true"
-
-	cookieString := "false"
-	if active {
-		cookieString = "true"
+	if dc.Store != nil {
+		if providers, err := dc.Store.GetAllProviders(r.Context()); err == nil {
+			for _, p := range providers {
+				decision.SyncDecisionProvidersFromLocalConfig(p)
+			}
+		}
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "simulate_metrics",
-		Value:    cookieString,
-		Path:     "/",
-		HttpOnly: false, // Allow clientside script visibility
-		MaxAge:   3600 * 24 * 365, // 1 year
-	})
-
-	ref := r.Header.Get("Referer")
-	if ref == "" {
-		ref = "/admin/metrics"
+	prompt := strings.TrimSpace(r.FormValue("prompt"))
+	if prompt == "" {
+		prompt = "What is 2+2?"
 	}
-	http.Redirect(w, r, ref, http.StatusSeeOther)
+	engine := strings.TrimSpace(r.FormValue("engine"))
+	if engine == "" {
+		engine = "jev"
+	}
+	task := strings.TrimSpace(r.FormValue("task"))
+
+	simpleModel := strings.TrimSpace(r.FormValue("simple_model"))
+	if simpleModel == "" {
+		simpleModel = "gemini-3.5-flash-lite"
+	}
+	mediumModel := strings.TrimSpace(r.FormValue("medium_model"))
+	if mediumModel == "" {
+		mediumModel = "gemini-3.8-flash"
+	}
+	complexModel := strings.TrimSpace(r.FormValue("complex_model"))
+	if complexModel == "" {
+		complexModel = "gemini-3.1-pro"
+	}
+
+	complexityCfg := config.ComplexityRouting{
+		Enabled:         true,
+		Engine:          engine,
+		SimpleModel:     simpleModel,
+		MediumModel:     mediumModel,
+		ComplexModel:    complexModel,
+		CLMEndpoint:     decision.GetEngineEndpoint("contrastive-lm"),
+		JevEndpoint:     decision.GetEngineEndpoint("jev"),
+		FastinoEndpoint: decision.GetEngineEndpoint("fastino"),
+	}
+
+	var result decision.DecisionResult
+
+	if task != "" {
+		if model, tier, ok := decision.ResolveTaskModel(task, complexityCfg); ok {
+			feats := decision.ExtractPromptFeatures(prompt, false, false)
+			feats.ExtractedTask = task
+			result = decision.DecisionResult{
+				Tier:        tier,
+				TargetModel: model,
+				Engine:      "task_mapping",
+				Confidence:  1.0,
+				Rationale:   fmt.Sprintf("Matched specialized agent task '%s' -> routed to model tier %s (%s).", task, tier, model),
+				Features:    feats,
+			}
+		}
+	}
+
+	if result.TargetModel == "" {
+		switch strings.ToLower(engine) {
+		case "fastino":
+			fastino := decision.NewFastinoDecisionEngine()
+			result = fastino.Classify(r.Context(), prompt, complexityCfg, false, false)
+		case "clm", "contrastive-lm":
+			clm := decision.NewCLMContrastiveEngine()
+			result = clm.Classify(r.Context(), prompt, complexityCfg, false, false)
+			if strings.ToLower(engine) == "contrastive-lm" {
+				result.Engine = "contrastive-lm"
+			}
+		case "heuristics":
+			feats := decision.ExtractPromptFeatures(prompt, false, false)
+			tier := "simple"
+			model := complexityCfg.SimpleModel
+			if feats.Length > 800 {
+				tier = "complex"
+				model = complexityCfg.ComplexModel
+			} else if feats.Length > 200 {
+				tier = "medium"
+				model = complexityCfg.MediumModel
+			}
+			result = decision.DecisionResult{
+				Tier:        tier,
+				TargetModel: model,
+				Engine:      "heuristics",
+				Confidence:  0.85,
+				Rationale:   fmt.Sprintf("Static character boundary check: prompt length is %d characters (simple threshold <= 200, medium <= 800).", feats.Length),
+				Features:    feats,
+			}
+		default: // "jev"
+			jev := decision.NewJevDecisionEngine()
+			result = jev.Classify(r.Context(), prompt, complexityCfg, false, false)
+		}
+	}
+
+	if strings.Contains(r.Header.Get("Accept"), "application/json") || r.URL.Query().Get("format") == "json" {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(result)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	_ = templates.ComplexityInspectResult(result).Render(r.Context(), w)
+}
+
+// ServeLocationsTestHelper is an exported test helper wrapper to execute fetchLocations in unit tests.
+func (dc *DashboardController) ServeLocationsTestHelper(ctx context.Context) ([]templates.LocationInfo, error) {
+	return dc.fetchLocations(ctx)
 }
 
 // ServeQueue renders the active Request Queue tab.
@@ -3213,13 +3890,16 @@ func (dc *DashboardController) ServeQueue(w http.ResponseWriter, r *http.Request
 	var items []templates.QueueSnapshotItem
 	for _, s := range status {
 		items = append(items, templates.QueueSnapshotItem{
-			AppID:       s.AppID,
-			Model:       s.Model,
-			Priority:    s.Priority,
-			Tier:        s.Tier,
-			Status:      s.Status,
-			ArrivalTime: s.ArrivalTime.Format(time.RFC3339),
-			DurationMs:  s.DurationMs,
+			AppID:          s.AppID,
+			Model:          s.Model,
+			Priority:       s.Priority,
+			Tier:           s.Tier,
+			Status:         s.Status,
+			ClusterID:      s.ClusterID,
+			AssignedNodeID: s.AssignedNodeID,
+			QueueSource:    s.QueueSource,
+			ArrivalTime:    s.ArrivalTime.Format(time.RFC3339),
+			DurationMs:     s.DurationMs,
 		})
 	}
 
@@ -3301,6 +3981,7 @@ func (dc *DashboardController) ServeDocs(w http.ResponseWriter, r *http.Request)
 				{Title: "Applications & Keys", Path: "admin/apps-and-keys.md"},
 				{Title: "Traffic Routing Rules", Path: "admin/routing-rules.md"},
 				{Title: "Declarative Custom Headers", Path: "admin/custom-headers.md"},
+				{Title: "Local Clusters & Runners", Path: "admin/local-clusters.md"},
 				{Title: "Metrics & Expenditure Analytics", Path: "admin/metrics-and-costs.md"},
 			},
 		},
@@ -3361,54 +4042,18 @@ func (dc *DashboardController) ServeDocs(w http.ResponseWriter, r *http.Request)
 func (dc *DashboardController) ServeClusters(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// Fetch active providers to see if local config exists
 	providers, err := dc.Store.GetAllProviders(ctx)
 	if err != nil {
 		log.Printf("[Dashboard] Error loading providers for clusters: %v", err)
 	}
 
-	// Fetch active registered runners from REST API Config Store
 	activeNodes, err := dc.Store.GetRegisteredRunners(ctx)
 	if err != nil {
 		log.Printf("[Dashboard] Error loading registered runners: %v", err)
 	}
-
-	// If no nodes registered, mock some if simulating is true
-	simulate := false
-	if val, ok := ctx.Value("simulate_metrics").(bool); ok && val {
-		simulate = true
-	}
-
-	if len(activeNodes) == 0 && simulate {
-		activeNodes = []config.RunnerResponse{
-			{
-				Node: config.Node{
-					ID:                "runner-mac-m3-ultra",
-					Name:              "Jason's Mac Studio (M3 Ultra)",
-					Status:            "online",
-					LastHeartbeat:     time.Now().Add(-2 * time.Second),
-					MemoryAllocatedGB: 128,
-					ComputeGPUCores:   76,
-					SupportedModels:   []string{"gemma2:2b", "gemma2:9b", "llama3:8b"},
-					MaxModelSizeGB:    64,
-					MaxConcurrent:     8,
-				},
-				AssignedClusters: []string{"cluster-alpha"},
-			},
-			{
-				Node: config.Node{
-					ID:                "runner-k8s-pod-prod-01",
-					Name:              "K8s Pod Operator - Node Node-12",
-					Status:            "busy",
-					LastHeartbeat:     time.Now().Add(-1 * time.Second),
-					MemoryAllocatedGB: 80,
-					ComputeGPUCores:   5120, // Nvidia A100 Cores
-					SupportedModels:   []string{"gemma2:9b", "llama3:70b"},
-					MaxModelSizeGB:    64,
-					MaxConcurrent:     6,
-				},
-				AssignedClusters: []string{"cluster-beta"},
-			},
+	for i := range activeNodes {
+		if !activeNodes[i].Node.LastHeartbeat.IsZero() && time.Since(activeNodes[i].Node.LastHeartbeat) > 30*time.Second && activeNodes[i].Node.Status == "online" {
+			activeNodes[i].Node.Status = "offline"
 		}
 	}
 
@@ -3436,49 +4081,15 @@ func (dc *DashboardController) PollClustersActive(w http.ResponseWriter, r *http
 	if err != nil {
 		log.Printf("[Dashboard] Error loading registered runners: %v", err)
 	}
-
-	simulate := false
-	if val, ok := ctx.Value("simulate_metrics").(bool); ok && val {
-		simulate = true
-	}
-
-	if len(activeNodes) == 0 && simulate {
-		activeNodes = []config.RunnerResponse{
-			{
-				Node: config.Node{
-					ID:                "runner-mac-m3-ultra",
-					Name:              "Jason's Mac Studio (M3 Ultra)",
-					Status:            "online",
-					LastHeartbeat:     time.Now().Add(-2 * time.Second),
-					MemoryAllocatedGB: 128,
-					ComputeGPUCores:   76,
-					SupportedModels:   []string{"gemma2:2b", "gemma2:9b", "llama3:8b"},
-					MaxModelSizeGB:    64,
-					MaxConcurrent:     8,
-				},
-				AssignedClusters: []string{"cluster-alpha"},
-			},
-			{
-				Node: config.Node{
-					ID:                "runner-k8s-pod-prod-01",
-					Name:              "K8s Pod Operator - Node Node-12",
-					Status:            "busy",
-					LastHeartbeat:     time.Now().Add(-1 * time.Second),
-					MemoryAllocatedGB: 80,
-					ComputeGPUCores:   5120,
-					SupportedModels:   []string{"gemma2:9b", "llama3:70b"},
-					MaxModelSizeGB:    64,
-					MaxConcurrent:     6,
-				},
-				AssignedClusters: []string{"cluster-beta"},
-			},
+	for i := range activeNodes {
+		if !activeNodes[i].Node.LastHeartbeat.IsZero() && time.Since(activeNodes[i].Node.LastHeartbeat) > 30*time.Second && activeNodes[i].Node.Status == "online" {
+			activeNodes[i].Node.Status = "offline"
 		}
 	}
 
 	queueItems, _ := dc.Store.GetQueueStatus(ctx)
 
 	w.Header().Set("Content-Type", "text/html")
-	// Render the clusters template segment
 	_ = templates.ClustersPoller(templates.ClustersViewModel{
 		ActiveNodes: activeNodes,
 		QueueDepth:  len(queueItems),
@@ -3488,10 +4099,27 @@ func (dc *DashboardController) PollClustersActive(w http.ResponseWriter, r *http
 
 // ServeClusterMappingsModal renders the attachments modal for a specific runner node.
 func (dc *DashboardController) ServeClusterMappingsModal(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	nodeID := r.URL.Query().Get("id")
+	nodeID := strings.TrimSpace(r.URL.Query().Get("id"))
 	if nodeID == "" {
 		http.Error(w, "Missing node id", http.StatusBadRequest)
+		return
+	}
+	dc.ServeClusterNodeModal(w, r)
+}
+
+// ServeClusterNodeModal renders the modal overlay for pre-registering a new cluster node or editing an existing runner node.
+func (dc *DashboardController) ServeClusterNodeModal(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	nodeID := strings.TrimSpace(r.URL.Query().Get("id"))
+
+	providers, err := dc.Store.GetAllProviders(ctx)
+	if err != nil {
+		log.Printf("[Dashboard] Error loading providers for node modal: %v", err)
+	}
+
+	if nodeID == "" {
+		w.Header().Set("Content-Type", "text/html")
+		_ = templates.RunnerModal(config.Node{}, nil, providers).Render(ctx, w)
 		return
 	}
 
@@ -3502,38 +4130,491 @@ func (dc *DashboardController) ServeClusterMappingsModal(w http.ResponseWriter, 
 	}
 
 	var targetRunner *config.RunnerResponse
-	for _, r := range runners {
-		if r.Node.ID == nodeID {
-			targetRunner = &r
+	for _, runner := range runners {
+		if runner.Node.ID == nodeID {
+			rCopy := runner
+			targetRunner = &rCopy
 			break
 		}
 	}
 
-	// Fallback for simulation mock nodes
 	if targetRunner == nil {
-		targetRunner = &config.RunnerResponse{
-			Node: config.Node{
-				ID:                nodeID,
-				Name:              "Dynamic Connected Node",
-				MemoryAllocatedGB: 16,
-				ComputeGPUCores:   8,
-				MaxModelSizeGB:    8,
-				MaxConcurrent:     2,
-			},
-			AssignedClusters: []string{},
-		}
-	}
-
-	providers, err := dc.Store.GetAllProviders(ctx)
-	if err != nil {
-		log.Printf("[Dashboard] Error loading providers for modal: %v", err)
+		http.Error(w, "Runner node not found", http.StatusNotFound)
+		return
 	}
 
 	w.Header().Set("Content-Type", "text/html")
 	_ = templates.RunnerModal(targetRunner.Node, targetRunner.AssignedClusters, providers).Render(ctx, w)
 }
 
-// AttachRunnerToClusters handles form submission mapping runner to selected clusters.
+// ServeClusterEditModal renders the modal overlay for creating or editing a local cluster or direct endpoint.
+func (dc *DashboardController) ServeClusterEditModal(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	resourceType := strings.TrimSpace(r.URL.Query().Get("type"))
+	id := strings.TrimSpace(r.URL.Query().Get("id"))
+
+	providers, err := dc.Store.GetAllProviders(ctx)
+	if err != nil {
+		http.Error(w, "Failed to load providers", http.StatusInternalServerError)
+		return
+	}
+	runners, _ := dc.Store.GetRegisteredRunners(ctx)
+
+	var allClusters []config.LocalCluster
+	var allEndpoints []config.DirectEndpoint
+	seenClusters := make(map[string]int)
+	for _, p := range providers {
+		if p.ID == config.ProviderLocal {
+			for _, reg := range p.Regions {
+				if reg.LocalConfig != nil {
+					for _, cl := range reg.LocalConfig.Clusters {
+						seenClusters[cl.ID] = len(allClusters)
+						allClusters = append(allClusters, cl)
+					}
+					allEndpoints = append(allEndpoints, reg.LocalConfig.DirectEndpoints...)
+				}
+			}
+		}
+	}
+	for _, runner := range runners {
+		for _, cid := range runner.AssignedClusters {
+			trimmed := strings.TrimSpace(cid)
+			if trimmed == "" {
+				continue
+			}
+			if idx, ok := seenClusters[trimmed]; ok {
+				if allClusters[idx].Nodes == nil {
+					allClusters[idx].Nodes = make(map[string]config.Node)
+				}
+				if runner.Node.ID != "" {
+					allClusters[idx].Nodes[runner.Node.ID] = runner.Node
+				}
+			} else {
+				nodes := make(map[string]config.Node)
+				if runner.Node.ID != "" {
+					nodes[runner.Node.ID] = runner.Node
+				}
+				seenClusters[trimmed] = len(allClusters)
+				allClusters = append(allClusters, config.LocalCluster{
+					ID:          trimmed,
+					Name:        trimmed,
+					Description: "Auto-discovered from connected runner node(s).",
+					QueueName:   "queue-" + trimmed,
+					Nodes:       nodes,
+					MaxQueueAge: 90,
+				})
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	if id == "" {
+		if resourceType == "endpoint" || resourceType == "direct-http" {
+			_ = templates.ClusterEditModal("endpoint", config.LocalCluster{}, config.DirectEndpoint{
+				Engine: "vllm",
+				Role:   "inference",
+				Active: true,
+			}, allClusters, runners).Render(ctx, w)
+			return
+		}
+		_ = templates.ClusterEditModal("cluster", config.LocalCluster{
+			MaxQueueAge: 90,
+		}, config.DirectEndpoint{}, allClusters, runners).Render(ctx, w)
+		return
+	}
+
+	if resourceType == "endpoint" || resourceType == "direct-http" {
+		for _, ep := range allEndpoints {
+			if ep.ID == id {
+				_ = templates.ClusterEditModal("endpoint", config.LocalCluster{}, ep, allClusters, runners).Render(ctx, w)
+				return
+			}
+		}
+		http.Error(w, "Direct endpoint not found", http.StatusNotFound)
+		return
+	}
+
+	for _, cl := range allClusters {
+		if cl.ID == id {
+			_ = templates.ClusterEditModal("cluster", cl, config.DirectEndpoint{}, allClusters, runners).Render(ctx, w)
+			return
+		}
+	}
+	http.Error(w, "Local cluster not found", http.StatusNotFound)
+}
+
+// CreateProviderCluster handles creating or updating a local cluster or direct endpoint in the "local" provider configuration.
+func (dc *DashboardController) CreateProviderCluster(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Failed to parse form", http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+	entryType := strings.TrimSpace(r.FormValue("type"))
+	id := strings.TrimSpace(r.FormValue("id"))
+	name := strings.TrimSpace(r.FormValue("name"))
+	target := strings.TrimSpace(r.FormValue("target"))
+
+	if id == "" || name == "" {
+		http.Error(w, "Cluster or endpoint ID and Name are required.", http.StatusBadRequest)
+		return
+	}
+
+	providers, err := dc.Store.GetAllProviders(ctx)
+	if err != nil {
+		log.Printf("[Dashboard] Error loading providers: %v", err)
+		http.Error(w, "Failed to load providers", http.StatusInternalServerError)
+		return
+	}
+
+	localProv := config.ProviderConfig{
+		ID:          config.ProviderLocal,
+		DisplayName: "Local Infrastructure",
+		Enabled:     true,
+		Regions:     make(map[string]config.RegionConfig),
+	}
+	for _, p := range providers {
+		if p.ID == config.ProviderLocal {
+			localProv = p
+			break
+		}
+	}
+	if localProv.Regions == nil {
+		localProv.Regions = make(map[string]config.RegionConfig)
+	}
+	localReg, ok := localProv.Regions["local-cluster"]
+	if !ok {
+		localReg = config.RegionConfig{
+			Code:        "local-cluster",
+			Active:      true,
+			LocalConfig: &config.LocalConfig{},
+		}
+	}
+	if localReg.LocalConfig == nil {
+		localReg.LocalConfig = &config.LocalConfig{}
+	}
+
+	var modifiedRunners []config.RunnerResponse
+
+	switch entryType {
+	case "endpoint", "direct-http":
+		urlStr := strings.TrimSpace(r.FormValue("url"))
+		if urlStr == "" {
+			urlStr = target
+		}
+		modelStr := strings.TrimSpace(r.FormValue("model"))
+		if modelStr == "" {
+			modelStr = name
+		}
+		if urlStr == "" {
+			http.Error(w, "Endpoint URL is required.", http.StatusBadRequest)
+			return
+		}
+		engineStr := strings.TrimSpace(r.FormValue("engine"))
+		roleStr := strings.TrimSpace(r.FormValue("role"))
+		clusterIDStr := strings.TrimSpace(r.FormValue("cluster_id"))
+		activeStr := strings.ToLower(strings.TrimSpace(r.FormValue("active")))
+
+		activeVal := true
+		if activeStr == "false" || activeStr == "0" || activeStr == "off" {
+			activeVal = false
+		}
+
+		ep := config.DirectEndpoint{
+			ID:        id,
+			Name:      name,
+			ModelName: modelStr,
+			URL:       urlStr,
+			Engine:    engineStr,
+			Role:      roleStr,
+			ClusterID: clusterIDStr,
+			Active:    activeVal,
+		}
+		lowerModel := strings.ToLower(modelStr)
+		if lowerModel == "contrastive-lm" || lowerModel == "clm" || lowerModel == "jev" || lowerModel == "fastino" {
+			if lowerModel == "clm" {
+				lowerModel = "contrastive-lm"
+			}
+			if ep.Role == "" {
+				ep.Role = "decision_engine"
+			}
+			if ep.Engine == "" {
+				ep.Engine = lowerModel
+			}
+			ep.ConnectionMode = "cluster"
+			if ep.ClusterID == "" {
+				ep.ClusterID = id
+			}
+		}
+		updated := false
+		for i, existing := range localReg.LocalConfig.DirectEndpoints {
+			if existing.ID == id {
+				if ep.Engine == "" {
+					ep.Engine = existing.Engine
+				}
+				if ep.Role == "" {
+					ep.Role = existing.Role
+				}
+				if !r.Form.Has("cluster_id") && ep.ClusterID == "" {
+					ep.ClusterID = existing.ClusterID
+				}
+				if ep.ConnectionMode == "" {
+					ep.ConnectionMode = existing.ConnectionMode
+				}
+				if !r.Form.Has("active") {
+					ep.Active = existing.Active
+				}
+				localReg.LocalConfig.DirectEndpoints[i] = ep
+				updated = true
+				break
+			}
+		}
+		if !updated {
+			localReg.LocalConfig.DirectEndpoints = append(localReg.LocalConfig.DirectEndpoints, ep)
+		}
+	default: // "cluster" or "pull-queue"
+		queueName := strings.TrimSpace(r.FormValue("queue_name"))
+		if queueName == "" {
+			queueName = target
+		}
+		description := strings.TrimSpace(r.FormValue("description"))
+		fallbackModel := strings.TrimSpace(r.FormValue("fallback_model"))
+		fallbackLocation := strings.TrimSpace(r.FormValue("fallback_location"))
+		if fallbackModel != "" && !config.IsValidModelName(fallbackModel) {
+			http.Error(w, "Invalid or legacy fallback_model: "+fallbackModel, http.StatusBadRequest)
+			return
+		}
+		maxAgeStr := strings.TrimSpace(r.FormValue("max_queue_age"))
+		var maxQueueAge time.Duration
+		if maxAgeStr != "" {
+			if parsedAge, parseErr := strconv.Atoi(maxAgeStr); parseErr == nil && parsedAge > 0 {
+				maxQueueAge = time.Duration(parsedAge)
+			}
+		}
+
+		selectedNodeIDs := r.Form["node_ids"]
+		nodeSelectionPresent := r.FormValue("node_selection_present") == "1"
+
+		clusterIdx := -1
+		for i, existing := range localReg.LocalConfig.Clusters {
+			if existing.ID == id {
+				if queueName == "" {
+					queueName = existing.QueueName
+				}
+				if queueName == "" {
+					queueName = "queue-" + id
+				}
+				if !r.Form.Has("description") && description == "" {
+					description = existing.Description
+				}
+				if !r.Form.Has("fallback_model") && fallbackModel == "" {
+					fallbackModel = existing.FallbackModel
+				}
+				if !r.Form.Has("fallback_location") && fallbackLocation == "" {
+					fallbackLocation = existing.FallbackLocation
+				}
+				if maxQueueAge == 0 {
+					maxQueueAge = existing.MaxQueueAge
+				}
+				localReg.LocalConfig.Clusters[i] = config.LocalCluster{
+					ID:               id,
+					Name:             name,
+					Description:      description,
+					QueueName:        queueName,
+					MaxQueueAge:      maxQueueAge,
+					FallbackModel:    fallbackModel,
+					FallbackLocation: fallbackLocation,
+					Nodes:            existing.Nodes,
+				}
+				clusterIdx = i
+				break
+			}
+		}
+		if clusterIdx == -1 {
+			if queueName == "" {
+				queueName = "queue-" + id
+			}
+			if maxQueueAge == 0 {
+				maxQueueAge = 90
+			}
+			cl := config.LocalCluster{
+				ID:               id,
+				Name:             name,
+				Description:      description,
+				QueueName:        queueName,
+				MaxQueueAge:      maxQueueAge,
+				FallbackModel:    fallbackModel,
+				FallbackLocation: fallbackLocation,
+			}
+			clusterIdx = len(localReg.LocalConfig.Clusters)
+			localReg.LocalConfig.Clusters = append(localReg.LocalConfig.Clusters, cl)
+		}
+
+		if len(selectedNodeIDs) > 0 || nodeSelectionPresent {
+			selectedSet := make(map[string]bool, len(selectedNodeIDs))
+			for _, nid := range selectedNodeIDs {
+				trimmed := strings.TrimSpace(nid)
+				if trimmed != "" {
+					selectedSet[trimmed] = true
+				}
+			}
+			attachedNodes := make(map[string]config.Node)
+			if runners, runErr := dc.Store.GetRegisteredRunners(ctx); runErr == nil {
+				for _, runner := range runners {
+					hasPool := false
+					for _, cid := range runner.AssignedClusters {
+						if cid == id {
+							hasPool = true
+							break
+						}
+					}
+					if selectedSet[runner.Node.ID] {
+						attachedNodes[runner.Node.ID] = runner.Node
+						if !hasPool {
+							runner.AssignedClusters = append(runner.AssignedClusters, id)
+							modifiedRunners = append(modifiedRunners, runner)
+						}
+					} else if nodeSelectionPresent && hasPool {
+						filtered := make([]string, 0, len(runner.AssignedClusters))
+						for _, cid := range runner.AssignedClusters {
+							if cid != id {
+								filtered = append(filtered, cid)
+							}
+						}
+						runner.AssignedClusters = filtered
+						modifiedRunners = append(modifiedRunners, runner)
+					}
+				}
+			}
+			localReg.LocalConfig.Clusters[clusterIdx].Nodes = attachedNodes
+		}
+	}
+
+	localProv.Regions["local-cluster"] = localReg
+
+	if err := dc.Store.SaveProvider(ctx, localProv); err != nil {
+		log.Printf("[Dashboard] Error saving provider cluster/endpoint: %v", err)
+		http.Error(w, "Failed to save provider configuration", http.StatusInternalServerError)
+		return
+	}
+	for _, runner := range modifiedRunners {
+		_ = dc.Store.SaveRegisteredRunner(ctx, runner)
+		_ = dc.Store.AttachRunnerToClusters(ctx, runner.Node.ID, runner.AssignedClusters)
+	}
+	decision.SyncDecisionProvidersFromLocalConfig(localProv)
+
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/admin/clusters")
+		dc.ServeClusters(w, r)
+		return
+	}
+	http.Redirect(w, r, "/admin/clusters", http.StatusSeeOther)
+}
+
+// DeleteProviderCluster removes a local cluster or direct endpoint from the "local" provider configuration.
+func (dc *DashboardController) DeleteProviderCluster(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx := r.Context()
+	entryType := strings.TrimSpace(r.URL.Query().Get("type"))
+	id := strings.TrimSpace(r.URL.Query().Get("id"))
+	if id == "" {
+		http.Error(w, "Missing cluster or endpoint id", http.StatusBadRequest)
+		return
+	}
+
+	providers, err := dc.Store.GetAllProviders(ctx)
+	if err != nil {
+		log.Printf("[Dashboard] Error loading providers for deletion: %v", err)
+		http.Error(w, "Failed to load providers", http.StatusInternalServerError)
+		return
+	}
+
+	for _, p := range providers {
+		if p.ID == config.ProviderLocal {
+			localProv := p
+			for regKey, reg := range localProv.Regions {
+				if reg.LocalConfig == nil {
+					continue
+				}
+				if entryType == "endpoint" || entryType == "direct-http" {
+					var remaining []config.DirectEndpoint
+					for _, ep := range reg.LocalConfig.DirectEndpoints {
+						if ep.ID != id {
+							remaining = append(remaining, ep)
+						}
+					}
+					reg.LocalConfig.DirectEndpoints = remaining
+				} else {
+					var remaining []config.LocalCluster
+					for _, cl := range reg.LocalConfig.Clusters {
+						if cl.ID != id {
+							remaining = append(remaining, cl)
+						}
+					}
+					reg.LocalConfig.Clusters = remaining
+				}
+				localProv.Regions[regKey] = reg
+			}
+			if err := dc.Store.SaveProvider(ctx, localProv); err != nil {
+				log.Printf("[Dashboard] Error deleting provider entry: %v", err)
+				http.Error(w, "Failed to update provider configuration", http.StatusInternalServerError)
+				return
+			}
+			break
+		}
+	}
+
+	// If a pull-queue cluster was deleted, scrub its ID from any registered runner's AssignedClusters
+	if entryType != "endpoint" && entryType != "direct-http" {
+		if runners, runErr := dc.Store.GetRegisteredRunners(ctx); runErr == nil {
+			for _, runner := range runners {
+				filtered := []string{}
+				changed := false
+				for _, cid := range runner.AssignedClusters {
+					if cid == id {
+						changed = true
+					} else {
+						filtered = append(filtered, cid)
+					}
+				}
+				if changed {
+					runner.AssignedClusters = filtered
+					_ = dc.Store.SaveRegisteredRunner(ctx, runner)
+					_ = dc.Store.AttachRunnerToClusters(ctx, runner.Node.ID, filtered)
+				}
+			}
+		}
+	}
+
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Refresh", "true")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// SaveClusterMappings is an alias for AttachRunnerToClusters supporting /admin/clusters/mappings/save.
+func (dc *DashboardController) SaveClusterMappings(w http.ResponseWriter, r *http.Request) {
+	dc.AttachRunnerToClusters(w, r)
+}
+
+// SaveClusterNode handles pre-registering a new cluster node or updating an existing runner node and its cluster assignments.
+func (dc *DashboardController) SaveClusterNode(w http.ResponseWriter, r *http.Request) {
+	dc.AttachRunnerToClusters(w, r)
+}
+
+// AttachRunnerToClusters handles form submission mapping runner to selected clusters and creating or updating node capacity limits.
 func (dc *DashboardController) AttachRunnerToClusters(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -3546,19 +4627,91 @@ func (dc *DashboardController) AttachRunnerToClusters(w http.ResponseWriter, r *
 		return
 	}
 
-	nodeID := r.FormValue("node_id")
+	nodeID := strings.TrimSpace(r.FormValue("node_id"))
 	clusterIDs := r.Form["cluster_ids"]
+	if clusterIDs == nil {
+		clusterIDs = []string{}
+	}
 
 	if nodeID == "" {
 		http.Error(w, "Missing node ID", http.StatusBadRequest)
 		return
 	}
 
-	err := dc.Store.AttachRunnerToClusters(ctx, nodeID, clusterIDs)
-	if err != nil {
-		log.Printf("[Dashboard] Error saving attachments: %v", err)
-		http.Error(w, "Failed to save runner attachments", http.StatusInternalServerError)
+	runners, _ := dc.Store.GetRegisteredRunners(ctx)
+	var targetRunner *config.RunnerResponse
+	for _, runner := range runners {
+		if runner.Node.ID == nodeID {
+			rCopy := runner
+			targetRunner = &rCopy
+			break
+		}
+	}
+
+	if targetRunner == nil {
+		nodeName := strings.TrimSpace(r.FormValue("name"))
+		if nodeName == "" {
+			nodeName = nodeID
+		}
+		targetRunner = &config.RunnerResponse{
+			Node: config.Node{
+				ID:                nodeID,
+				Name:              nodeName,
+				Status:            "pre-registered",
+				MemoryAllocatedGB: 64,
+				ComputeGPUCores:   60,
+				MaxModelSizeGB:    32,
+				MaxConcurrent:     2,
+			},
+			AssignedClusters: clusterIDs,
+		}
+	} else {
+		targetRunner.AssignedClusters = clusterIDs
+		if nodeName := strings.TrimSpace(r.FormValue("name")); nodeName != "" {
+			targetRunner.Node.Name = nodeName
+		}
+	}
+
+	if memStr := strings.TrimSpace(r.FormValue("memory_allocated_gb")); memStr != "" {
+		if val, parseErr := strconv.Atoi(memStr); parseErr == nil && val > 0 {
+			targetRunner.Node.MemoryAllocatedGB = val
+		}
+	}
+	if gpuStr := strings.TrimSpace(r.FormValue("compute_gpu_cores")); gpuStr != "" {
+		if val, parseErr := strconv.Atoi(gpuStr); parseErr == nil && val >= 0 {
+			targetRunner.Node.ComputeGPUCores = val
+		}
+	}
+	if maxSizeStr := strings.TrimSpace(r.FormValue("max_model_size_gb")); maxSizeStr != "" {
+		if val, parseErr := strconv.Atoi(maxSizeStr); parseErr == nil && val >= 0 {
+			targetRunner.Node.MaxModelSizeGB = val
+		}
+	}
+	if maxConcStr := strings.TrimSpace(r.FormValue("max_concurrent")); maxConcStr != "" {
+		if val, parseErr := strconv.Atoi(maxConcStr); parseErr == nil && val >= 0 {
+			targetRunner.Node.MaxConcurrent = val
+		}
+	}
+	if r.Form.Has("supported_models") {
+		rawModels := strings.Split(r.FormValue("supported_models"), ",")
+		var parsedModels []string
+		for _, m := range rawModels {
+			trimmed := strings.TrimSpace(m)
+			if trimmed != "" {
+				parsedModels = append(parsedModels, trimmed)
+			}
+		}
+		targetRunner.Node.SupportedModels = parsedModels
+	}
+
+	if err := dc.Store.SaveRegisteredRunner(ctx, *targetRunner); err != nil {
+		log.Printf("[Dashboard] Error saving registered runner: %v", err)
+		http.Error(w, "Failed to save runner node", http.StatusInternalServerError)
 		return
+	}
+
+	if err := dc.Store.AttachRunnerToClusters(ctx, nodeID, clusterIDs); err != nil {
+		log.Printf("[Dashboard] Error saving attachments: %v", err)
 	}
 
 	// Redirect back to full clusters view
@@ -3588,5 +4741,3 @@ func (dc *DashboardController) DeRegisterClusterNode(w http.ResponseWriter, r *h
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(""))
 }
-
-

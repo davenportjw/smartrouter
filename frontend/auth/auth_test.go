@@ -11,9 +11,9 @@ import (
 
 func TestIsEmailAuthorized(t *testing.T) {
 	allowedList := []string{
-		"google.com",
-		"cloudadvocacyorg.joonix.net",
-		"admin@example.com",
+		"corp.example.org",
+		"example.com",
+		"admin@contractor.org",
 		"@special-team.org",
 	}
 
@@ -24,17 +24,17 @@ func TestIsEmailAuthorized(t *testing.T) {
 	}{
 		{
 			name:     "Exact match on allowed domain",
-			email:    "operator@google.com",
+			email:    "operator@corp.example.org",
 			expected: true,
 		},
 		{
 			name:     "Exact match on other allowed domain",
-			email:    "user@cloudadvocacyorg.joonix.net",
+			email:    "user@example.com",
 			expected: true,
 		},
 		{
 			name:     "Exact match on specific allowed email address",
-			email:    "admin@example.com",
+			email:    "admin@contractor.org",
 			expected: true,
 		},
 		{
@@ -44,7 +44,7 @@ func TestIsEmailAuthorized(t *testing.T) {
 		},
 		{
 			name:     "Denied email in disallowed domain",
-			email:    "user@example.com",
+			email:    "user@contractor.org",
 			expected: false,
 		},
 		{
@@ -54,17 +54,17 @@ func TestIsEmailAuthorized(t *testing.T) {
 		},
 		{
 			name:     "Case insensitivity test for email and pattern matching",
-			email:    "Admin@EXAMPLE.com",
+			email:    "Admin@CONTRACTOR.org",
 			expected: true,
 		},
 		{
 			name:     "Case insensitivity test for domains",
-			email:    "Operator@Google.Com",
+			email:    "Operator@Corp.Example.Org",
 			expected: true,
 		},
 		{
 			name:     "Whitespace trimming test",
-			email:    "   admin@example.com   ",
+			email:    "   admin@contractor.org   ",
 			expected: true,
 		},
 	}
@@ -76,6 +76,34 @@ func TestIsEmailAuthorized(t *testing.T) {
 				t.Errorf("isEmailAuthorized(%q, %v) = %v; want %v", tc.email, allowedList, actual, tc.expected)
 			}
 		})
+	}
+}
+
+func TestResolveAllowedDomainsFromEnv(t *testing.T) {
+	t.Setenv("ALLOWED_EMAIL_DOMAINS", "")
+	t.Setenv("ALLOWED_AUTH_DOMAINS", "example.com, corp.example.org")
+	t.Setenv("ALLOWED_DOMAINS", "corp.example.org, partner.example.net")
+	t.Setenv("ADMIN_ALLOWED_DOMAINS", "")
+	t.Setenv("ALLOWED_EMAILS", "admin@contractor.org")
+
+	domains := ResolveAllowedDomainsFromEnv()
+	if len(domains) != 4 {
+		t.Fatalf("expected 4 unique allowed entries, got %d: %v", len(domains), domains)
+	}
+	if !isEmailAuthorized("dev@example.com", domains) {
+		t.Errorf("expected dev@example.com to be authorized")
+	}
+	if !isEmailAuthorized("eng@corp.example.org", domains) {
+		t.Errorf("expected eng@corp.example.org to be authorized")
+	}
+	if !isEmailAuthorized("ops@partner.example.net", domains) {
+		t.Errorf("expected ops@partner.example.net to be authorized")
+	}
+	if !isEmailAuthorized("admin@contractor.org", domains) {
+		t.Errorf("expected admin@contractor.org to be authorized")
+	}
+	if isEmailAuthorized("intruder@unauthorized.org", domains) {
+		t.Errorf("expected intruder@unauthorized.org to be denied")
 	}
 }
 
@@ -206,6 +234,28 @@ func TestMiddleware(t *testing.T) {
 		}
 		if loc := rr.Header().Get("Location"); loc != "/login" {
 			t.Errorf("expected redirect to /login, got %q", loc)
+		}
+	})
+
+	t.Run("Invalid Cookie Clears Session and Redirects", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/admin/dashboard", nil)
+		req.AddCookie(&http.Cookie{Name: "session", Value: "stale-invalid-cookie"})
+		rr := httptest.NewRecorder()
+
+		middleware.ServeHTTP(rr, req)
+
+		if rr.Code != http.StatusFound {
+			t.Errorf("expected status 302, got %d", rr.Code)
+		}
+		cookies := rr.Result().Cookies()
+		cleared := false
+		for _, c := range cookies {
+			if c.Name == "session" && c.MaxAge == -1 {
+				cleared = true
+			}
+		}
+		if !cleared {
+			t.Errorf("expected invalid session cookie to be cleared with MaxAge=-1")
 		}
 	})
 

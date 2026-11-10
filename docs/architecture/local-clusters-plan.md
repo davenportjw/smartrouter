@@ -117,7 +117,7 @@ sequenceDiagram
     participant Runner as Cluster Runner (Mac/K8s)
     participant Model as Local llama-server
 
-    Client->>Router: POST /v1/models/gemma2:2b:generateContent (with App-Key)
+    Client->>Router: POST /v1/models/gemma-4-4b:generateContent (with App-Key)
     Router->>Router: Verify API Key & resolve App Priority
     Router->>Queue: Enqueue Request (Context, Payload, Priority)
     
@@ -125,7 +125,7 @@ sequenceDiagram
 
     loop Heartbeat & Polling
         Runner->>Router: POST /cluster/runners/heartbeat (I'm online & idle)
-        Runner->>Queue: POST /cluster/queue/poll (Request work for 'gemma2:2b')
+        Runner->>Queue: POST /cluster/queue/poll (Request work for 'gemma-4-4b')
     end
 
     Queue-->>Runner: Return job (Payload, Request ID)

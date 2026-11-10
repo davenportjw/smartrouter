@@ -21,18 +21,28 @@ type Client struct {
 
 // ComplexityRouting defines configurations and thresholds for dynamic routing.
 type ComplexityRouting struct {
-	Enabled                bool   `firestore:"enabled" json:"enabled"`
-	AlwaysOverride         bool   `firestore:"always_override" json:"always_override"`
-	SimpleModel            string `firestore:"simple_model" json:"simple_model"`
-	MediumModel            string `firestore:"medium_model" json:"medium_model"`
-	ComplexModel           string `firestore:"complex_model" json:"complex_model"`
-	SimpleCharLimit        int    `firestore:"simple_char_limit" json:"simple_char_limit"`
-	MediumCharLimit        int    `firestore:"medium_char_limit" json:"medium_char_limit"`
-	ForceComplexMultimodal bool   `firestore:"force_complex_multimodal" json:"force_complex_multimodal"`
-	ForceComplexTools      bool   `firestore:"force_complex_tools" json:"force_complex_tools"`
-	UseLLMClassifier       bool   `firestore:"use_llm_classifier" json:"use_llm_classifier"`
-	ClassifierModel        string `firestore:"classifier_model" json:"classifier_model"`
-	AdditionalInstructions string `firestore:"additional_instructions" json:"additional_instructions"`
+	Enabled                bool              `firestore:"enabled" json:"enabled"`
+	AlwaysOverride         bool              `firestore:"always_override" json:"always_override"`
+	Engine                 string            `firestore:"engine" json:"engine"` // "heuristics", "llm", "jev", "fastino", "clm", "contrastive-lm"
+	SimpleModel            string            `firestore:"simple_model" json:"simple_model"`
+	MediumModel            string            `firestore:"medium_model" json:"medium_model"`
+	ComplexModel           string            `firestore:"complex_model" json:"complex_model"`
+	SimpleCharLimit        int               `firestore:"simple_char_limit" json:"simple_char_limit"`
+	MediumCharLimit        int               `firestore:"medium_char_limit" json:"medium_char_limit"`
+	ForceComplexMultimodal bool              `firestore:"force_complex_multimodal" json:"force_complex_multimodal"`
+	ForceComplexTools      bool              `firestore:"force_complex_tools" json:"force_complex_tools"`
+	UseLLMClassifier       bool              `firestore:"use_llm_classifier" json:"use_llm_classifier"`
+	ClassifierModel        string            `firestore:"classifier_model" json:"classifier_model"`
+	AdditionalInstructions string            `firestore:"additional_instructions" json:"additional_instructions"`
+	JevEndpoint            string            `firestore:"jev_endpoint" json:"jev_endpoint"`
+	FastinoEndpoint        string            `firestore:"fastino_endpoint" json:"fastino_endpoint"`
+	CLMEndpoint            string            `firestore:"clm_endpoint" json:"clm_endpoint"`
+	SecretRef              string            `firestore:"secret_ref,omitempty" json:"secret_ref,omitempty"`
+	MinConfidence          float64           `firestore:"min_confidence,omitempty" json:"min_confidence,omitempty"`
+	SimpleCriteria         string            `firestore:"simple_criteria,omitempty" json:"simple_criteria,omitempty"`
+	MediumCriteria         string            `firestore:"medium_criteria,omitempty" json:"medium_criteria,omitempty"`
+	ComplexCriteria        string            `firestore:"complex_criteria,omitempty" json:"complex_criteria,omitempty"`
+	TaskMapping            map[string]string `firestore:"task_mapping" json:"task_mapping"` // Maps task names to target models
 }
 
 // App represents an explicit application belonging to a client.
@@ -58,16 +68,20 @@ type APIKey struct {
 
 // RoutingRule defines dynamic model rewrites and targets.
 type RoutingRule struct {
-	ID             string `firestore:"id" json:"id"`
-	AppID          string `firestore:"app_id" json:"app_id"`               // bound app boundary
-	ModelPattern   string `firestore:"model_pattern" json:"model_pattern"` // regex or exact match
-	ClientTier     string `firestore:"client_tier" json:"client_tier"`     // "all" or specific tier
-	HeaderName     string `firestore:"header_name" json:"header_name"`     // optional header filter
-	HeaderValue    string `firestore:"header_value" json:"header_value"`   // optional value pattern to match
-	TargetModel    string `firestore:"target_model" json:"target_model"`
-	TargetLocation string `firestore:"target_location" json:"target_location"` // E.g. "us-central1" for Vertex AI
-	FallbackModel  string `firestore:"fallback_model" json:"fallback_model"`
-	PriorityWeight int    `firestore:"priority_weight" json:"priority_weight"`
+	ID             string  `firestore:"id" json:"id"`
+	AppID          string  `firestore:"app_id" json:"app_id"`                               // bound app boundary
+	ModelPattern   string  `firestore:"model_pattern" json:"model_pattern"`                 // regex or exact match
+	ClientTier     string  `firestore:"client_tier" json:"client_tier"`                     // "all" or specific tier
+	HeaderName     string  `firestore:"header_name" json:"header_name"`                     // optional header filter
+	HeaderValue    string  `firestore:"header_value" json:"header_value"`                   // optional value pattern to match
+	ComplexityTier string  `firestore:"complexity_tier,omitempty" json:"complexity_tier,omitempty"` // optional "simple", "medium", "complex"
+	DecisionEngine string  `firestore:"decision_engine,omitempty" json:"decision_engine,omitempty"` // optional "jev", "fastino", "contrastive-lm", "clm", "llm", "heuristics"
+	MinConfidence  float64 `firestore:"min_confidence,omitempty" json:"min_confidence,omitempty"`   // optional minimum classifier confidence (0.0 - 1.0)
+	TaskKind       string  `firestore:"task_kind,omitempty" json:"task_kind,omitempty"`             // optional X-Task-Kind / task filter
+	TargetModel    string  `firestore:"target_model" json:"target_model"`
+	TargetLocation string  `firestore:"target_location" json:"target_location"` // E.g. "us-central1" for Vertex AI
+	FallbackModel  string  `firestore:"fallback_model" json:"fallback_model"`
+	PriorityWeight int     `firestore:"priority_weight" json:"priority_weight"`
 }
 
 // CustomHeader defines client-provided custom header verification rules.
@@ -118,27 +132,48 @@ type RegionConfig struct {
 	LocalConfig     *LocalConfig      `firestore:"local_config,omitempty" json:"local_config,omitempty"`
 }
 
+// DecisionProviderConfig stores global connection and cluster settings for a decision engine (jev, fastino, contrastive-lm).
+type DecisionProviderConfig struct {
+	Engine         string `firestore:"engine" json:"engine"`
+	Endpoint       string `firestore:"endpoint,omitempty" json:"endpoint,omitempty"`
+	ConnectionMode string `firestore:"connection_mode,omitempty" json:"connection_mode,omitempty"`
+	ClusterID      string `firestore:"cluster_id,omitempty" json:"cluster_id,omitempty"`
+	SecretRef      string `firestore:"secret_ref,omitempty" json:"secret_ref,omitempty"`
+}
+
 // LocalConfig defines the parameters for running models on local systems/clusters.
 type LocalConfig struct {
-	DirectEndpoints []DirectEndpoint `firestore:"direct_endpoints" json:"direct_endpoints"` // Static local endpoints
-	Clusters        []LocalCluster   `firestore:"clusters" json:"clusters"`                 // Shared local queues
+	DirectEndpoints   []DirectEndpoint                  `firestore:"direct_endpoints" json:"direct_endpoints"` // Static local endpoints
+	Clusters          []LocalCluster                    `firestore:"clusters" json:"clusters"`                 // Shared local queues
+	DecisionProviders map[string]DecisionProviderConfig `firestore:"decision_providers,omitempty" json:"decision_providers,omitempty"`
 }
 
 // DirectEndpoint describes a single static local endpoint bypassing the queue.
 type DirectEndpoint struct {
-	ID        string `firestore:"id" json:"id"`
-	ModelName string `firestore:"model_name" json:"model_name"` // e.g., "llama-3-8b"
-	URL       string `firestore:"url" json:"url"`               // e.g., "http://192.168.1.15:8000/v1"
-	Active    bool   `firestore:"active" json:"active"`
+	ID             string `firestore:"id" json:"id"`
+	Name           string `firestore:"name,omitempty" json:"name,omitempty"`
+	ModelName      string `firestore:"model_name" json:"model_name"` // e.g., "gemma-4-26b", "contrastive-lm"
+	URL            string `firestore:"url" json:"url"`               // e.g., "http://10.128.0.5:8080/rank"
+	BaseURL        string `firestore:"base_url,omitempty" json:"base_url,omitempty"`
+	Active         bool   `firestore:"active" json:"active"`
+	Role           string `firestore:"role,omitempty" json:"role,omitempty"`
+	Engine         string `firestore:"engine,omitempty" json:"engine,omitempty"`
+	SecretRef      string `firestore:"secret_ref,omitempty" json:"secret_ref,omitempty"`
+	ConnectionMode string `firestore:"connection_mode,omitempty" json:"connection_mode,omitempty"`
+	ClusterID      string `firestore:"cluster_id,omitempty" json:"cluster_id,omitempty"`
 }
 
 // LocalCluster manages dynamic pool queuing for on-prem machines.
 type LocalCluster struct {
-	ID          string            `firestore:"id" json:"id"`
-	Name        string            `firestore:"name" json:"name"`
-	QueueName   string            `firestore:"queue_name" json:"queue_name"`
-	MaxQueueAge time.Duration     `firestore:"max_queue_age" json:"max_queue_age"`
-	Nodes       map[string]Node   `firestore:"nodes" json:"nodes"` // Heartbeating computing agents
+	ID               string          `firestore:"id" json:"id"`
+	Name             string          `firestore:"name" json:"name"`
+	Description      string          `firestore:"description" json:"description"`
+	QueueName        string          `firestore:"queue_name" json:"queue_name"`
+	MaxQueueDepth    int             `firestore:"max_queue_depth,omitempty" json:"max_queue_depth,omitempty"`
+	MaxQueueAge      time.Duration   `firestore:"max_queue_age" json:"max_queue_age"`
+	FallbackModel    string          `firestore:"fallback_model,omitempty" json:"fallback_model,omitempty"`
+	FallbackLocation string          `firestore:"fallback_location,omitempty" json:"fallback_location,omitempty"`
+	Nodes            map[string]Node `firestore:"nodes" json:"nodes"` // Heartbeating computing agents
 }
 
 // Node represents a computing instance running a Smart Router agent.
@@ -163,6 +198,7 @@ type LocalDB struct {
 	CustomHeaders []CustomHeader               `json:"custom_headers"`
 	Models        []ModelConfig                `json:"models"`
 	Providers     map[string]ProviderConfig    `json:"providers"`
+	Runners       []RunnerResponse             `json:"runners,omitempty"`
 }
 
 // HashKey returns the hex-encoded SHA-256 hash of an API key.
@@ -202,7 +238,7 @@ func GetMultiRegionParent(loc string) string {
 
 // IsLocationCompatible returns true if the modelLoc is compatible with the router's serving boundary.
 func IsLocationCompatible(routerLoc, modelLoc string) bool {
-	if modelLoc == "global" || modelLoc == "" {
+	if modelLoc == "global" || modelLoc == "local" || modelLoc == "" {
 		return true
 	}
 	if routerLoc == modelLoc {
@@ -252,9 +288,22 @@ func ExtractLocationFromResourceName(name string) string {
 // IsValidModelName validates standard and custom Vertex AI model names.
 func IsValidModelName(name string) bool {
 	if strings.HasPrefix(name, "gemini-") {
+		// Reject non-existent 3.8 model variants (only 3.8-flash exists for text/multimodal)
+		if name == "gemini-3.8-pro" || name == "gemini-3.8-flash-lite" {
+			return false
+		}
 		// Reject legacy Gemini versions below 2.5 (e.g., gemini-1.5, gemini-2.0 up to gemini-2.4)
 		reLegacy := regexp.MustCompile(`^gemini-(1\.[0-9]|2\.[0-4])(?:-|$)`)
 		if reLegacy.MatchString(name) {
+			return false
+		}
+		return true
+	}
+
+	if strings.HasPrefix(name, "gemma-") {
+		// Only Gemma 4 models are permitted (reject Gemma 1, 2, 3)
+		reGemmaLegacy := regexp.MustCompile(`^gemma-([1-3])(?:-|$)`)
+		if reGemmaLegacy.MatchString(name) {
 			return false
 		}
 		return true
@@ -288,6 +337,19 @@ func StripLocationSuffix(id string) string {
 	return id
 }
 
+// ExtractLocationSuffix returns the location segment after "@" in a model ID, or "" if none is present.
+func ExtractLocationSuffix(id string) string {
+	if idx := strings.Index(id, "@"); idx != -1 && idx+1 < len(id) {
+		return id[idx+1:]
+	}
+	return ""
+}
+
+// SplitModelAndLocation splits a model identifier with an optional "@location" suffix into (baseModel, location).
+func SplitModelAndLocation(id string) (string, string) {
+	return StripLocationSuffix(id), ExtractLocationSuffix(id)
+}
+
 // IsMultiRegionOrGlobal returns true if the location segment represents a multi-region (e.g., "us", "eu") or the global region.
 func IsMultiRegionOrGlobal(loc string) bool {
 	if loc == "" {
@@ -311,27 +373,56 @@ func GetVertexEndpointHost(loc string) string {
 	return fmt.Sprintf("aiplatform.%s.rep.googleapis.com", loc)
 }
 
+// GetDefaultLocationForModel returns the appropriate Vertex AI location for a model.
+// Gemini 3.x and 4.x models are served exclusively via global/multi-region endpoints (e.g. "global", "us").
+func GetDefaultLocationForModel(modelName string, currentLoc string) string {
+	if resLoc := ExtractLocationFromResourceName(modelName); resLoc != "" {
+		return resLoc
+	}
+	if sufLoc := ExtractLocationSuffix(modelName); sufLoc != "" {
+		return sufLoc
+	}
+	baseID := StripLocationSuffix(modelName)
+	if strings.HasPrefix(baseID, "gemini-3.") || strings.HasPrefix(baseID, "gemini-4") {
+		if currentLoc == "us" || currentLoc == "eu" || currentLoc == "global" {
+			return currentLoc
+		}
+		return "global"
+	}
+	if currentLoc != "" {
+		return currentLoc
+	}
+	return "us-central1"
+}
+
 // QueueSnapshotItem represents a request in the scheduling queue.
 type QueueSnapshotItem struct {
-	AppID       string    `json:"app_id"`
-	Model       string    `json:"model"`
-	Priority    string    `json:"priority"`
-	Tier        string    `json:"tier"`
-	Status      string    `json:"status"`
-	ArrivalTime time.Time `json:"arrival_time"`
-	DurationMs  int64     `json:"duration_ms"`
+	AppID          string    `json:"app_id"`
+	Model          string    `json:"model"`
+	Priority       string    `json:"priority"`
+	Tier           string    `json:"tier"`
+	Status         string    `json:"status"`
+	ArrivalTime    time.Time `json:"arrival_time"`
+	DurationMs     int64     `json:"duration_ms"`
+	ClusterID      string    `json:"cluster_id,omitempty"`
+	AssignedNodeID string    `json:"assigned_node_id,omitempty"`
+	QueueSource    string    `json:"queue_source,omitempty"`
 }
 
 // QueueJob represents an active held request inside the priority queue.
 type QueueJob struct {
-	ID           string            `json:"id"`
-	ClusterID    string            `json:"cluster_id"`
-	AppID        string            `json:"app_id"`
-	Model        string            `json:"model"`
-	Priority     string            `json:"priority"` // "high", "medium", "low"
-	Payload      []byte            `json:"payload"`
-	ResponseChan chan QueueResult  `json:"-"`
-	CreatedAt    time.Time         `json:"created_at"`
+	ID             string           `json:"id"`
+	ClusterID      string           `json:"cluster_id"`
+	AssignedNodeID string           `json:"assigned_node_id,omitempty"`
+	AppID          string           `json:"app_id"`
+	Model          string           `json:"model"`
+	Priority       string           `json:"priority"` // "high", "medium", "low"
+	Tier           string           `json:"tier,omitempty"`
+	MaxAge         time.Duration    `json:"max_age,omitempty"`
+	Payload        []byte           `json:"payload"`
+	ResponseChan   chan QueueResult `json:"-"`
+	CreatedAt      time.Time        `json:"created_at"`
+	StartedAt      time.Time        `json:"started_at,omitempty"`
 }
 
 // QueueResult carries the execution output back to the proxy loop.

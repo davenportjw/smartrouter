@@ -1,6 +1,8 @@
 package templates
 
 import (
+	"fmt"
+	"strings"
 	"geminirouter/pkg/config"
 )
 
@@ -9,8 +11,8 @@ templ HeadersTab(items []config.CustomHeader) {
 		<!-- Header & Actions -->
 		<div class="sm:flex sm:items-center sm:justify-between">
 			<div>
-				<h1 class="text-2xl font-bold tracking-tight text-gray-900">Custom Headers</h1>
-				<p class="mt-2 text-sm text-gray-700">
+				<h1 class="text-2xl font-bold tracking-tight text-slate-900">Custom Headers</h1>
+				<p class="mt-2 text-sm text-slate-700">
 					Manage and enforce custom metadata or session headers client applications must send.
 				</p>
 			</div>
@@ -18,7 +20,8 @@ templ HeadersTab(items []config.CustomHeader) {
 				<button
 					hx-get="/admin/headers/new"
 					hx-target="#modal-container"
-					class="block rounded-md bg-blue-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-blue-500 transition"
+					onclick="document.querySelectorAll('[data-edit-row]').forEach(r => r.classList.remove('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30'))"
+					class="block rounded-md bg-blue-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-blue-700 transition"
 				>
 					Add Header Rule
 				</button>
@@ -26,8 +29,8 @@ templ HeadersTab(items []config.CustomHeader) {
 		</div>
 
 		<!-- Expandable Custom Headers Usage Guide -->
-		<details class="group border border-gray-200 rounded-lg bg-white shadow-sm overflow-hidden">
-			<summary class="flex items-center justify-between cursor-pointer p-4 bg-gray-50 hover:bg-gray-100 transition select-none">
+		<details class="group border border-slate-200 rounded-lg bg-white shadow-sm overflow-hidden">
+			<summary class="flex items-center justify-between cursor-pointer p-4 bg-slate-50 hover:bg-slate-100 transition select-none">
 				<div class="flex items-center gap-3">
 					<div class="p-2 bg-blue-50 text-blue-600 rounded-lg">
 						<svg class="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
@@ -35,37 +38,37 @@ templ HeadersTab(items []config.CustomHeader) {
 						</svg>
 					</div>
 					<div class="text-left">
-						<span class="text-sm font-semibold text-gray-900">How to use custom headers in client integrations</span>
-						<p class="text-xs text-gray-500">View HTTP request headers injection and official SDK code examples</p>
+						<span class="text-sm font-semibold text-slate-900">How to use custom headers in client integrations</span>
+						<p class="text-xs text-slate-500">View HTTP request headers injection and official SDK code examples</p>
 					</div>
 				</div>
-				<div class="text-gray-400 group-open:rotate-180 transition-transform duration-200">
+				<div class="text-slate-400 group-open:rotate-180 transition-transform duration-200">
 					<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
 					</svg>
 				</div>
 			</summary>
 			
-			<div class="p-6 border-t border-gray-200 bg-white space-y-6 text-sm text-gray-600 text-left">
+			<div class="p-6 border-t border-slate-200 bg-white space-y-6 text-sm text-slate-600 text-left">
 				<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
 					<!-- Quick reference -->
-					<div class="md:col-span-1 space-y-4 border-r border-gray-100 pr-6">
+					<div class="md:col-span-1 space-y-4 border-r border-slate-100 pr-6">
 						<div>
-							<h4 class="text-xs font-bold uppercase tracking-wider text-gray-500">Verification Protocol</h4>
-							<p class="mt-1 text-xs text-gray-500 leading-relaxed">
-								Custom headers are checked at the smart router gateway before requests are matched to routing policies. If a required header fails validation, the request is rejected with a clear <code class="bg-gray-100 text-gray-800 px-1 rounded text-[10px]">400 Bad Request</code>.
+							<h4 class="text-xs font-bold uppercase tracking-wider text-slate-500">Verification Protocol</h4>
+							<p class="mt-1 text-xs text-slate-500 leading-relaxed">
+								Custom headers are checked at the smart router gateway before requests are matched to routing policies. If a required header fails validation, the request is rejected with a clear <code class="bg-slate-100 text-slate-800 px-1 rounded text-[10px]">400 Bad Request</code>.
 							</p>
 						</div>
 						<div>
-							<h4 class="text-xs font-bold uppercase tracking-wider text-gray-500">Active Headers Defined</h4>
+							<h4 class="text-xs font-bold uppercase tracking-wider text-slate-500">Active Headers Defined</h4>
 							<ul class="mt-2 space-y-1 text-xs">
 								if len(items) == 0 {
-									<li class="text-gray-400 italic">No headers defined currently.</li>
+									<li class="text-slate-400 italic">No headers defined currently.</li>
 								} else {
 									for _, item := range items {
 										<li class="flex items-center gap-1.5">
 											<span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-											<code class="font-mono text-gray-700">{ item.Name }</code>
+											<code class="font-mono text-slate-700">{ item.Name }</code>
 											if item.Required {
 												<span class="text-[10px] text-red-500 font-semibold">(Required)</span>
 											}
@@ -78,79 +81,85 @@ templ HeadersTab(items []config.CustomHeader) {
 
 					<!-- Code examples -->
 					<div class="md:col-span-2 space-y-4">
-						<h4 class="text-xs font-bold uppercase tracking-wider text-gray-500">Integration Examples (Passing Custom Headers)</h4>
+						<h4 class="text-xs font-bold uppercase tracking-wider text-slate-500">Integration Examples (Passing Custom Headers)</h4>
 						
 						<div class="space-y-4">
 							<!-- curl example -->
-							<div class="rounded-lg overflow-hidden bg-gray-950">
-								<div class="bg-gray-900 px-4 py-1.5 flex justify-between items-center">
-									<span class="text-xs font-semibold text-gray-400 font-mono">cURL / HTTP API</span>
+							<div class="rounded-lg overflow-hidden bg-slate-950" data-code-snippet>
+								<div class="bg-slate-900 px-4 py-1.5 flex justify-between items-center">
+									<span class="text-xs font-semibold text-slate-400 font-mono">cURL / HTTP API</span>
+									<button
+										type="button"
+										onclick="copyCodeSnippet(this)"
+										title="Copy to clipboard"
+										aria-label="Copy to clipboard"
+										class="copy-snippet-btn p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer"
+									>
+										<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+										</svg>
+									</button>
 								</div>
-								<pre class="p-4 text-xs font-mono text-gray-300 overflow-x-auto whitespace-pre-wrap"><code>curl -X POST "<span class="dynamic-origin-url">http://localhost:8080</span>/v1/models/gemini-2.5-flash:generateContent" \
-  -H "x-goog-api-key: YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  for _, item := range items {
-  -H "{ item.Name }: YOUR_VALUE" \
-  }
-  -d '{"{"}contents": [{"{"}parts":[{"{"}text": "Hello Gemini!"{"}"}]{"}"}]{"}"}'</code></pre>
+								<pre class="p-4 text-xs font-mono text-slate-300 overflow-x-auto whitespace-pre-wrap"><code>{ curlHeadersSnippet(items) }</code></pre>
 							</div>
 
 							<!-- Multi-language Grid -->
 							<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
 								<!-- Python -->
-								<div class="rounded-lg overflow-hidden bg-gray-950">
-									<div class="bg-gray-900 px-3 py-1 flex justify-between items-center">
-										<span class="text-[10px] font-semibold text-gray-400 font-mono">Python SDK</span>
+								<div class="rounded-lg overflow-hidden bg-slate-950" data-code-snippet>
+									<div class="bg-slate-900 px-3 py-1 flex justify-between items-center">
+										<span class="text-[10px] font-semibold text-slate-400 font-mono">Python SDK</span>
+										<button
+											type="button"
+											onclick="copyCodeSnippet(this)"
+											title="Copy to clipboard"
+											aria-label="Copy to clipboard"
+											class="copy-snippet-btn p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer"
+										>
+											<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+											</svg>
+										</button>
 									</div>
-									<pre class="p-3 text-[11px] font-mono text-gray-300 overflow-x-auto"><code>from google import genai
-
-client = genai.Client(
-    api_key="YOUR_KEY",
-    http_options={"{"}
-        "api_endpoint": "<span class="dynamic-origin-url">http://localhost:8080</span>",
-        "headers": {"{"}
-            for _, item := range items {
-            "{ item.Name }": "YOUR_VALUE",
-            }
-        {"}"}
-    {"}"}
-)</code></pre>
+									<pre class="p-3 text-[11px] font-mono text-slate-300 overflow-x-auto whitespace-pre"><code>{ pythonHeadersSnippet(items) }</code></pre>
 								</div>
 
 								<!-- Go -->
-								<div class="rounded-lg overflow-hidden bg-gray-950">
-									<div class="bg-gray-900 px-3 py-1 flex justify-between items-center">
-										<span class="text-[10px] font-semibold text-gray-400 font-mono">Go SDK</span>
+								<div class="rounded-lg overflow-hidden bg-slate-950" data-code-snippet>
+									<div class="bg-slate-900 px-3 py-1 flex justify-between items-center">
+										<span class="text-[10px] font-semibold text-slate-400 font-mono">Go SDK</span>
+										<button
+											type="button"
+											onclick="copyCodeSnippet(this)"
+											title="Copy to clipboard"
+											aria-label="Copy to clipboard"
+											class="copy-snippet-btn p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer"
+										>
+											<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+											</svg>
+										</button>
 									</div>
-									<pre class="p-3 text-[11px] font-mono text-gray-300 overflow-x-auto"><code>import "google.golang.org/api/option"
-
-client, err := genai.NewClient(ctx,
-    option.WithAPIKey("YOUR_KEY"),
-    option.WithEndpoint("<span class="dynamic-origin-url">http://localhost:8080</span>"),
-    option.WithHTTPHeader(map[string][]string{"{"}
-        for _, item := range items {
-        "{ item.Name }": {"{"}"YOUR_VALUE"{"}"},
-        }
-    {"}"}),
-)</code></pre>
+									<pre class="p-3 text-[11px] font-mono text-slate-300 overflow-x-auto whitespace-pre"><code>{ goHeadersSnippet(items) }</code></pre>
 								</div>
 
 								<!-- JS/TS -->
-								<div class="rounded-lg overflow-hidden bg-gray-950">
-									<div class="bg-gray-900 px-3 py-1 flex justify-between items-center">
-										<span class="text-[10px] font-semibold text-gray-400 font-mono">JS/TS SDK</span>
+								<div class="rounded-lg overflow-hidden bg-slate-950" data-code-snippet>
+									<div class="bg-slate-900 px-3 py-1 flex justify-between items-center">
+										<span class="text-[10px] font-semibold text-slate-400 font-mono">JS/TS SDK</span>
+										<button
+											type="button"
+											onclick="copyCodeSnippet(this)"
+											title="Copy to clipboard"
+											aria-label="Copy to clipboard"
+											class="copy-snippet-btn p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer"
+										>
+											<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+											</svg>
+										</button>
 									</div>
-									<pre class="p-3 text-[11px] font-mono text-gray-300 overflow-x-auto"><code>import {"{"} GoogleGenAI {"}"} from '@google/genai';
-
-const ai = new GoogleGenAI({"{"}
-  apiKey: "YOUR_KEY",
-  baseUrl: "<span class="dynamic-origin-url">http://localhost:8080</span>",
-  headers: {"{"}
-    for _, item := range items {
-    "{ item.Name }": "YOUR_VALUE",
-    }
-  {"}"}
-{"}"});</code></pre>
+									<pre class="p-3 text-[11px] font-mono text-slate-300 overflow-x-auto whitespace-pre"><code>{ jsHeadersSnippet(items) }</code></pre>
 								</div>
 							</div>
 						</div>
@@ -159,48 +168,45 @@ const ai = new GoogleGenAI({"{"}
 			</div>
 		</details>
 
-		<!-- Table of Custom Headers -->
-		<div class="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
-			<div class="inline-block min-w-full align-middle">
-				<table class="min-w-full divide-y divide-gray-300">
-					<thead class="bg-gray-50">
+		<!-- Master-Detail Split Layout: Custom Headers Table (Left) + Contextual Inspector (Right) -->
+		<div data-layout="master-detail-split" class="flex flex-col lg:flex-row gap-6 items-start">
+			<div class="flex-1 min-w-0 w-full bg-white shadow-xs ring-1 ring-slate-900/5 sm:rounded-xl overflow-hidden">
+				<div class="overflow-x-auto">
+					<table class="min-w-full divide-y divide-slate-300">
+					<thead class="bg-slate-50">
 						<tr>
-							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Header Name</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Scope</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Description</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Required</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Validation Type</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Value Pattern</th>
+							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-slate-900 sm:pl-6">Header Name</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-slate-900">Scope</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-slate-900">Description</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-slate-900">Required</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-slate-900">Validation Type</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-slate-900">Value Pattern</th>
 							<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
 								<span class="sr-only">Actions</span>
 							</th>
 						</tr>
 					</thead>
-					<tbody class="divide-y divide-gray-200 bg-white">
+					<tbody class="divide-y divide-slate-200 bg-white">
 						if len(items) == 0 {
 							<tr>
-								<td colspan="7" class="text-center py-8 text-sm text-gray-500 italic">
+								<td colspan="7" class="text-center py-8 text-sm text-slate-500 italic">
 									No Custom Headers defined. Define headers to apply request enforcement.
 								</td>
 							</tr>
 						} else {
 							for _, item := range items {
-								<tr class="hover:bg-gray-50 transition-colors">
-									<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6 font-mono font-semibold text-gray-900">
+								<tr data-edit-row={ item.ID } class="hover:bg-slate-50 transition-colors">
+									<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6 font-mono font-semibold text-slate-900">
 										{ item.Name }
 									</td>
 									<td class="whitespace-nowrap px-3 py-4 text-sm">
 										if item.AppID == "" || item.AppID == "global" {
-											<span class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
-												Global
-											</span>
+											<span class="text-slate-600">Global</span>
 										} else {
-											<span class="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
-												{ item.AppID }
-											</span>
+											<span class="font-mono text-xs text-slate-700">{ item.AppID }</span>
 										}
 									</td>
-									<td class="px-3 py-4 text-sm text-gray-600 max-w-xs truncate">
+									<td class="px-3 py-4 text-sm text-slate-600 max-w-xs truncate">
 										{ item.Description }
 									</td>
 									<td class="whitespace-nowrap px-3 py-4 text-sm">
@@ -209,25 +215,24 @@ const ai = new GoogleGenAI({"{"}
 												Yes
 											</span>
 										} else {
-											<span class="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10">
-												No (Optional)
-											</span>
+											<span class="text-xs text-slate-400">Optional</span>
 										}
 									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900 font-medium">
+									<td class="whitespace-nowrap px-3 py-4 text-sm text-slate-900 font-medium">
 										{ item.Validation }
 									</td>
-									<td class="px-3 py-4 text-sm text-gray-500 font-mono text-xs truncate max-w-xs">
+									<td class="px-3 py-4 text-sm text-slate-500 font-mono text-xs truncate max-w-xs">
 										if item.ValuePattern != "" {
 											{ item.ValuePattern }
 										} else {
-											<span class="text-gray-400 italic">N/A</span>
+											<span class="text-slate-400 italic">N/A</span>
 										}
 									</td>
 									<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
 										<button
 											hx-get={ "/admin/headers/edit?id=" + item.ID }
 											hx-target="#modal-container"
+											onclick="document.querySelectorAll('[data-edit-row]').forEach(r => r.classList.remove('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30')); this.closest('tr').classList.add('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30')"
 											class="text-blue-600 hover:text-blue-900 transition font-semibold mr-4"
 										>
 											Edit
@@ -247,10 +252,68 @@ const ai = new GoogleGenAI({"{"}
 						}
 					</tbody>
 				</table>
+				</div>
 			</div>
-		</div>
 
-		<!-- Modal Target Anchor -->
-		<div id="modal-container"></div>
+			<!-- Right Contextual Inspector Pane -->
+			<aside id="modal-container" class="w-full lg:w-[400px] xl:w-[440px] shrink-0 lg:sticky lg:top-6 hidden [&:has(*)]:block"></aside>
+		</div>
 	</div>
+}
+
+func curlHeadersSnippet(items []config.CustomHeader) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "curl -X POST \"%s/v1/models/gemini-3.8-flash:generateContent\" \\\n", ProxyURL())
+	b.WriteString("  -H \"x-goog-api-key: YOUR_API_KEY\" \\\n")
+	b.WriteString("  -H \"Content-Type: application/json\" \\\n")
+	for _, item := range items {
+		fmt.Fprintf(&b, "  -H \"%s: YOUR_VALUE\" \\\n", item.Name)
+	}
+	b.WriteString("  -d '{\"contents\": [{\"parts\":[{\"text\": \"Hello Gemini!\"}]}]}'")
+	return b.String()
+}
+
+func pythonHeadersSnippet(items []config.CustomHeader) string {
+	var b strings.Builder
+	b.WriteString("from google import genai\n\n")
+	b.WriteString("client = genai.Client(\n")
+	b.WriteString("    api_key=\"YOUR_KEY\",\n")
+	b.WriteString("    http_options={\n")
+	fmt.Fprintf(&b, "        \"base_url\": \"%s\",\n", ProxyURL())
+	b.WriteString("        \"headers\": {\n")
+	for _, item := range items {
+		fmt.Fprintf(&b, "            \"%s\": \"YOUR_VALUE\",\n", item.Name)
+	}
+	b.WriteString("        }\n    }\n)")
+	return b.String()
+}
+
+func goHeadersSnippet(items []config.CustomHeader) string {
+	var b strings.Builder
+	b.WriteString("import \"google.golang.org/genai\"\n\n")
+	b.WriteString("client, err := genai.NewClient(ctx, &genai.ClientConfig{\n")
+	b.WriteString("    APIKey: \"YOUR_KEY\",\n")
+	b.WriteString("    HTTPOptions: genai.HTTPOptions{\n")
+	fmt.Fprintf(&b, "        BaseURL: \"%s\",\n", ProxyURL())
+	b.WriteString("        Headers: http.Header{\n")
+	for _, item := range items {
+		fmt.Fprintf(&b, "            \"%s\": []string{\"YOUR_VALUE\"},\n", item.Name)
+	}
+	b.WriteString("        },\n    },\n})")
+	return b.String()
+}
+
+func jsHeadersSnippet(items []config.CustomHeader) string {
+	var b strings.Builder
+	b.WriteString("import { GoogleGenAI } from '@google/genai';\n\n")
+	b.WriteString("const ai = new GoogleGenAI({\n")
+	b.WriteString("  apiKey: \"YOUR_KEY\",\n")
+	b.WriteString("  httpOptions: {\n")
+	fmt.Fprintf(&b, "    baseUrl: \"%s\",\n", ProxyURL())
+	b.WriteString("    headers: {\n")
+	for _, item := range items {
+		fmt.Fprintf(&b, "      \"%s\": \"YOUR_VALUE\",\n", item.Name)
+	}
+	b.WriteString("    }\n  }\n});")
+	return b.String()
 }

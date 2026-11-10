@@ -24,7 +24,7 @@ templ QueueTab(items []QueueSnapshotItem) {
 		</div>
 
 		<!-- Queue Lifespan Info Banner -->
-		<div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5 shadow-xs">
+		<div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5 shadow-sm">
 			<div class="flex gap-4">
 				<div class="flex-shrink-0 p-2 bg-blue-500 text-white rounded-lg self-start">
 					<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
@@ -47,7 +47,7 @@ templ QueueTab(items []QueueSnapshotItem) {
 			
 			<!-- KPI Cards: Active and Queued Request counts -->
 			<div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 mb-6">
-				<div class="relative overflow-hidden rounded-2xl bg-white px-6 pb-6 pt-5 border border-gray-200/80 shadow-sm">
+				<div class="relative overflow-hidden rounded-lg bg-white px-6 pb-6 pt-5 border border-gray-200/80 shadow-sm">
 					<dt>
 						<p class="text-sm font-medium text-gray-500">Processing Requests</p>
 					</dt>
@@ -57,7 +57,7 @@ templ QueueTab(items []QueueSnapshotItem) {
 					</dd>
 				</div>
 
-				<div class="relative overflow-hidden rounded-2xl bg-white px-6 pb-6 pt-5 border border-gray-200/80 shadow-sm">
+				<div class="relative overflow-hidden rounded-lg bg-white px-6 pb-6 pt-5 border border-gray-200/80 shadow-sm">
 					<dt>
 						<p class="text-sm font-medium text-gray-500">Queued Requests</p>
 					</dt>
@@ -67,7 +67,7 @@ templ QueueTab(items []QueueSnapshotItem) {
 					</dd>
 				</div>
 
-				<div class="relative overflow-hidden rounded-2xl bg-white px-6 pb-6 pt-5 border border-gray-200/80 shadow-sm">
+				<div class="relative overflow-hidden rounded-lg bg-white px-6 pb-6 pt-5 border border-gray-200/80 shadow-sm">
 					<dt>
 						<p class="text-sm font-medium text-gray-500">Total Concurrency Load</p>
 					</dt>
@@ -79,18 +79,9 @@ templ QueueTab(items []QueueSnapshotItem) {
 			</div>
 
 			<!-- Queue Table Card -->
-			<div class="overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-sm">
+			<div class="overflow-hidden rounded-lg border border-gray-200/80 bg-white shadow-sm">
 				<div class="px-6 py-5 border-b border-gray-100 bg-white flex items-center justify-between">
 					<h3 class="text-base font-bold text-gray-900">Request Queue & Concurrency Pipeline</h3>
-					if len(items) > 0 {
-						<span class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-600/10">
-							Load Pending
-						</span>
-					} else {
-						<span class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/10">
-							Healthy / Idle
-						</span>
-					}
 				</div>
 
 				if len(items) == 0 {
@@ -112,43 +103,51 @@ templ QueueTab(items []QueueSnapshotItem) {
 								<tr>
 									<th scope="col" class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Application</th>
 									<th scope="col" class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Target Model</th>
+									<th scope="col" class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Queue / Runner</th>
 									<th scope="col" class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Priority</th>
 									<th scope="col" class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Client Tier</th>
 									<th scope="col" class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Status</th>
 									<th scope="col" class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Active Duration</th>
 								</tr>
 							</thead>
-							<tbody class="divide-y divide-gray-150 bg-white">
+							<tbody class="divide-y divide-slate-200 bg-white">
 								for _, item := range items {
 									<tr class="hover:bg-gray-50/50 transition">
-										<td class="whitespace-nowrap px-6 py-4.5 text-sm font-bold text-gray-900">
+										<td class="whitespace-nowrap px-6 py-4 text-sm font-bold text-gray-900">
 											{ item.AppID }
 										</td>
-										<td class="whitespace-nowrap px-6 py-4.5 text-sm text-gray-600">
-											<span class="font-mono bg-gray-100 px-2 py-1 rounded text-xs text-gray-800">
+										<td class="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
+											<span class="font-mono text-xs text-slate-800">
 												{ item.Model }
 											</span>
 										</td>
-										<td class="whitespace-nowrap px-6 py-4.5 text-sm">
+										<td class="whitespace-nowrap px-6 py-4 text-xs text-gray-600">
+											<div class="flex flex-wrap items-center gap-1.5">
+												if item.ClusterID != "" {
+													<span class="font-mono text-xs text-slate-700">{ item.ClusterID }</span>
+												}
+												if item.AssignedNodeID != "" {
+													<span class="font-mono text-xs text-emerald-700">{ item.AssignedNodeID }</span>
+												}
+												if item.ClusterID == "" && item.AssignedNodeID == "" {
+													<span class="text-gray-400">Upstream Scheduler</span>
+												}
+											</div>
+										</td>
+										<td class="whitespace-nowrap px-6 py-4 text-sm">
 											switch item.Priority {
 											case "high":
-												<span class="inline-flex items-center rounded-md bg-rose-50 px-2 py-1 text-xs font-medium text-rose-700 ring-1 ring-inset ring-rose-600/10">
-													High Priority
-												</span>
+												<span class="text-xs font-medium text-slate-700">High Priority</span>
 											case "medium":
-												<span class="inline-flex items-center rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-600/10">
-													Medium Priority
-												</span>
+												<span class="text-xs font-medium text-slate-700">Medium Priority</span>
 											default:
-												<span class="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10">
-													Low Priority
-												</span>
+												<span class="text-xs font-medium text-slate-700">Low Priority</span>
 											}
 										</td>
-										<td class="whitespace-nowrap px-6 py-4.5 text-sm text-gray-600">
+										<td class="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
 											<span class="capitalize">{ item.Tier }</span>
 										</td>
-										<td class="whitespace-nowrap px-6 py-4.5 text-sm">
+										<td class="whitespace-nowrap px-6 py-4 text-sm">
 											if item.Status == "processing" {
 												<span class="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/10">
 													<span class="h-1.5 w-1.5 mr-1.5 rounded-full bg-blue-500 animate-pulse"></span>
@@ -161,7 +160,7 @@ templ QueueTab(items []QueueSnapshotItem) {
 												</span>
 											}
 										</td>
-										<td class="whitespace-nowrap px-6 py-4.5 text-sm text-gray-600 font-medium">
+										<td class="whitespace-nowrap px-6 py-4 text-sm text-gray-600 font-medium">
 											{ formatDuration(item.DurationMs) }
 										</td>
 									</tr>

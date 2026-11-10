@@ -1,69 +1,174 @@
 package templates
 
 import (
+	"encoding/json"
 	"fmt"
 	"geminirouter/pkg/config"
+	"strings"
 )
 
 templ RunnerModal(node config.Node, assignedClusters []string, providers []config.ProviderConfig) {
-	<div id="modal-backing" class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity z-45" onclick="document.getElementById('runner-mapping-modal').remove(); document.getElementById('modal-backing').remove();"></div>
-	<div id="runner-mapping-modal" class="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
-		<div class="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-gray-100">
+	<div
+		id="runner-mapping-modal"
+		class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4"
+		onclick="if (event.target === this) this.remove();"
+	>
+		<div class="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
 			<!-- Modal Header -->
-			<div class="bg-gray-50/80 border-b border-gray-100 px-6 py-4 flex items-center justify-between">
+			<div class="bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
 				<div>
-					<h3 class="text-lg font-bold text-gray-900">Manage Runner Associations</h3>
-					<p class="text-xs text-gray-500 mt-0.5">Bind runner to single or multiple cluster routing pools.</p>
+					if node.ID == "" {
+						<h3 class="text-base font-bold text-slate-900">Register Cluster Node</h3>
+						<p class="text-xs text-slate-500 mt-0.5">Pre-register a managed hardware node, assign it to pull-queue clusters, or copy the daemon heartbeat cURL command.</p>
+					} else {
+						<h3 class="text-base font-bold text-slate-900">Manage Runner Associations &amp; Limits</h3>
+						<p class="text-xs text-slate-500 mt-0.5">Bind runner to routing cluster pools and configure node hardware &amp; execution limits.</p>
+					}
 				</div>
-				<button type="button" class="text-gray-400 hover:text-gray-600 font-bold text-lg" onclick="document.getElementById('runner-mapping-modal').remove(); document.getElementById('modal-backing').remove();">&times;</button>
+				<button
+					type="button"
+					aria-label="Close modal"
+					class="text-slate-400 hover:text-slate-600 font-bold text-lg px-2 py-1 rounded hover:bg-slate-200/60 transition cursor-pointer"
+					onclick="document.getElementById('runner-mapping-modal').remove();"
+				>&times;</button>
 			</div>
 
 			<form
-				hx-post="/admin/clusters/attach"
+				hx-post="/admin/clusters/nodes/save"
 				hx-swap="none"
-				class="p-6 space-y-6"
+				class="p-6 space-y-4"
 			>
-				<input type="hidden" name="node_id" value={ node.ID } />
-
-				<!-- Hardware Specs Summary Card -->
-				<div class="rounded-xl bg-blue-50/50 border border-blue-100 p-4 flex items-center gap-3">
-					<div class="p-2 bg-blue-100 text-blue-700 rounded-lg">
-						<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-							<path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-						</svg>
-					</div>
-					<div class="text-left">
-						<span class="text-sm font-bold text-blue-950">{ node.Name }</span>
-						<div class="text-xs text-blue-800 mt-0.5 font-mono">{ node.ID }</div>
-						<div class="text-[11px] text-blue-500 font-semibold mt-1 font-sans">
-							{ fmt.Sprintf("%d GB RAM  •  GPU cores: %d  •  Max Model Limit: %d GB", node.MemoryAllocatedGB, node.ComputeGPUCores, node.MaxModelSizeGB) }
+				if node.ID == "" {
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+						<div>
+							<label for="runner-node-id" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Node ID</label>
+							<input
+								type="text"
+								id="runner-node-id"
+								name="node_id"
+								required
+								placeholder="e.g. mac-studio-m3-01"
+								class="block w-full rounded-md border-slate-300 bg-white p-2 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300"
+							/>
 						</div>
+						<div>
+							<label for="runner-node-name" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Display Name / Hostname</label>
+							<input
+								type="text"
+								id="runner-node-name"
+								name="name"
+								required
+								placeholder="e.g. Mac Studio M3 Ultra"
+								class="block w-full rounded-md border-slate-300 bg-white p-2 text-xs text-slate-900 ring-1 ring-inset ring-slate-300"
+							/>
+						</div>
+					</div>
+				} else {
+					<input type="hidden" name="node_id" value={ node.ID } />
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+						<div>
+							<label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Node ID</label>
+							<div class="rounded-md bg-slate-100 px-3 py-2 text-xs font-mono text-slate-700 border border-slate-200">{ node.ID }</div>
+						</div>
+						<div>
+							<label for="runner-node-name" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Display Name / Hostname</label>
+							<input
+								type="text"
+								id="runner-node-name"
+								name="name"
+								required
+								value={ node.Name }
+								class="block w-full rounded-md border-slate-300 bg-white p-2 text-xs text-slate-900 ring-1 ring-inset ring-slate-300"
+							/>
+						</div>
+					</div>
+				}
+
+				<!-- Hardware Specs & Execution Limits -->
+				<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+					<div>
+						<label for="runner-memory-gb" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Unified RAM (GB)</label>
+						<input
+							type="number"
+							id="runner-memory-gb"
+							name="memory_allocated_gb"
+							min="1"
+							value={ fmt.Sprintf("%d", defaultIntIfZero(node.MemoryAllocatedGB, 64)) }
+							class="block w-full rounded-md border-slate-300 bg-white p-2 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300"
+						/>
+					</div>
+					<div>
+						<label for="runner-gpu-cores" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">GPU Cores</label>
+						<input
+							type="number"
+							id="runner-gpu-cores"
+							name="compute_gpu_cores"
+							min="0"
+							value={ fmt.Sprintf("%d", defaultIntIfZero(node.ComputeGPUCores, 60)) }
+							class="block w-full rounded-md border-slate-300 bg-white p-2 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300"
+						/>
+					</div>
+					<div>
+						<label for="runner-max-model-size-gb" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Max Model Cap (GB)</label>
+						<input
+							type="number"
+							id="runner-max-model-size-gb"
+							name="max_model_size_gb"
+							min="0"
+							value={ fmt.Sprintf("%d", node.MaxModelSizeGB) }
+							class="block w-full rounded-md border-slate-300 bg-white p-2 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300"
+						/>
+					</div>
+					<div>
+						<label for="runner-max-concurrent" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Max Concurrency</label>
+						<input
+							type="number"
+							id="runner-max-concurrent"
+							name="max_concurrent"
+							min="1"
+							value={ fmt.Sprintf("%d", defaultIntIfZero(node.MaxConcurrent, 2)) }
+							class="block w-full rounded-md border-slate-300 bg-white p-2 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300"
+						/>
 					</div>
 				</div>
 
+				<!-- Supported Models -->
+				<div>
+					<label for="runner-supported-models" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Supported Models (Comma-Separated)</label>
+					<input
+						type="text"
+						id="runner-supported-models"
+						name="supported_models"
+						value={ formatSupportedModelsInput(node.SupportedModels, node.ID == "") }
+						placeholder="gemma-4-26b, gemma-4-4b, contrastive-lm"
+						class="block w-full rounded-md border-slate-300 bg-white p-2 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300"
+					/>
+					<p class="text-[11px] text-slate-500 mt-1">Models hosted on this runner node (e.g. <code class="font-mono">gemma-4-26b</code>, <code class="font-mono">gemma-4-31b</code>, <code class="font-mono">gemma-4-4b</code>, <code class="font-mono">contrastive-lm</code>).</p>
+				</div>
+
 				<!-- Clusters List -->
-				<div class="space-y-3">
-					<label class="block text-xs font-bold uppercase tracking-wider text-gray-500">Attach to Routing Clusters</label>
-					<div class="divide-y divide-gray-100 border border-gray-200 rounded-xl max-h-60 overflow-y-auto bg-white">
-						if len(getAvailableClusters(providers)) == 0 {
-							<div class="p-6 text-center text-xs text-gray-500">
-								No on-premises clusters defined. Add a local cluster configuration under Settings.
+				<div class="space-y-2">
+					<label class="block text-xs font-bold uppercase tracking-wider text-slate-600">Attach to On-Premises Cluster Pools</label>
+					<div class="divide-y divide-slate-100 border border-slate-200 rounded-xl max-h-44 overflow-y-auto bg-white">
+						if len(getAvailableClusters(providers, assignedClusters...)) == 0 {
+							<div class="p-4 text-center text-xs text-slate-500">
+								No on-premises cluster pools defined yet. Create a cluster pool in Table 1 first.
 							</div>
 						} else {
-							for _, cluster := range getAvailableClusters(providers) {
-								<label class="flex items-start gap-3.5 p-4 hover:bg-gray-50/60 transition cursor-pointer select-none text-left">
+							for _, cluster := range getAvailableClusters(providers, assignedClusters...) {
+								<label class="flex items-start gap-3.5 p-3 hover:bg-slate-50 transition cursor-pointer select-none text-left">
 									<div class="flex items-center h-5">
 										<input
 											type="checkbox"
 											name="cluster_ids"
 											value={ cluster.ID }
 											checked?={ hasCluster(assignedClusters, cluster.ID) }
-											class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+											class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
 										/>
 									</div>
 									<div>
-										<span class="text-sm font-semibold text-gray-900">{ cluster.Name }</span>
-										<div class="text-xs text-gray-500 mt-0.5 font-mono">{ cluster.ID } (Queue: { cluster.QueueName })</div>
+										<span class="text-sm font-semibold text-slate-900">{ cluster.Name }</span>
+										<div class="text-xs text-slate-500 mt-0.5 font-mono">{ cluster.ID } (Queue: { cluster.QueueName })</div>
 									</div>
 								</label>
 							}
@@ -71,25 +176,403 @@ templ RunnerModal(node config.Node, assignedClusters []string, providers []confi
 					</div>
 				</div>
 
+				<!-- Daemon / cURL Heartbeat Join Snippet -->
+				<div class="rounded-lg border border-slate-200 bg-slate-900 text-slate-100 overflow-hidden" data-code-snippet>
+					<div class="px-3.5 py-2 bg-slate-800/90 border-b border-slate-700 flex items-center justify-between">
+						<span class="text-[11px] font-bold uppercase tracking-wider text-slate-300">Daemon / cURL Join Command</span>
+						<button
+							type="button"
+							onclick="copyCodeSnippet(this)"
+							title="Copy to clipboard"
+							class="inline-flex items-center gap-1 rounded bg-slate-700 hover:bg-slate-600 px-2 py-0.5 text-[11px] font-medium text-slate-200 transition cursor-pointer"
+						>
+							Copy Command
+						</button>
+					</div>
+					<pre class="p-3.5 text-[11px] font-mono text-slate-200 overflow-x-auto whitespace-pre-wrap"><code>{ buildRunnerJoinCurlSnippet(node, assignedClusters) }</code></pre>
+				</div>
+
 				<!-- Form Actions -->
-				<div class="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+				<div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
 					<button
 						type="button"
-						onclick="document.getElementById('runner-mapping-modal').remove(); document.getElementById('modal-backing').remove();"
-						class="rounded-md bg-white px-3 py-2 text-xs font-semibold text-gray-700 border border-gray-300 hover:bg-gray-50 transition"
+						onclick="document.getElementById('runner-mapping-modal').remove();"
+						class="rounded-md bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 border border-slate-300 hover:bg-slate-50 transition cursor-pointer"
 					>
 						Cancel
 					</button>
 					<button
 						type="submit"
-						class="rounded-md bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-500 transition shadow"
+						class="rounded-md bg-blue-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-blue-700 transition shadow-sm cursor-pointer"
 					>
-						Save Attachments
+						if node.ID == "" {
+							Register Node
+						} else {
+							Save Node Configuration
+						}
 					</button>
 				</div>
 			</form>
 		</div>
 	</div>
+}
+
+templ ClusterEditModal(resourceType string, cl config.LocalCluster, ep config.DirectEndpoint, clusters []config.LocalCluster, runners []config.RunnerResponse) {
+	<div
+		id="cluster-edit-modal"
+		class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4"
+		onclick="if (event.target === this) this.remove();"
+	>
+		<div class="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden">
+			<div class="bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+				<div>
+					if resourceType == "cluster" || resourceType == "pull-queue" {
+						if cl.ID == "" {
+							<h3 class="text-base font-bold text-slate-900">Add On-Premises Cluster Pool</h3>
+							<p class="text-xs text-slate-500 mt-0.5">Create a logical pull-queue pool for managed hardware nodes to poll, and attach existing worker nodes.</p>
+						} else {
+							<h3 class="text-base font-bold text-slate-900">Edit Cluster Pool &amp; Attached Nodes</h3>
+							<p class="text-xs text-slate-500 mt-0.5">Update queue pool configuration, cloud failover, and attached worker nodes.</p>
+						}
+					} else {
+						if ep.ID == "" {
+							<h3 class="text-base font-bold text-slate-900">Add Direct HTTP Endpoint</h3>
+							<p class="text-xs text-slate-500 mt-0.5">Register an unmanaged push-based HTTP inference or Contrastive-LM server.</p>
+						} else {
+							<h3 class="text-base font-bold text-slate-900">Edit Direct Endpoint</h3>
+							<p class="text-xs text-slate-500 mt-0.5">Modify local inference or decision engine endpoint parameters.</p>
+						}
+					}
+				</div>
+				<button
+					type="button"
+					aria-label="Close modal"
+					class="text-slate-400 hover:text-slate-600 font-bold text-lg px-2 py-1 rounded hover:bg-slate-200/60 transition cursor-pointer"
+					onclick="document.getElementById('cluster-edit-modal').remove();"
+				>&times;</button>
+			</div>
+
+			<form hx-post="/admin/clusters/providers/create" class="p-6 space-y-4 overflow-y-auto">
+				if resourceType == "cluster" || resourceType == "pull-queue" {
+					<input type="hidden" name="type" value="cluster" />
+					<input type="hidden" name="node_selection_present" value="1" />
+					if cl.ID == "" {
+						<div>
+							<label for="edit-cluster-id" class="block text-xs font-semibold text-slate-700 mb-1">Cluster Pool ID (Routing Target Location)</label>
+							<input
+								type="text"
+								id="edit-cluster-id"
+								name="id"
+								required
+								placeholder="e.g. mac-studio-pool"
+								class="block w-full rounded-md border-slate-300 bg-white p-2 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300"
+							/>
+							<p class="text-[11px] text-slate-500 mt-1">Reference this ID as the <code class="font-mono bg-slate-100 px-1 rounded">Location</code> in Routing Rules to dispatch requests to this pool.</p>
+						</div>
+					} else {
+						<input type="hidden" name="id" value={ cl.ID } />
+						<div>
+							<label class="block text-xs font-semibold text-slate-700 mb-1">Cluster Pool ID (Routing Target Location)</label>
+							<div class="rounded-md bg-slate-100 px-3 py-2 text-xs font-mono text-slate-700 border border-slate-200">{ cl.ID }</div>
+						</div>
+					}
+					<div>
+						<label for="edit-cluster-name" class="block text-xs font-semibold text-slate-700 mb-1">Display Name</label>
+						<input
+							type="text"
+							id="edit-cluster-name"
+							name="name"
+							required
+							value={ cl.Name }
+							placeholder="e.g. Mac Studio M3 Ultra Pool"
+							class="block w-full rounded-md border-slate-300 bg-white p-2 text-xs text-slate-900 ring-1 ring-inset ring-slate-300"
+						/>
+					</div>
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+						<div>
+							<label for="edit-cluster-queue" class="block text-xs font-semibold text-slate-700 mb-1">Queue Name <span class="font-normal text-slate-400">(Optional)</span></label>
+							<input
+								type="text"
+								id="edit-cluster-queue"
+								name="queue_name"
+								value={ cl.QueueName }
+								placeholder="Defaults to queue-<cluster-id>"
+								class="block w-full rounded-md border-slate-300 bg-white p-2 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300"
+							/>
+						</div>
+						<div>
+							<label for="edit-cluster-max-age" class="block text-xs font-semibold text-slate-700 mb-1">Max Queue Age / Timeout (sec)</label>
+							<input
+								type="number"
+								id="edit-cluster-max-age"
+								name="max_queue_age"
+								min="1"
+								value={ fmt.Sprintf("%d", defaultIntIfZero(int(cl.MaxQueueAge), 90)) }
+								class="block w-full rounded-md border-slate-300 bg-white p-2 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300"
+							/>
+						</div>
+					</div>
+					<div>
+						<label for="edit-cluster-desc" class="block text-xs font-semibold text-slate-700 mb-1">Description</label>
+						<input
+							type="text"
+							id="edit-cluster-desc"
+							name="description"
+							value={ cl.Description }
+							placeholder="e.g. Primary Apple Silicon M3 Ultra pool"
+							class="block w-full rounded-md border-slate-300 bg-white p-2 text-xs text-slate-900 ring-1 ring-inset ring-slate-300"
+						/>
+					</div>
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+						<div>
+							<label for="edit-cluster-fallback-model" class="block text-xs font-semibold text-slate-700 mb-1">Cloud Fallback Model (Optional)</label>
+							<input
+								type="text"
+								id="edit-cluster-fallback-model"
+								name="fallback_model"
+								value={ cl.FallbackModel }
+								placeholder="e.g. gemini-3.8-flash"
+								class="block w-full rounded-md border-slate-300 bg-white p-2 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300"
+							/>
+						</div>
+						<div>
+							<label for="edit-cluster-fallback-location" class="block text-xs font-semibold text-slate-700 mb-1">Fallback Location (Optional)</label>
+							<input
+								type="text"
+								id="edit-cluster-fallback-location"
+								name="fallback_location"
+								value={ cl.FallbackLocation }
+								placeholder="e.g. global or us-central1"
+								class="block w-full rounded-md border-slate-300 bg-white p-2 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300"
+							/>
+						</div>
+					</div>
+
+					<!-- Attach Existing Cluster Nodes (Managed Runners) -->
+					<div class="pt-2 border-t border-slate-200">
+						<div class="flex items-center justify-between mb-1.5">
+							<label class="block text-xs font-semibold text-slate-800">Attach Existing Cluster Nodes (Managed Runners)</label>
+							<span class="text-[11px] font-medium text-slate-500">{ fmt.Sprintf("%d registered node(s)", len(runners)) }</span>
+						</div>
+						<p class="text-[11px] text-slate-500 mb-2">Select which existing hardware runner nodes should poll and execute jobs queued in this cluster pool.</p>
+						if len(runners) == 0 {
+							<div class="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-xs text-slate-500">
+								No cluster nodes are registered yet. Register a node using <strong>+ Register Cluster Node</strong> in Section 2 after saving this pool.
+							</div>
+						} else {
+							<div class="max-h-44 overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-100 bg-slate-50/50">
+								for _, r := range runners {
+									<label class="flex items-start gap-3 px-3 py-2.5 hover:bg-blue-50/50 transition cursor-pointer">
+										<input
+											type="checkbox"
+											name="node_ids"
+											value={ r.Node.ID }
+											checked?={ isRunnerAttachedToCluster(r, cl) }
+											class="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-600"
+										/>
+										<div class="flex-1 min-w-0">
+											<div class="flex items-center justify-between gap-2">
+												<div class="flex items-center gap-1.5 truncate">
+													<span class="text-xs font-semibold text-slate-900 truncate">{ r.Node.Name }</span>
+													<span class="text-[11px] font-mono text-slate-500">({ r.Node.ID })</span>
+												</div>
+												if r.Node.Status == "online" {
+													<span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20">Online</span>
+												} else {
+													<span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">Offline</span>
+												}
+											</div>
+											<div class="text-[11px] text-slate-500 mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+												<span>RAM: <strong class="font-mono text-slate-700">{ fmt.Sprintf("%d GB", r.Node.MemoryAllocatedGB) }</strong></span>
+												<span>Max Concurrent: <strong class="font-mono text-slate-700">{ fmt.Sprintf("%d", defaultIntIfZero(r.Node.MaxConcurrent, 2)) }</strong></span>
+												if len(r.AssignedClusters) > 0 {
+													<span>Current Pools: <code class="font-mono text-[10px] bg-white px-1 py-0.5 rounded border border-slate-200 text-slate-600">{ strings.Join(r.AssignedClusters, ", ") }</code></span>
+												}
+											</div>
+										</div>
+									</label>
+								}
+							</div>
+						}
+					</div>
+				} else {
+					<input type="hidden" name="type" value="endpoint" />
+					if ep.ID == "" {
+						<div>
+							<label for="edit-ep-id" class="block text-xs font-semibold text-slate-700 mb-1">Endpoint ID</label>
+							<input
+								type="text"
+								id="edit-ep-id"
+								name="id"
+								required
+								placeholder="e.g. ep-gemma4-vllm or clm-local-01"
+								class="block w-full rounded-md border-slate-300 bg-white p-2 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300"
+							/>
+						</div>
+					} else {
+						<input type="hidden" name="id" value={ ep.ID } />
+						<div>
+							<label class="block text-xs font-semibold text-slate-700 mb-1">Endpoint ID</label>
+							<div class="rounded-md bg-slate-100 px-3 py-2 text-xs font-mono text-slate-700 border border-slate-200">{ ep.ID }</div>
+						</div>
+					}
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+						<div>
+							<label for="edit-ep-name" class="block text-xs font-semibold text-slate-700 mb-1">Display Name</label>
+							<input
+								type="text"
+								id="edit-ep-name"
+								name="name"
+								required
+								value={ ep.Name }
+								placeholder="e.g. Gemma 4 26B vLLM Node"
+								class="block w-full rounded-md border-slate-300 bg-white p-2 text-xs text-slate-900 ring-1 ring-inset ring-slate-300"
+							/>
+						</div>
+						<div>
+							<label for="edit-ep-model" class="block text-xs font-semibold text-slate-700 mb-1">Served Model</label>
+							<input
+								type="text"
+								id="edit-ep-model"
+								name="model"
+								required
+								value={ ep.ModelName }
+								placeholder="e.g. gemma-4-26b or contrastive-lm"
+								class="block w-full rounded-md border-slate-300 bg-white p-2 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300"
+							/>
+						</div>
+					</div>
+					<div>
+						<label for="edit-ep-url" class="block text-xs font-semibold text-slate-700 mb-1">Base URL</label>
+						<input
+							type="text"
+							id="edit-ep-url"
+							name="url"
+							required
+							value={ ep.URL }
+							placeholder="http://10.0.1.25:8000/v1"
+							class="block w-full rounded-md border-slate-300 bg-white p-2 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300"
+						/>
+					</div>
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+						<div>
+							<label for="edit-ep-engine" class="block text-xs font-semibold text-slate-700 mb-1">Engine Type</label>
+							<select
+								id="edit-ep-engine"
+								name="engine"
+								class="block w-full rounded-md border-slate-300 bg-white p-2 text-xs font-medium text-slate-900 ring-1 ring-inset ring-slate-300"
+							>
+								<option value="vllm" selected?={ ep.Engine == "vllm" }>vLLM</option>
+								<option value="ollama" selected?={ ep.Engine == "ollama" }>Ollama</option>
+								<option value="sglang" selected?={ ep.Engine == "sglang" }>SGLang</option>
+								<option value="mlx" selected?={ ep.Engine == "mlx" }>Apple MLX</option>
+								<option value="contrastive-lm" selected?={ ep.Engine == "contrastive-lm" }>Contrastive-LM</option>
+							</select>
+						</div>
+						<div>
+							<label for="edit-ep-role" class="block text-xs font-semibold text-slate-700 mb-1">Endpoint Role</label>
+							<select
+								id="edit-ep-role"
+								name="role"
+								class="block w-full rounded-md border-slate-300 bg-white p-2 text-xs font-medium text-slate-900 ring-1 ring-inset ring-slate-300"
+							>
+								<option value="inference" selected?={ ep.Role == "" || ep.Role == "inference" }>Inference Node</option>
+								<option value="decision_engine" selected?={ ep.Role == "decision_engine" }>Decision Engine (CLM)</option>
+							</select>
+						</div>
+					</div>
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+						<div>
+							<label for="edit-ep-cluster" class="block text-xs font-semibold text-slate-700 mb-1">Parent Cluster (Optional)</label>
+							<select
+								id="edit-ep-cluster"
+								name="cluster_id"
+								class="block w-full rounded-md border-slate-300 bg-white p-2 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300"
+							>
+								<option value="" selected?={ ep.ClusterID == "" }>None (Standalone)</option>
+								for _, c := range clusters {
+									<option value={ c.ID } selected?={ ep.ClusterID == c.ID }>{ c.Name } ({ c.ID })</option>
+								}
+							</select>
+						</div>
+						<div>
+							<label for="edit-ep-active" class="block text-xs font-semibold text-slate-700 mb-1">Endpoint Status</label>
+							<select
+								id="edit-ep-active"
+								name="active"
+								class="block w-full rounded-md border-slate-300 bg-white p-2 text-xs font-medium text-slate-900 ring-1 ring-inset ring-slate-300"
+							>
+								<option value="true" selected?={ ep.ID == "" || ep.Active }>Active (Enabled)</option>
+								<option value="false" selected?={ ep.ID != "" && !ep.Active }>Disabled (Offline)</option>
+							</select>
+						</div>
+					</div>
+				}
+
+				<div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
+					<button
+						type="button"
+						onclick="document.getElementById('cluster-edit-modal').remove();"
+						class="rounded-md bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 border border-slate-300 hover:bg-slate-50 transition cursor-pointer"
+					>
+						Cancel
+					</button>
+					<button
+						type="submit"
+						class="rounded-md bg-blue-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-blue-700 transition shadow-sm cursor-pointer"
+					>
+						Save Changes
+					</button>
+				</div>
+			</form>
+		</div>
+	</div>
+}
+
+func defaultIntIfZero(val int, fallback int) int {
+	if val <= 0 {
+		return fallback
+	}
+	return val
+}
+
+func formatSupportedModelsInput(models []string, isNew bool) string {
+	if len(models) > 0 {
+		return strings.Join(models, ", ")
+	}
+	if isNew {
+		return "gemma-4-26b, gemma-4-4b, contrastive-lm"
+	}
+	return ""
+}
+
+func buildRunnerJoinCurlSnippet(node config.Node, assignedClusters []string) string {
+	nodeID := node.ID
+	if nodeID == "" {
+		nodeID = "mac-studio-m3-01"
+	}
+	nodeName := node.Name
+	if nodeName == "" {
+		nodeName = "Mac Studio M3 Ultra"
+	}
+	memGB := defaultIntIfZero(node.MemoryAllocatedGB, 64)
+	gpuCores := defaultIntIfZero(node.ComputeGPUCores, 60)
+	maxModelGB := defaultIntIfZero(node.MaxModelSizeGB, 32)
+	maxConc := defaultIntIfZero(node.MaxConcurrent, 2)
+	clusterID := "mac-studio-pool"
+	if len(assignedClusters) > 0 && assignedClusters[0] != "" {
+		clusterID = assignedClusters[0]
+	}
+	models := node.SupportedModels
+	if len(models) == 0 {
+		models = []string{"gemma-4-26b", "gemma-4-4b", "contrastive-lm"}
+	}
+	modelsJSON, err := json.Marshal(models)
+	if err != nil {
+		modelsJSON = []byte(`["gemma-4-26b","gemma-4-4b","contrastive-lm"]`)
+	}
+	return fmt.Sprintf("curl -X POST \"%s/api/v1/cluster/runners/register?cluster_id=%s\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"id\":\"%s\",\"name\":\"%s\",\"status\":\"online\",\"memory_allocated_gb\":%d,\"compute_gpu_cores\":%d,\"max_model_size_gb\":%d,\"max_concurrent\":%d,\"supported_models\":%s}'",
+		ProxyURL(), clusterID, nodeID, nodeName, memGB, gpuCores, maxModelGB, maxConc, string(modelsJSON))
 }
 
 func hasCluster(list []string, item string) bool {
@@ -101,18 +584,47 @@ func hasCluster(list []string, item string) bool {
 	return false
 }
 
-func getAvailableClusters(providers []config.ProviderConfig) []config.LocalCluster {
+func getAvailableClusters(providers []config.ProviderConfig, assignedClusters ...string) []config.LocalCluster {
 	var list []config.LocalCluster
+	seen := make(map[string]bool)
 	for _, p := range providers {
 		if p.ID == config.ProviderLocal {
 			for _, reg := range p.Regions {
 				if reg.LocalConfig != nil {
 					for _, c := range reg.LocalConfig.Clusters {
 						list = append(list, c)
+						seen[c.ID] = true
 					}
 				}
 			}
 		}
 	}
+	for _, cid := range assignedClusters {
+		trimmed := strings.TrimSpace(cid)
+		if trimmed != "" && !seen[trimmed] {
+			seen[trimmed] = true
+			list = append(list, config.LocalCluster{
+				ID:        trimmed,
+				Name:      trimmed,
+				QueueName: "queue-" + trimmed,
+			})
+		}
+	}
 	return list
 }
+
+func isRunnerAttachedToCluster(r config.RunnerResponse, cl config.LocalCluster) bool {
+	if cl.ID == "" {
+		return false
+	}
+	if hasCluster(r.AssignedClusters, cl.ID) {
+		return true
+	}
+	if cl.Nodes != nil {
+		if _, ok := cl.Nodes[r.Node.ID]; ok {
+			return true
+		}
+	}
+	return false
+}
+

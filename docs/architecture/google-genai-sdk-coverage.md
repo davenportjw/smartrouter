@@ -1,118 +1,131 @@
-# 🗺️ Google GenAI SDK Coverage vs. Smart Router Capabilities
+# 🗺️ Google GenAI & OpenAI SDK Coverage vs. Smart Router Capabilities
 
-This document provides a comprehensive technical matrix comparing the capabilities of the official **Google GenAI SDK** (`google-genai` in Python, Node.js, etc.) against the native processing, interception, and routing capabilities of the **Smart Router**.
+This document provides a comprehensive technical matrix comparing the capabilities of the official **Google GenAI SDK** (`google-genai` in Python, Node.js) and the **OpenAI SDK / Ecosystem** (`openai`, `langchain-openai`, `litellm`) against the native processing, interception, and routing capabilities of the **Smart Router**.
 
 ---
 
 ## 📊 Compatibility Matrix
 
-The table below outlines how SDK calls map to the Smart Router, including support status, telemetry/rate-limiting support, and known integration caveats.
+The table below outlines how SDK calls map to the Smart Router, including support status, telemetry/rate-limiting support, and integration details.
 
 | SDK Namespace / Feature | Go Proxy API Endpoint | Status | Rate Limiting (RPM/TPM) | Complexity Routing (`gemini-dynamic`) | Technical Details & Caveats |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **`models.generate_content`** | `POST /v1/models/*:generateContent` | **Full** | Yes (Full adjustment) | Yes | Intercepted, token counts adjusted in post-request `ModifyResponse` callback. |
-| **`models.generate_content_stream`** | `POST /v1/models/*:streamGenerateContent` | **Full** | Yes (Base limit) | Yes | Request/response streams successfully. **Caveat:** Real-time token counting is bypassed; falls back to input character heuristics. |
-| **Structured Outputs** | Inside `generateContent` payload | **Full** | Yes | Yes | Fully supported as the `responseSchema` is passed transparently to the Vertex AI endpoint. |
-| **Function Calling & Tools** | Inside `generateContent` payload | **Full** | Yes | Yes | Intercepted. If `ForceComplexTools` is enabled, routes automatically to `gemini-2.5-pro`. |
-| **Multimodal (Images/Files)** | Inside `generateContent` payload | **Full** | Yes | Yes | Supported. If `ForceComplexMultimodal` is enabled, instantly bypasses LLM classifier and routes to `gemini-2.5-pro`. |
-| **System Instructions** | Inside `generateContent` payload | **Full** | Yes | Yes | Supported. Passed transparently upstream. |
+| **Google GenAI `models.generate_content`** | `POST /v1/models/*:generateContent` | **Full** | Yes (Full adjustment) | Yes | Intercepted, token counts adjusted in post-request `ModifyResponse` callback. |
+| **Google GenAI `models.generate_content_stream`** | `POST /v1/models/*:streamGenerateContent` | **Full** | Yes (Base limit) | Yes | Request/response streams successfully via SSE. |
+| **OpenAI `chat.completions.create`** | `POST /v1/chat/completions` & `POST /v1beta/openai/chat/completions` | **Full** | Yes (Full adjustment) | Yes | Translates OpenAI messages/tools into Vertex Gemini payload, runs full 4-stage complexity routing, and returns OpenAI `chat.completion` JSON + `X-Routed-Model` header. |
+| **OpenAI Streaming (`stream=True`)** | `POST /v1/chat/completions` (`stream: true`) | **Full** | Yes (Base limit) | Yes | Translates upstream Gemini stream into standard OpenAI `chat.completion.chunk` SSE events terminated by `data: [DONE]`. |
+| **OpenAI & GenAI `models.list` / `models.retrieve`** | `GET /v1/models` & `GET /v1/models/{id}` | **Full** | Authenticated | N/A | Returns OpenAI-compatible `{"object": "list", "data": [...]}` and single-model descriptors for `gemini-dynamic` and all active models. |
+| **Structured Outputs (`response_format` / `responseSchema`)** | Inside `generateContent` / `chat/completions` | **Full** | Yes | Yes | Supports native Gemini `responseSchema` and OpenAI `json_object` / `json_schema` response formats. |
+| **Function Calling & Tools (`tools`)** | Inside `generateContent` / `chat/completions` | **Full** | Yes | Yes | Intercepted across both Gemini and OpenAI specs. If `ForceComplexTools` is enabled, routes automatically to the configured complex target (e.g., `gemini-3.1-pro`). |
+| **Multimodal (Images / Data URLs)** | Inside `generateContent` / `chat/completions` | **Full** | Yes | Yes | Supports Gemini `inlineData`/`fileData` and OpenAI `image_url` content parts. If `ForceComplexMultimodal` is enabled, routes to the complex model tier. |
+| **System / Developer Instructions** | Inside `generateContent` / `chat/completions` | **Full** | Yes | Yes | Supports Gemini `systemInstruction` and OpenAI `system`/`developer` roles. |
 | **`models.embed_content`** | `POST /v1/models/*:embedContent` | **Partial** | RPM Only | No | **Caveat:** TPM estimation `/ 4` is optimized for generation; embeddings bypass semantic token adjustments. |
 | **`models.count_tokens`** | `POST /v1/models/*:countTokens` | **Full** | RPM Only | No | Rewritten to regional endpoint. Bypasses TPM limitations since no content is generated. |
-| **`chats` (Sessions)** | Uses `generateContent` loop | **Full** | Yes | Yes | Standard SDK chat sessions use standard generate content methods under the hood. |
-| **`files.upload` (File API)** | `POST /v1beta/files` (or Vertex equivalent) | **Unsupported** | No | No | **Gap:** Large file staging APIs target different host/paths. Clients must upload large files (>20MB) directly to Vertex AI/GCP buckets. |
-| **`models.list` / `models.get`** | `GET /v1/models` | **Unsupported** | No | No | **Gap:** List models query paths bypass regional prefix rules. Use the Smart Router Admin dashboard to view registered active models. |
-| **`caches` (Context Caching)** | `POST /v1/cachedContents` | **Unsupported** | No | No | **Gap:** Context caching endpoints are not currently intercepted or rewritten by the Go router's reverse proxy director. |
+| **`chats` (Multi-Turn Sessions)** | Uses `generateContent` or `chat/completions` | **Full** | Yes | Yes | Supports `X-Session-ID`, `X-Session-Turn`, and `X-Agent-Task` headers for session pinning and multi-turn escalation. |
+| **`files.upload` (File API)** | `POST /v1beta/files` | **Unsupported** | No | No | **Gap:** Large file staging APIs target global upload hosts. Upload large files (>20MB) directly to Google Cloud Storage (`gs://`). |
+| **`caches` (Context Caching)** | `POST /v1/cachedContents` | **Unsupported** | No | No | **Gap:** Context caching endpoints are not currently rewritten by the reverse proxy director. |
 
 ---
 
 ## 🧠 Core Architectural Interception Flow
 
-The Smart Router intercepts standard HTTP client traffic generated by the Google GenAI SDK by overriding the target host and regional URL paths.
+The Smart Router intercepts standard HTTP client traffic generated by both the **Google GenAI SDK** and the **OpenAI SDK** (as well as LangChain and LiteLLM) by normalizing requests into the router's 4-stage evaluation pipeline.
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant SDK as Google GenAI SDK
+    participant SDK as Client SDK (OpenAI / Google GenAI / LangChain / LiteLLM)
     participant SR as Smart Router (Go Proxy)
     participant DB as Firestore / local_db.json
-    participant VAI as Upstream Vertex AI API
+    participant VAI as Upstream Vertex AI / Local Cluster
 
-    SDK->>SR: POST /v1/models/gemini-dynamic:generateContent (Key/Bearer, App Headers)
-    Note over SR: Step 1: Authenticate App & Client
+    SDK->>SR: POST /v1/chat/completions OR /v1/models/gemini-dynamic:generateContent
+    Note over SR: Step 1: Authenticate App & Client (Bearer Key, x-goog-api-key, or IAM OIDC)
     SR->>DB: LookupApp(appID) / LookupKey(key)
     DB-->>SR: Return App Limits & Configs
-    Note over SR: Step 2: Evaluate Rate Limits
-    SR->>SR: RPM / TPM Check
-    Note over SR: Step 3: Stage 1 - Complexity Routing
-    SR->>SR: Heuristics / LLM Complexity Classification
-    Note over SR: Step 4: Stage 2 - Declarative Header Rules
-    SR->>SR: Apply Routing Rules & Location Steering
-    Note over SR: Step 5: Path and Host Rewrite
+    Note over SR: Step 2: Normalize OpenAI Payload (if /v1/chat/completions)
+    SR->>SR: Translate messages, tools & config -> Gemini generateContent
+    Note over SR: Step 3: Evaluate Rate Limits (RPM / TPM)
+    Note over SR: Step 4: Stage 0-3 Complexity Routing (Jev / Fastino / Contrastive-LM / LLM)
+    Note over SR: Step 5: Declarative Header Rules & Priority Queueing
     SR->>VAI: POST /v1/projects/{project}/locations/{location}/publishers/google/models/{target_model}:generateContent
     VAI-->>SR: 200 OK + Usage Metadata Tokens
-    Note over SR: Step 6: Adjust Rate Limits
-    SR->>SR: Adjust Limiter (Actual vs. Estimated Tokens)
-    SR-->>SDK: Return payload + X-Routed-Model Audit Headers
+    Note over SR: Step 6: Adjust Rate Limits & Translate Response (if OpenAI spec)
+    SR-->>SDK: Return payload (OpenAI chat.completion or Gemini) + X-Routed-Model Audit Headers
 ```
 
 ---
 
-## 🛠️ Integration Guide
+## 🛠️ Integration Examples
 
-To configure the official Google GenAI SDK to target the Smart Router, override the `api_endpoint` inside the client options block.
+### 1. OpenAI Python SDK (`openai`)
 
-### Python SDK Example
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="YOUR_ROUTER_API_KEY",
+    base_url="https://gemini-smart-router-txgsracloq-uc.a.run.app/v1",
+)
+
+response = client.chat.completions.create(
+    model="gemini-dynamic",
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "Explain Quantum Computing in one simple sentence."},
+    ],
+)
+
+print(f"Routed Model: {response.model}")
+print(f"Response: {response.choices[0].message.content}")
+```
+
+### 2. Google GenAI Python SDK (`google-genai`)
 
 ```python
 from google import genai
 from google.genai import types
 
-# Initialize client pointing to the Smart Router proxy
 client = genai.Client(
     api_key="YOUR_ROUTER_API_KEY",
     http_options={
-        "api_endpoint": "https://smartrouter.yourcompany.com"
-    }
+        "api_endpoint": "https://gemini-smart-router-txgsracloq-uc.a.run.app"
+    },
 )
 
-# Route dynamically based on payload size and complexity
 response = client.models.generate_content(
     model="gemini-dynamic",
     contents="Explain Quantum Computing in one simple sentence.",
     config=types.GenerateContentConfig(
-        http_headers={
-            "X-Client-App-ID": "billing-service-prod"
-        }
-    )
+        http_headers={"X-Session-ID": "billing-service-prod"}
+    ),
 )
 
-print(f"Routed Model: {response.headers.get('X-Routed-Model')}")
 print(f"Response: {response.text}")
 ```
 
-### Node.js SDK Example
+### 3. LangChain (`langchain-openai`) & LiteLLM (`litellm`)
 
-```javascript
-import { GoogleGenAI } from '@google/genai';
+```python
+from langchain_openai import ChatOpenAI
+import litellm
 
-const ai = new GoogleGenAI({
-  apiKey: 'YOUR_ROUTER_API_KEY',
-  httpOptions: {
-    apiEndpoint: 'https://smartrouter.yourcompany.com'
-  }
-});
+# LangChain
+llm = ChatOpenAI(
+    model="gemini-dynamic",
+    api_key="YOUR_ROUTER_API_KEY",
+    base_url="https://gemini-smart-router-txgsracloq-uc.a.run.app/v1",
+)
+print(llm.invoke("Write a haiku about distributed systems.").content)
 
-const response = await ai.models.generateContent({
-  model: 'gemini-dynamic',
-  contents: 'Write a simple hello world program in Rust.',
-  config: {
-    httpHeaders: {
-      'X-Client-App-ID': 'billing-service-prod'
-    }
-  }
-});
-
-console.log(response.text);
+# LiteLLM
+res = litellm.completion(
+    model="openai/gemini-dynamic",
+    api_base="https://gemini-smart-router-txgsracloq-uc.a.run.app/v1",
+    api_key="YOUR_ROUTER_API_KEY",
+    messages=[{"role": "user", "content": "Hello via LiteLLM!"}],
+)
+print(res.choices[0].message.content)
 ```
 
 ---
@@ -120,26 +133,13 @@ console.log(response.text);
 ## ⚠️ What is NOT Covered (Coverage Gaps & Limitations)
 
 > [!WARNING]
-> **CRITICAL COMPATIBILITY LIMITATIONS**:
-> The Smart Router acts as a reverse proxy designed specifically to handle core text generation and regional endpoint rewriting. It is **NOT** a drop-in replacement for all Google GenAI endpoints. The following namespaces and features are completely unsupported or partially bypassed:
+> **COMPATIBILITY LIMITATIONS**:
+> The Smart Router is designed for text, multimodal, tool-calling generation, and model discovery. The following namespaces are outside the proxy's scope:
 
-### 🔴 Completely Unsupported SDK Namespaces
+### 🔴 Unsupported Namespaces
 * **`files` Namespace (`client.files.upload`, `client.files.get`, etc.)**:
-  * **Reason**: The SDK's File API uploads large files directly to `https://generativelanguage.googleapis.com/upload/v1beta/files` or specific global cloud storage systems, bypassing regional `/v1/models` path rewrites.
-  * **Mitigation**: Stage files directly in Google Cloud Storage (GCS) buckets and pass reference URIs using `fileData` inside the content request body, or bypass the router for standard file management calls.
+  * **Mitigation**: Stage files directly in Google Cloud Storage (GCS) buckets and pass reference URIs using `fileData` inside the content request body.
 * **`caches` Namespace (`client.caches.create`, `client.caches.list`, etc.)**:
-  * **Reason**: Standard regional path-rewriter rules in `proxy.go` do not capture or translate the `/v1/cachedContents` path structure.
   * **Mitigation**: Call Vertex AI caching endpoints directly with native credentials rather than using the Smart Router proxy.
 * **`tunings` Namespace (`client.tunings.create_tuned_model`)**:
-  * **Reason**: Supervised fine-tuning and dataset pipeline actions utilize long-running operations on globally orchestrated resources that the proxy does not support.
-
-### 🟡 Partially Supported / Caveated Features
-* **Real-Time Streaming Token Tracking (`models.generate_content_stream`)**:
-  * **Limit**: When using streaming chunks, the Smart Router cannot run post-request correction loops on response tokens inside `ModifyResponse` because the payload is written immediately to the TCP socket chunk-by-chunk.
-  * **Mitigation**: The proxy defaults to a character count heuristic estimation (`len(bodyBytes) / 4`). Increase your App's TPM limits or select `OptOutTPM` for heavy streaming consumers to prevent false-positive rate limiting.
-* **Dynamic Model Discovery (`models.list`, `models.get`)**:
-  * **Limit**: SDK requests targeting `/v1/models` without concrete regional namespaces or actions fail path-matching validations, causing routing errors.
-  * **Mitigation**: Avoid using programmatic SDK discovery methods. Instead, query the Smart Router dashboard UI at `/admin/models` to review verified active locations and compliant model versions.
-* **Dynamic Embedding Routing & TPM Metrics (`models.embed_content`)**:
-  * **Limit**: The TPM estimator formula is specifically calibrated for text generation. Embeddings are proxied to the correct regional server but bypass token rate calculations and dynamic routing optimizations.
-
+  * **Mitigation**: Execute supervised fine-tuning jobs directly via Vertex AI Custom Training or the Vertex AI Tuning API.

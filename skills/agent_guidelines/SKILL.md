@@ -12,11 +12,11 @@ This skill equips agentic software engineers with the precise guidelines, model 
 ## 1. Prerequisites
 
 Before performing any modifications:
-- Ensure you are in the workspace root (the directory containing `main.go` and `go.mod`).
+- Ensure you are in the workspace root (the directory containing `go.mod`).
 - Go toolchain must be installed.
-- You must run testing and verification commands using standard Go test utilities:
+- You must run testing and verification commands across all packages using standard Go test utilities:
   ```bash
-  go test -v ./pkg/...
+  go test -v ./pkg/... ./backend/... ./frontend/...
   ```
 
 ---
@@ -26,13 +26,23 @@ Before performing any modifications:
 To ensure optimal performance, advanced reasoning capabilities, and long-term support, this repository enforces strict model selection policies.
 
 > [!IMPORTANT]
-> **CRITICAL RULE**: You must NEVER use, route to, or configure a Gemini model version earlier than the **Gemini 2.5** series. Legacy models (such as `gemini-1.0-*`, `gemini-1.5-*`, and `gemini-2.0-*`) are deprecated for active production routing in this repository.
+> **CRITICAL RULE**: You must NEVER use, route to, or configure a Gemini model version earlier than the **Gemini 2.5** series or Gemma earlier than **Gemma 4**. Legacy models (such as `gemini-1.0-*`, `gemini-1.5-*`, `gemini-2.0-*`, and `gemma2:*`) and non-existent variants (`gemini-3.8-pro`, `gemini-3.8-flash-lite`) are strictly prohibited.
 
-### Authorized Gemini Model List (In Development & Production)
-- **`gemini-2.5-flash`**: Default choice for high-throughput, general-purpose content generation, low-latency, and cost-effective routing.
-- **`gemini-2.5-pro`**: Recommended for complex multi-step reasoning, coding, mathematical analysis, and heavy payloads requiring advanced reasoning.
-- **`gemini-2.5-flash-lite`**: Recommended for lightweight, ultra-low latency, and highly cost-sensitive tasks.
-- **Subsequent 2.5+ Versions**: Future model series (e.g., Gemini 3.0, Gemini 3.5) are authorized as they exceed the 2.5 baseline.
+### Authorized Model Catalog (In Development & Production)
+- **Gemini 4 Series**:
+  - **`gemini-4-argon`**: Next-generation frontier reasoning and multimodal model (`global`, `us`, `us-central1`).
+- **Gemini 3.8 Series**:
+  - **`gemini-3.8-flash`**: Flagship ultra-low latency multimodal and reasoning model (`global`, `us`, `us-central1`, `europe-west1`).
+- **Gemini 3.5 Series**:
+  - **`gemini-3.5-flash`**: High-throughput general-purpose content generation (`global`, `us`, `us-central1`, `europe-west9`, `europe-west1`).
+  - **`gemini-3.5-flash-lite`**: Ultra-fast, cost-optimized model for simple prompts, classification, and triage (`global`, `us`, `us-central1`).
+- **Gemini 3.1 Series**:
+  - **`gemini-3.1-pro`**: Deep reasoning, complex coding, debugging, and mathematical analysis (`global`, `us`, `us-central1`).
+  - **`gemini-3.1-flash-lite`**: Lightweight high-throughput model (`global`, `us`, `us-central1`).
+- **Gemini 2.5 Series (Baseline)**:
+  - **`gemini-2.5-flash`**, **`gemini-2.5-pro`**, **`gemini-2.5-flash-lite`** (`us-central1`, `us`, `global`).
+- **Gemma 4 Series (Open / Local Cluster Models)**:
+  - **`gemma-4-26b`**, **`gemma-4-31b`**, **`gemma-4-4b`**.
 
 ---
 
@@ -42,18 +52,22 @@ To reduce agent worktime and maintain a clean architecture, you should reuse the
 
 ### A. The App-Centric Architecture
 We model traffic around a hierarchy: **Client -> App -> APIKey**.
-- **Client**: The billing and tier boundary (e.g., `premium`, `standard`, `free`).
-- **App**: The functional logical boundary (e.g., `mobile-app`, `billing-service`). RPM, TPM, and latency priority are mapped directly to individual Apps rather than a client as a whole.
+- **Client**: The billing and tier boundary (`premium`, `standard`, `free`) with default fallback quotas (`FallbackRPM`, `FallbackTPM`, `FallbackPriority`).
+- **App**: The functional logical boundary (e.g., `mobile-app`, `billing-service`). RPM, TPM, and latency priority are mapped directly to individual Apps, inheriting fallback quotas from the parent Client when unspecified during creation.
 - **APIKey / OIDC Service Account**: Access credentials mapped directly to a specific `App`.
 - *How to use*: To access client and app constraints, query `rp.Store.LookupApp(appID)` and `rp.Store.LookupClient(clientID)`.
 
-### B. Local JSON Database Mocking (`LOCAL_DEV`)
-Rather than relying on live cloud services (Firestore) during local development and unit testing, the codebase uses a local database mock.
+### B. Crisp Slate & Cobalt 2–3 Panel Dashboard & Never-Mock Policy
+- **3-Panel Layout**: Left Sidebar (`#0F172A` Slate-900) for core domain navigation, Center Workspace (`#F8FAFC` Slate-50 canvas, `#FFFFFF` cards) with compact Intent Pills, and Right Expandable Contextual Drawer (`id="context-drawer"`) for live documentation and curl snippets using dynamic `ProxyURL()`.
+- **Strict Never-Mock Directive**: Never introduce synthetic telemetry (`generateMockMetrics`, `generateMockCosts`), `math/rand` fake numbers, or simulation toggles (`ToggleSimulation`) in dashboard or API handlers. Always query real backend endpoints and surface explicit empty states or error alerts (`FormErrorAlert`).
+
+### C. Local JSON Database Mode (`LOCAL_DEV`)
+Rather than relying on live cloud services (Firestore) during local development and unit testing, the codebase supports a local JSON store.
 - Setting the environment variable `LOCAL_DEV=true` forces `pkg/config/config.go` to load `/data/local_db.json`.
 - **Schema Auto-Migration**: The `initLocalDB()` method automatically migrates legacy client/key associations into explicit App models without resetting the developer's local database.
-- *How to use*: In tests, always mock configuration by setting `os.Setenv("LOCAL_DEV", "true")` and utilizing `config.NewConfigStore`.
+- *How to use*: In tests, isolate configuration by setting `os.Setenv("LOCAL_DEV", "true")` and utilizing `config.NewConfigStore`.
 
-### C. Declarative Custom Header Verification
+### D. Declarative Custom Header Verification
 Avoid writing manual validation logic or parsing headers directly in the HTTP handler. Instead, use the declarative `CustomHeader` validation engine.
 - A `CustomHeader` rule contains:
   - `Name`: Header key (e.g., `X-Client-App-ID`).
@@ -72,9 +86,9 @@ Avoid writing manual validation logic or parsing headers directly in the HTTP ha
   }
   ```
 
-### D. Seeding & Mocking Upstream APIs in Tests
-In unit tests, avoid making real network calls to the upstream Google Vertex AI API. 
-- Overwrite `rp.TokenSource` with a `mockTokenSource` that yields static mock tokens.
+### E. Seeding & Testing Upstream APIs in Unit Tests
+In unit tests, avoid making external network calls to the upstream Google Vertex AI API:
+- Overwrite `rp.TokenSource` with a test token source that yields deterministic test tokens.
 - Override `rp.Proxy.Transport` or `rp.Target` using a local `httptest.NewServer` to capture routed requests and inspect outbound paths.
 
 ## 4. Test-Driven Development (TDD) Workflow
@@ -82,15 +96,15 @@ In unit tests, avoid making real network calls to the upstream Google Vertex AI 
 Every new feature, routing rule modification, or custom header constraint MUST be developed using Test-Driven Development (TDD).
 
 ### The TDD Loop:
-1. **Red**: Write a failing integration/unit test in `pkg/proxy/proxy_test.go` specifying the desired behavior.
-2. **Green**: Add the minimum amount of code in `pkg/proxy/proxy.go` (or relevant config package) to satisfy the new test.
-3. **Refactor**: Clean up code structure, ensuring all styles match and no code duplication occurs. Ensure `go test -v ./pkg/...` passes.
+1. **Red**: Write a failing integration/unit test in `backend/proxy/proxy_test.go` (or `frontend/dashboard/dashboard_test.go` for UI handlers) specifying the desired behavior.
+2. **Green**: Add the minimum amount of code in `backend/proxy/proxy.go` or `frontend/dashboard/dashboard.go` (or `pkg/config`) to satisfy the new test.
+3. **Refactor**: Clean up code structure, ensuring all styles match and no code duplication occurs. Ensure `go test -v ./pkg/... ./backend/... ./frontend/...` passes.
 
 ### ⚠️ The Integration Test Requirement
-Every new feature or logic addition **MUST** include at least one end-to-end integration test (or multiple if required) within `pkg/proxy/proxy_test.go`.
+Every new feature or logic addition **MUST** include at least one end-to-end integration test (or multiple if required) within `backend/proxy/proxy_test.go`.
 - **Scope**: A simple unit test of a single isolated function (e.g., just testing `config.MatchRule` or `limiter.EvaluateLimit`) is **INSUFFICIENT**. 
 - **Methodology**: An integration test must trigger the entire reverse proxy routing loop. It must:
-  1. Set `LOCAL_DEV=true` and instantiate a mock database via `config.NewConfigStore`.
+  1. Set `LOCAL_DEV=true` and instantiate a local database via `config.NewConfigStore`.
   2. Pre-seed the client, app, API key, and routing/header rules.
   3. Instantiate the `RouterProxy` with a local `httptest.NewServer` backend.
   4. Construct a standard incoming HTTP request (`httptest.NewRequest`) and send it through the proxy via `rp.ServeHTTP(w, req)`.

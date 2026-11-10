@@ -94,25 +94,10 @@ func (as *AuthStore) CreateSession(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Restrict authentication access to authorized domains or specific email addresses
-		allowedDomainsEnv := os.Getenv("ALLOWED_EMAIL_DOMAINS")
-		if allowedDomainsEnv == "" {
-			log.Printf("[Auth] Access denied because ALLOWED_EMAIL_DOMAINS environment variable is not set")
-			http.Error(w, "Authentication system is misconfigured: ALLOWED_EMAIL_DOMAINS must be explicitly set", http.StatusInternalServerError)
-			return
-		}
-
-		parts := strings.Split(allowedDomainsEnv, ",")
-		var allowedDomains []string
-		for _, p := range parts {
-			trimmed := strings.TrimSpace(p)
-			if trimmed != "" {
-				allowedDomains = append(allowedDomains, trimmed)
-			}
-		}
-
+		allowedDomains := ResolveAllowedDomainsFromEnv()
 		if len(allowedDomains) == 0 {
-			log.Printf("[Auth] Access denied because ALLOWED_EMAIL_DOMAINS has no valid entries")
-			http.Error(w, "Authentication system is misconfigured: ALLOWED_EMAIL_DOMAINS has no valid entries", http.StatusInternalServerError)
+			log.Printf("[Auth] Access denied because no authorized domains are configured in ALLOWED_EMAIL_DOMAINS / ALLOWED_AUTH_DOMAINS")
+			http.Error(w, "Authentication system is misconfigured: ALLOWED_EMAIL_DOMAINS must be explicitly set", http.StatusInternalServerError)
 			return
 		}
 
@@ -201,6 +186,12 @@ func (as *AuthStore) Middleware(next http.Handler) http.Handler {
 			uid = "dev-admin-uid"
 		} else {
 			if as.Client == nil {
+				http.SetCookie(w, &http.Cookie{
+					Name:   "session",
+					Value:  "",
+					MaxAge: -1,
+					Path:   "/",
+				})
 				http.Redirect(w, r, "/login", http.StatusFound)
 				return
 			}
@@ -225,6 +216,57 @@ func (as *AuthStore) Middleware(next http.Handler) http.Handler {
 		ctx := context.WithValue(r.Context(), uidContextKey, uid)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// HasValidSession checks whether the request carries a valid, verified session cookie.
+func (as *AuthStore) HasValidSession(r *http.Request) bool {
+	if as == nil {
+		return false
+	}
+	cookie, err := r.Cookie("session")
+	if err != nil || cookie.Value == "" {
+		return false
+	}
+	if os.Getenv("LOCAL_DEV") == "true" && cookie.Value == "dev-admin-session-cookie" {
+		return true
+	}
+	if as.Client == nil {
+		return false
+	}
+	_, err = as.Client.VerifySessionCookieAndCheckRevoked(r.Context(), cookie.Value)
+	return err == nil
+}
+
+// ResolveAllowedDomainsFromEnv parses comma-separated authorized domains and email addresses
+// from ALLOWED_EMAIL_DOMAINS, ALLOWED_AUTH_DOMAINS, ALLOWED_DOMAINS, ADMIN_ALLOWED_DOMAINS, and ALLOWED_EMAILS.
+func ResolveAllowedDomainsFromEnv() []string {
+	envKeys := []string{
+		"ALLOWED_EMAIL_DOMAINS",
+		"ALLOWED_AUTH_DOMAINS",
+		"ALLOWED_DOMAINS",
+		"ADMIN_ALLOWED_DOMAINS",
+		"ALLOWED_EMAILS",
+	}
+	seen := make(map[string]struct{})
+	var allowed []string
+	for _, key := range envKeys {
+		raw := os.Getenv(key)
+		if raw == "" {
+			continue
+		}
+		for _, part := range strings.Split(raw, ",") {
+			trimmed := strings.TrimSpace(part)
+			if trimmed == "" {
+				continue
+			}
+			lower := strings.ToLower(trimmed)
+			if _, exists := seen[lower]; !exists {
+				seen[lower] = struct{}{}
+				allowed = append(allowed, trimmed)
+			}
+		}
+	}
+	return allowed
 }
 
 // isEmailAuthorized checks if the provided email is authorized based on a list of specific emails or domains.

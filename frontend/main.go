@@ -12,9 +12,14 @@ import (
 	"geminirouter/frontend/auth"
 	"geminirouter/frontend/dashboard"
 	"geminirouter/pkg/config"
+	"geminirouter/pkg/decision"
 )
 
 func main() {
+	if os.Getenv("K_SERVICE") == "" {
+		_ = decision.LoadDotEnv()
+	}
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8081" // Frontend defaults to 8081 locally to avoid conflict
@@ -51,15 +56,23 @@ func main() {
 
 	// Initialize Dashboard Controller (wrapped around our REST Client Store)
 	dashController := dashboard.NewDashboardController(apiConfigStore, projectID, location)
+	dashController.SessionVerifier = authStore.HasValidSession
 
 	mux := http.NewServeMux()
 
 	// Admin Dashboard & HTMX Operations (wrapped in Firebase auth verification middleware)
-	mux.Handle("/admin/", authStore.Middleware(http.HandlerFunc(dashController.ServeApps))) // Default route redirects/renders Apps
+	mux.Handle("/admin/", authStore.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/admin/" && r.URL.Path != "/admin" {
+			http.NotFound(w, r)
+			return
+		}
+		http.Redirect(w, r, "/admin/apps", http.StatusFound)
+	})))
 	mux.Handle("/admin/apps", authStore.Middleware(http.HandlerFunc(dashController.ServeApps)))
 	mux.Handle("/admin/apps/new", authStore.Middleware(http.HandlerFunc(dashController.ServeAppsNewModal)))
 	mux.Handle("/admin/apps/edit", authStore.Middleware(http.HandlerFunc(dashController.ServeAppsEditModal)))
 	mux.Handle("/admin/apps/create", authStore.Middleware(http.HandlerFunc(dashController.CreateApp)))
+	mux.Handle("/admin/apps/delete", authStore.Middleware(http.HandlerFunc(dashController.DeleteApp)))
 	mux.Handle("/admin/clients", authStore.Middleware(http.HandlerFunc(dashController.ServeClients)))
 	mux.Handle("/admin/clients/new", authStore.Middleware(http.HandlerFunc(dashController.ServeClientsNewModal)))
 	mux.Handle("/admin/clients/edit", authStore.Middleware(http.HandlerFunc(dashController.ServeClientsEditModal)))
@@ -80,12 +93,17 @@ func main() {
 	mux.Handle("/admin/rules/new", authStore.Middleware(http.HandlerFunc(dashController.ServeRulesNewModal)))
 	mux.Handle("/admin/rules/edit", authStore.Middleware(http.HandlerFunc(dashController.ServeRulesEditModal)))
 	mux.Handle("/admin/rules/create", authStore.Middleware(http.HandlerFunc(dashController.CreateRule)))
+	mux.Handle("/admin/rules/save", authStore.Middleware(http.HandlerFunc(dashController.SaveRule)))
 	mux.Handle("/admin/rules/delete", authStore.Middleware(http.HandlerFunc(dashController.DeleteRule)))
 	mux.Handle("/admin/complexity", authStore.Middleware(http.HandlerFunc(dashController.ServeComplexity)))
 	mux.Handle("/admin/complexity/edit", authStore.Middleware(http.HandlerFunc(dashController.ServeComplexityEditModal)))
 	mux.Handle("/admin/complexity/save", authStore.Middleware(http.HandlerFunc(dashController.SaveComplexitySettings)))
+	mux.Handle("/admin/complexity/keys", authStore.Middleware(http.HandlerFunc(dashController.HandleComplexityKeys)))
+	mux.Handle("/admin/complexity/providers/probe", authStore.Middleware(http.HandlerFunc(dashController.HandleComplexityProviderProbe)))
+	mux.Handle("/admin/complexity/inspect", authStore.Middleware(http.HandlerFunc(dashController.HandleComplexityInspect)))
 	mux.Handle("/admin/models", authStore.Middleware(http.HandlerFunc(dashController.ServeModels)))
 	mux.Handle("/admin/models/refresh", authStore.Middleware(http.HandlerFunc(dashController.RefreshModels)))
+	mux.Handle("/admin/models/refresh/status", authStore.Middleware(http.HandlerFunc(dashController.RefreshModelsStatus)))
 	mux.Handle("/admin/models/toggle", authStore.Middleware(http.HandlerFunc(dashController.ToggleModel)))
 	mux.Handle("/admin/models/delete", authStore.Middleware(http.HandlerFunc(dashController.DeleteModel)))
 	mux.Handle("/admin/metrics", authStore.Middleware(http.HandlerFunc(dashController.ServeMetrics)))
@@ -93,23 +111,40 @@ func main() {
 	mux.Handle("/admin/queue", authStore.Middleware(http.HandlerFunc(dashController.ServeQueue)))
 	mux.Handle("/admin/clusters", authStore.Middleware(http.HandlerFunc(dashController.ServeClusters)))
 	mux.Handle("/admin/clusters/poll", authStore.Middleware(http.HandlerFunc(dashController.PollClustersActive)))
+	mux.Handle("/admin/clusters/active", authStore.Middleware(http.HandlerFunc(dashController.PollClustersActive)))
 	mux.Handle("/admin/clusters/mappings", authStore.Middleware(http.HandlerFunc(dashController.ServeClusterMappingsModal)))
+	mux.Handle("/admin/clusters/mappings-modal", authStore.Middleware(http.HandlerFunc(dashController.ServeClusterMappingsModal)))
+	mux.Handle("/admin/clusters/node-modal", authStore.Middleware(http.HandlerFunc(dashController.ServeClusterNodeModal)))
+	mux.Handle("/admin/clusters/nodes/save", authStore.Middleware(http.HandlerFunc(dashController.SaveClusterNode)))
+	mux.Handle("/admin/clusters/edit-modal", authStore.Middleware(http.HandlerFunc(dashController.ServeClusterEditModal)))
 	mux.Handle("/admin/clusters/attach", authStore.Middleware(http.HandlerFunc(dashController.AttachRunnerToClusters)))
+	mux.Handle("/admin/clusters/mappings/save", authStore.Middleware(http.HandlerFunc(dashController.SaveClusterMappings)))
 	mux.Handle("/admin/clusters/delete", authStore.Middleware(http.HandlerFunc(dashController.DeRegisterClusterNode)))
+	mux.Handle("/admin/clusters/providers/create", authStore.Middleware(http.HandlerFunc(dashController.CreateProviderCluster)))
+	mux.Handle("/admin/clusters/create", authStore.Middleware(http.HandlerFunc(dashController.CreateProviderCluster)))
+	mux.Handle("/admin/clusters/providers/delete", authStore.Middleware(http.HandlerFunc(dashController.DeleteProviderCluster)))
 	mux.Handle("/admin/docs", authStore.Middleware(http.HandlerFunc(dashController.ServeDocs)))
-	mux.Handle("/admin/toggle-simulation", authStore.Middleware(http.HandlerFunc(dashController.ToggleSimulation)))
 
 	// Authentication endpoints
 	mux.HandleFunc("/login", dashController.ServeLogin)
 	mux.HandleFunc("/logout", authStore.Logout)
 	mux.HandleFunc("/auth/session", authStore.CreateSession)
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
+		http.Redirect(w, r, "/admin/apps", http.StatusFound)
+	})
 
-	// Static Assets (Served locally or staged from compiled assets folder)
-	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+	// Static Assets (Served only when the static directory exists)
+	if info, err := os.Stat("static"); err == nil && info.IsDir() {
+		mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+	}
 
 	srv := &http.Server{
 		Addr:              ":" + port,
-		Handler:           injectSimulationContext(mux),
+		Handler:           mux,
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
@@ -138,16 +173,4 @@ func main() {
 	}
 
 	log.Println("Frontend server exiting cleanly.")
-}
-
-// injectSimulationContext extracts the simulate_metrics cookie and injects its value into the request context.
-func injectSimulationContext(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		simulate := false
-		if cookie, err := r.Cookie("simulate_metrics"); err == nil && cookie.Value == "true" {
-			simulate = true
-		}
-		ctx := context.WithValue(r.Context(), "simulate_metrics", simulate)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
 }

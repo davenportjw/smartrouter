@@ -3,6 +3,7 @@ package templates
 import (
 	"fmt"
 	"geminirouter/pkg/config"
+	"time"
 )
 
 type LocationInfo struct {
@@ -48,13 +49,28 @@ type ModelStats struct {
 }
 
 type ModelInfo struct {
-	ID          string
-	DisplayName string
-	Location    string
-	Type        string
-	Active      bool
-	Obsolete    bool
-	Stats       ModelStats
+	ID              string
+	DisplayName     string
+	Location        string
+	Type            string
+	Active          bool
+	Obsolete        bool
+	InputCostPer1M  float64
+	OutputCostPer1M float64
+	Stats           ModelStats
+}
+
+type ModelRefreshStatus struct {
+	Running        bool      `json:"running"`
+	Phase          string    `json:"phase"`
+	Message        string    `json:"message"`
+	CompletedSteps int       `json:"completed_steps"`
+	TotalSteps     int       `json:"total_steps"`
+	Percent        int       `json:"percent"`
+	VerifiedCount  int       `json:"verified_count"`
+	Error          string    `json:"error,omitempty"`
+	StartedAt      time.Time `json:"started_at,omitempty"`
+	UpdatedAt      time.Time `json:"updated_at,omitempty"`
 }
 
 type ModelsViewModel struct {
@@ -63,6 +79,36 @@ type ModelsViewModel struct {
 	ParentLocation   string
 	GenerativeModels []ModelInfo
 	EmbeddingModels  []ModelInfo
+	RefreshStatus    ModelRefreshStatus
+}
+
+func displayModelTitle(model ModelInfo) string {
+	title := config.StripLocationSuffix(model.DisplayName)
+	if title == "" {
+		title = config.StripLocationSuffix(model.ID)
+	}
+	return title
+}
+
+func formatRatePer1M(rate float64) string {
+	scaled := int(rate*10000 + 0.5)
+	if scaled%100 != 0 {
+		if scaled%10 != 0 {
+			return fmt.Sprintf("$%.4f", rate)
+		}
+		return fmt.Sprintf("$%.3f", rate)
+	}
+	return fmt.Sprintf("$%.2f", rate)
+}
+
+func formatUnitCost(model ModelInfo) string {
+	if model.Location == "local" || model.Type == "local" || (model.InputCostPer1M == 0 && model.OutputCostPer1M == 0) {
+		return "$0.00 (Local)"
+	}
+	if model.OutputCostPer1M == 0 && model.InputCostPer1M > 0 {
+		return fmt.Sprintf("%s / —", formatRatePer1M(model.InputCostPer1M))
+	}
+	return fmt.Sprintf("%s / %s", formatRatePer1M(model.InputCostPer1M), formatRatePer1M(model.OutputCostPer1M))
 }
 
 templ ModelTable(models []ModelInfo, title string, description string, emptyStateMessage string, routerLoc string) {
@@ -72,7 +118,7 @@ templ ModelTable(models []ModelInfo, title string, description string, emptyStat
 				<h3 class="text-base font-bold text-gray-900">{ title }</h3>
 				<p class="text-xs text-gray-500 mt-0.5">{ description }</p>
 			</div>
-			<span class="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 border border-blue-200">
+			<span class="text-xs font-mono text-slate-500">
 				{ fmt.Sprintf("%d Total", len(models)) }
 			</span>
 		</div>
@@ -94,6 +140,7 @@ templ ModelTable(models []ModelInfo, title string, description string, emptyStat
 							<th scope="col" class="px-3 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Type</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Location</th>
 							<th scope="col" class="px-3 py-3.5 text-center text-xs font-bold uppercase tracking-wider text-gray-500">Status</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Unit Cost (1M In / Out)</th>
 							<th scope="col" class="px-3 py-3.5 text-center text-xs font-bold uppercase tracking-wider text-gray-500">Request Count</th>
 							<th scope="col" class="px-3 py-3.5 text-center text-xs font-bold uppercase tracking-wider text-gray-500">Avg Latency</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Accum Spend</th>
@@ -105,9 +152,9 @@ templ ModelTable(models []ModelInfo, title string, description string, emptyStat
 							<tr class="hover:bg-gray-50/40 transition">
 								<td class="py-4 pl-6 pr-3 text-sm">
 									<div class="flex items-center gap-2">
-										<span class="font-semibold text-gray-900">{ config.StripLocationSuffix(model.DisplayName) }</span>
+										<span class="font-semibold text-gray-900">{ displayModelTitle(model) }</span>
 										if model.Obsolete {
-											<span class="inline-flex items-center rounded bg-amber-150 px-2 py-0.5 text-[10px] font-bold text-amber-800 border border-amber-200 animate-pulse">Obsolete</span>
+											<span class="inline-flex items-center rounded bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800 border border-amber-200">Obsolete</span>
 										}
 									</div>
 									<div class="text-xs font-mono text-gray-400 mt-0.5">{ config.StripLocationSuffix(model.ID) }</div>
@@ -115,21 +162,25 @@ templ ModelTable(models []ModelInfo, title string, description string, emptyStat
 								<td class="px-3 py-4 text-xs whitespace-nowrap">
 									switch model.Type {
 									case "foundation":
-										<span class="inline-flex items-center rounded-md bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700">Foundation</span>
+										<span class="text-xs font-medium text-slate-700">Foundation</span>
 									case "custom":
-										<span class="inline-flex items-center rounded-md bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-600/10">Tuned weights</span>
+										<span class="text-xs font-medium text-slate-700">Tuned weights</span>
+									case "local":
+										<span class="text-xs font-medium text-slate-700">Local Node</span>
 									default:
-										<span class="inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-700/10">Endpoint</span>
+										<span class="text-xs font-medium text-slate-700">Endpoint</span>
 									}
 								</td>
 								<td class="px-3 py-4 text-xs whitespace-nowrap">
 									switch model.Location {
 									case "global":
-										<span class="inline-flex items-center rounded-md bg-purple-50 px-2.5 py-1 text-xs font-semibold text-purple-700 ring-1 ring-inset ring-purple-700/15">global</span>
+										<span class="font-mono text-xs text-slate-600">global</span>
+									case "local":
+										<span class="font-mono text-xs text-slate-600">local (cluster)</span>
 									case routerLoc:
-										<span class="inline-flex items-center rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-600/15">local ({ model.Location })</span>
+										<span class="font-mono text-xs text-slate-600">local ({ model.Location })</span>
 									default:
-										<span class="inline-flex items-center rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 ring-1 ring-inset ring-indigo-600/15">multi ({ model.Location })</span>
+										<span class="font-mono text-xs text-slate-600">multi ({ model.Location })</span>
 									}
 								</td>
 								<td class="px-3 py-4 text-xs text-center whitespace-nowrap">
@@ -139,10 +190,17 @@ templ ModelTable(models []ModelInfo, title string, description string, emptyStat
 											Enabled
 										</span>
 									} else {
-										<span class="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-650 ring-1 ring-inset ring-gray-500/10">
+										<span class="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-gray-500/10">
 											<span class="h-1.5 w-1.5 rounded-full bg-gray-400"></span>
 											Disabled
 										</span>
+									}
+								</td>
+								<td class="px-3 py-4 text-xs font-mono text-gray-700 whitespace-nowrap">
+									if model.Location == "local" || model.Type == "local" || (model.InputCostPer1M == 0 && model.OutputCostPer1M == 0) {
+										<span class="font-semibold text-emerald-700">{ formatUnitCost(model) }</span>
+									} else {
+										<span class="font-semibold text-slate-800">{ formatUnitCost(model) }</span>
 									}
 								</td>
 								<td class="px-3 py-4 text-sm text-center font-semibold font-mono text-gray-800 whitespace-nowrap">
@@ -155,8 +213,7 @@ templ ModelTable(models []ModelInfo, title string, description string, emptyStat
 								<td class="px-3 py-4 text-sm text-center whitespace-nowrap">
 									if model.Active {
 										if model.Stats.AvgLatencyMs > 0 {
-											<span class="inline-flex items-center gap-x-1.5 rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-800 font-mono">
-												<span class="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+											<span class="font-mono text-xs font-semibold text-slate-800">
 												{ fmt.Sprintf("%d ms", model.Stats.AvgLatencyMs) }
 											</span>
 										} else {
@@ -208,7 +265,7 @@ templ ModelTable(models []ModelInfo, title string, description string, emptyStat
 }
 
 templ ModelsTab(vm ModelsViewModel) {
-	<div class="space-y-10">
+	<div class="space-y-8">
 		<!-- Top Header Section -->
 		<div class="border-b border-gray-200 pb-5">
 			<div class="sm:flex sm:items-center sm:justify-between">
@@ -219,21 +276,92 @@ templ ModelsTab(vm ModelsViewModel) {
 					</p>
 				</div>
 				<div class="mt-4 sm:ml-16 sm:mt-0 flex items-center gap-4">
-					<form action="/admin/models/refresh" method="POST" onsubmit="const btn = this.querySelector('button'); btn.disabled = true; btn.classList.add('opacity-75', 'cursor-not-allowed'); btn.innerHTML = '<svg class=\'animate-spin h-4 w-4 mr-2 text-white\' fill=\'none\' viewBox=\'0 0 24 24\'><circle class=\'opacity-25\' cx=\'12\' cy=\'12\' r=\'10\' stroke=\'currentColor\' stroke-width=\'4\'></circle><path class=\'opacity-75\' fill=\'currentColor\' d=\'M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z\'></path></svg> Refreshing Registry...';">
-						<button type="submit" class="inline-flex items-center gap-x-1.5 rounded-md bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 transition hover:shadow-md">
-							<!-- Refresh icon -->
-							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<form id="model-refresh-form" action="/admin/models/refresh" method="POST">
+						<button
+							id="model-refresh-btn"
+							type="submit"
+							disabled?={ vm.RefreshStatus.Running }
+							class={ "inline-flex items-center gap-x-1.5 rounded-md bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 transition hover:shadow-md", templ.KV("opacity-75 cursor-not-allowed", vm.RefreshStatus.Running) }
+						>
+							<svg id="model-refresh-icon" class={ "w-4 h-4", templ.KV("animate-spin", vm.RefreshStatus.Running) } fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89M9 11l3-3 3 3m-3-3v12" />
 							</svg>
-							Refresh Discovered Models
+							<span id="model-refresh-btn-label">
+								if vm.RefreshStatus.Running {
+									Discovery Running in Background...
+								} else {
+									Refresh Discovered Models
+								}
+							</span>
 						</button>
 					</form>
 				</div>
 			</div>
 		</div>
 
+		<!-- Background Model Discovery Status Banner & Progress Bar -->
+		<div
+			id="model-refresh-banner"
+			role="status"
+			aria-live="polite"
+			class={ "rounded-xl border border-indigo-200 bg-indigo-50/90 p-5 shadow-sm transition-all", templ.KV("hidden", !vm.RefreshStatus.Running && vm.RefreshStatus.Phase == "") }
+		>
+			<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+				<div class="flex items-center gap-2.5">
+					<span id="model-refresh-pulse" class="h-2.5 w-2.5 rounded-full bg-indigo-600 animate-pulse"></span>
+					<h3 id="model-refresh-title" class="text-sm font-bold text-indigo-950">
+						if vm.RefreshStatus.Running {
+							Discovering & Verifying Models in Background
+						} else if vm.RefreshStatus.Phase == "completed" {
+							Model Discovery Complete
+						} else if vm.RefreshStatus.Phase == "failed" {
+							Model Discovery Encountered an Error
+						} else {
+							Discovering & Verifying Models in Background
+						}
+					</h3>
+					<span class="text-xs text-indigo-700">
+						Runs asynchronously in the background — you can safely leave or close this page at any time.
+					</span>
+				</div>
+				<div class="flex items-center gap-3 text-xs font-mono font-semibold text-indigo-900">
+					<span id="model-refresh-steps">
+						{ fmt.Sprintf("%d / %d steps", vm.RefreshStatus.CompletedSteps, vm.RefreshStatus.TotalSteps) }
+					</span>
+					<span class="text-indigo-300">|</span>
+					<span id="model-refresh-verified" class="text-emerald-700">
+						{ fmt.Sprintf("%d verified", vm.RefreshStatus.VerifiedCount) }
+					</span>
+					<span class="text-indigo-300">|</span>
+					<span id="model-refresh-percent">
+						{ fmt.Sprintf("%d%%", vm.RefreshStatus.Percent) }
+					</span>
+				</div>
+			</div>
+
+			<!-- Native semantic progress for assistive tech + visual progress bar -->
+			<progress id="model-refresh-progress" max="100" value={ fmt.Sprintf("%d", vm.RefreshStatus.Percent) } class="sr-only">
+				{ fmt.Sprintf("%d%%", vm.RefreshStatus.Percent) }
+			</progress>
+			<div class="w-full bg-indigo-100 rounded-full h-2.5 overflow-hidden">
+				<div
+					id="model-refresh-bar"
+					class="bg-indigo-600 h-2.5 rounded-full transition-all duration-300 motion-reduce:transition-none"
+					style={ fmt.Sprintf("width: %d%%", vm.RefreshStatus.Percent) }
+				></div>
+			</div>
+
+			<p id="model-refresh-message" class="mt-2.5 text-xs font-mono text-indigo-900">
+				if vm.RefreshStatus.Message != "" {
+					{ vm.RefreshStatus.Message }
+				} else {
+					Initializing background model discovery across local clusters and Vertex AI regions...
+				}
+			</p>
+		</div>
+
 		<!-- Router Deployment Context & Serving Zone Info -->
-		<div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-150 p-6">
+		<div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-6">
 			<h3 class="text-sm font-bold text-blue-900 uppercase tracking-wider mb-4">Serving Regional Boundaries</h3>
 			<div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
 				<!-- Active Local region -->
@@ -289,5 +417,119 @@ templ ModelsTab(vm ModelsViewModel) {
 
 		<!-- 2. Embedding Models -->
 		@ModelTable(vm.EmbeddingModels, "Embedding Models", "Text, multimodal, and specialized representation models registered for embeddings pipelines.", "No embedding models discovered yet. Click 'Refresh Discovered Models' to auto-detect compatible assets in your Google Cloud Project.", vm.Location)
+
+		<script>
+			(function() {
+				const form = document.getElementById('model-refresh-form');
+				const btn = document.getElementById('model-refresh-btn');
+				const btnLabel = document.getElementById('model-refresh-btn-label');
+				const icon = document.getElementById('model-refresh-icon');
+				const banner = document.getElementById('model-refresh-banner');
+				const titleEl = document.getElementById('model-refresh-title');
+				const stepsEl = document.getElementById('model-refresh-steps');
+				const verifiedEl = document.getElementById('model-refresh-verified');
+				const percentEl = document.getElementById('model-refresh-percent');
+				const progressEl = document.getElementById('model-refresh-progress');
+				const barEl = document.getElementById('model-refresh-bar');
+				const msgEl = document.getElementById('model-refresh-message');
+				let pollTimer = null;
+
+				function renderStatus(st) {
+					if (!st) return;
+					if (st.running || st.phase) {
+						banner.classList.remove('hidden');
+					}
+					const pct = typeof st.percent === 'number' ? Math.max(0, Math.min(100, st.percent)) : 0;
+					if (stepsEl) stepsEl.textContent = (st.completed_steps || 0) + ' / ' + (st.total_steps || 0) + ' steps';
+					if (verifiedEl) verifiedEl.textContent = (st.verified_count || 0) + ' verified';
+					if (percentEl) percentEl.textContent = pct + '%';
+					if (progressEl) progressEl.value = pct;
+					if (barEl) barEl.style.width = pct + '%';
+					if (msgEl && st.message) msgEl.textContent = st.message;
+
+					if (st.running) {
+						if (titleEl) titleEl.textContent = 'Discovering & Verifying Models in Background';
+						if (btn) {
+							btn.disabled = true;
+							btn.classList.add('opacity-75', 'cursor-not-allowed');
+						}
+						if (btnLabel) btnLabel.textContent = 'Discovery Running in Background...';
+						if (icon) icon.classList.add('animate-spin');
+					} else if (st.phase === 'completed') {
+						if (titleEl) titleEl.textContent = 'Model Discovery Complete';
+						if (icon) icon.classList.remove('animate-spin');
+						if (btnLabel) btnLabel.textContent = 'Refresh Complete — Reloading...';
+					} else if (st.phase === 'failed') {
+						if (titleEl) titleEl.textContent = 'Model Discovery Encountered an Error';
+						if (icon) icon.classList.remove('animate-spin');
+						if (btn) {
+							btn.disabled = false;
+							btn.classList.remove('opacity-75', 'cursor-not-allowed');
+						}
+						if (btnLabel) btnLabel.textContent = 'Refresh Discovered Models';
+					}
+				}
+
+				async function pollRefreshStatus() {
+					try {
+						const resp = await fetch('/admin/models/refresh/status', {
+							headers: { 'Accept': 'application/json' },
+							cache: 'no-store'
+						});
+						if (!resp.ok) return;
+						const st = await resp.json();
+						renderStatus(st);
+						if (st.running) {
+							pollTimer = setTimeout(pollRefreshStatus, 1200);
+						} else if (st.phase === 'completed') {
+							setTimeout(function() {
+								window.location.href = '/admin/models';
+							}, 800);
+						}
+					} catch (e) {
+						pollTimer = setTimeout(pollRefreshStatus, 2000);
+					}
+				}
+
+				if (form) {
+					form.addEventListener('submit', async function(ev) {
+						ev.preventDefault();
+						if (pollTimer) clearTimeout(pollTimer);
+						renderStatus({
+							running: true,
+							phase: 'discovering',
+							percent: 5,
+							completed_steps: 0,
+							total_steps: 1,
+							verified_count: 0,
+							message: 'Starting background model discovery across local clusters and Vertex AI regions...'
+						});
+						try {
+							const resp = await fetch('/admin/models/refresh', {
+								method: 'POST',
+								headers: {
+									'Accept': 'application/json',
+									'X-Requested-With': 'fetch'
+								}
+							});
+							if (resp.ok || resp.status === 202) {
+								const st = await resp.json();
+								renderStatus(st);
+							}
+						} catch (e) {
+							// Continue polling even if initial fetch had a transient hiccup
+						}
+						pollTimer = setTimeout(pollRefreshStatus, 800);
+					});
+				}
+
+				const params = new URLSearchParams(window.location.search);
+				const initiallyRunning = btn && btn.disabled;
+				if (initiallyRunning || params.get('refresh') === 'started') {
+					pollRefreshStatus();
+				}
+			})();
+		</script>
 	</div>
 }
+

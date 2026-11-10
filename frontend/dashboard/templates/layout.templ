@@ -1,488 +1,648 @@
 package templates
 
 import (
-	"context"
+	"fmt"
 	"os"
+	"strings"
 )
 
-func IsSimulating(ctx context.Context) bool {
-	val, ok := ctx.Value("simulate_metrics").(bool)
-	return ok && val
+// ProxyURL returns the configured backend proxy endpoint URL for SDK and cURL snippets.
+func ProxyURL() string {
+	if u := os.Getenv("PROXY_PUBLIC_URL"); u != "" {
+		return strings.TrimSuffix(u, "/")
+	}
+	if u := os.Getenv("BACKEND_PUBLIC_URL"); u != "" {
+		return strings.TrimSuffix(u, "/")
+	}
+	if u := os.Getenv("BACKEND_API_URL"); u != "" {
+		return strings.TrimSuffix(u, "/")
+	}
+	return "http://localhost:8080"
 }
 
-func IsLocalDev() bool {
-	return os.Getenv("LOCAL_DEV") == "true"
+// shortHash safely truncates a hash string to at most 8 characters.
+func shortHash(s string) string {
+	if len(s) <= 8 {
+		return s
+	}
+	return s[:8]
 }
 
-templ Layout(title string, currentTab string, content templ.Component) {
+templ Layout(title string, activeTab string, content templ.Component) {
 	<!DOCTYPE html>
-	<html lang="en" class="h-full bg-gray-50">
+	<html lang="en" class="h-full bg-slate-50 text-slate-900">
 		<head>
 			<meta charset="UTF-8" />
 			<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 			<title>{ title } - Smart Router</title>
-			<!-- Tailwind CSS CDN -->
 			<script src="https://cdn.tailwindcss.com"></script>
-			<!-- HTMX CDN -->
 			<script src="https://unpkg.com/htmx.org@1.9.10"></script>
-			<!-- Google Fonts -->
 			<link rel="preconnect" href="https://fonts.googleapis.com" />
 			<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-			<link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet" />
+			<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
 			<style>
 				body {
-					font-family: 'Google Sans', 'Roboto', sans-serif;
+					font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+					background-color: #F8FAFC;
+					color: #0F172A;
 				}
-				/* Smooth transition for sidebar and main container */
-				.sidebar-transition {
-					transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
-					            padding-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
-					            max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+				h1, h2, h3, .font-display {
+					font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
 				}
-				
-				/* Collapsed Sidebar custom styles */
-				body.sidebar-collapsed .desktop-sidebar {
-					width: 4.5rem; /* w-18 */
+				code, pre, .font-mono {
+					font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+					font-variant-numeric: tabular-nums;
 				}
-				body.sidebar-collapsed .main-wrapper {
-					padding-left: 4.5rem;
-				}
-				body.sidebar-collapsed .sidebar-logo-full {
-					display: none;
-				}
-				body.sidebar-collapsed .sidebar-logo-mini {
-					display: flex;
-					justify-content: center;
-					width: 100%;
-				}
-				
-				/* Smoothly slide out text labels */
-				.sidebar-text {
-					display: inline-block;
-					max-width: 200px;
-					opacity: 1;
-					transition: max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
-					            opacity 0.2s ease-out;
-				}
-				body.sidebar-collapsed .sidebar-text {
-					max-width: 0;
+				.htmx-indicator {
 					opacity: 0;
-					overflow: hidden;
-					pointer-events: none;
+					transition: opacity 200ms ease-in;
 				}
-				
-				/* Smoothly hide group headers */
-				.sidebar-group-header {
+				.htmx-request .htmx-indicator {
 					opacity: 1;
-					max-height: 20px;
-					transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
-					            opacity 0.2s ease-out, 
-					            margin 0.3s ease;
 				}
-				body.sidebar-collapsed .sidebar-group-header {
-					max-height: 0;
-					opacity: 0;
-					margin: 0;
-					padding-top: 0;
-					padding-bottom: 0;
-					overflow: hidden;
-					pointer-events: none;
-				}
-				
-				body.sidebar-collapsed .sidebar-footer-copyright {
-					display: none;
-				}
-				body.sidebar-collapsed .sidebar-btn-text {
-					display: none;
-				}
-				body.sidebar-collapsed .sidebar-link-element {
-					justify-content: center;
-					padding-left: 0;
-					padding-right: 0;
-					border-left-width: 4px;
-				}
-				body.sidebar-collapsed .sidebar-chevron {
-					transform: rotate(180deg);
-				}
-				
-				/* Collapse style overrides for bottom Sign Out button */
-				body.sidebar-collapsed .desktop-sidebar .border-t {
-					padding: 0.75rem 0.5rem;
-					background-color: transparent;
-					border-top-color: transparent;
-				}
-				body.sidebar-collapsed .desktop-sidebar .border-t a {
-					background-color: transparent;
-					border-color: transparent;
-					box-shadow: none;
-					padding: 0.5rem 0;
-					justify-content: center;
-					width: 100%;
+				.htmx-request.htmx-indicator {
+					opacity: 1;
 				}
 			</style>
 		</head>
-		<body class="h-full flex overflow-hidden bg-gray-50 text-gray-900">
-			<script>
-				(function() {
-					const isCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
-					if (isCollapsed) {
-						document.body.classList.add('sidebar-collapsed');
-					}
-				})();
-			</script>
-			<!-- ========================================== -->
-			<!-- MOBILE SIDEBAR DRAWER (Hidden on Desktop)  -->
-			<!-- ========================================== -->
-			<div id="mobile-menu-drawer" class="fixed inset-0 z-50 flex md:hidden opacity-0 pointer-events-none transition-opacity duration-300 ease-in-out" role="dialog" aria-modal="true">
-				<!-- Backdrop overlay -->
-				<div id="mobile-menu-backdrop" class="fixed inset-0 bg-gray-900/60 backdrop-blur-xs transition-opacity duration-300 ease-in-out"></div>
+		<body class="h-full overflow-hidden flex flex-col bg-slate-50 text-slate-900">
+			<div class="flex h-full w-full overflow-hidden">
+				<!-- Panel 1: Left Navigation Sidebar (w-64, Crisp Slate) -->
+				<aside id="left-sidebar" class="w-64 shrink-0 bg-slate-100 border-r border-slate-200 flex flex-col justify-between overflow-y-auto select-none">
+					<div class="p-4 space-y-6">
+						<!-- Brand Header -->
+						<div class="flex items-center justify-between px-2 pt-1">
+							<a href="/admin/apps" class="flex items-center gap-2.5">
+								<div class="h-8 w-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">
+									SR
+								</div>
+								<div>
+									<span class="font-display text-base font-bold tracking-tight text-slate-900 block leading-none">Smart Router</span>
+									<span class="text-[11px] font-medium text-slate-500">Control Plane</span>
+								</div>
+							</a>
+						</div>
 
-				<!-- Drawer panel -->
-				<div id="mobile-menu-panel" class="relative mr-16 flex w-full max-w-xs flex-1 transform -translate-x-full transition-transform duration-300 ease-in-out bg-white flex-col z-10 shadow-2xl">
-					<!-- Close Button -->
-					<div class="absolute right-0 top-0 -mr-12 pt-4">
-						<button id="close-mobile-menu-btn" type="button" class="ml-1 flex h-10 w-10 items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-white">
-							<span class="sr-only">Close sidebar</span>
-							<svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-							</svg>
-						</button>
-					</div>
-
-					<!-- Mobile Sidebar Brand Logo Header -->
-					<div class="flex h-16 shrink-0 items-center justify-between px-6 border-b border-gray-150 bg-gray-50/80">
-						<div class="flex items-center gap-2">
-							<div class="flex items-center text-lg font-bold tracking-tight">
-								<span class="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Smart Router</span>
+						<!-- Domain 1: Tenancy & Access -->
+						<div class="space-y-1">
+							<div class="px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+								Tenancy &amp; Access
 							</div>
-							<span class="inline-flex items-center rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
-								Admin
-							</span>
+							<a
+								href="/admin/clients"
+								class={ "flex items-center gap-2.5 px-2.5 py-1.5 rounded-r-md text-[13px] leading-5 transition-colors",
+									templ.KV("bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600", activeTab == "clients"),
+									templ.KV("text-slate-700 hover:bg-slate-200/70 hover:text-slate-900 font-medium", activeTab != "clients") }
+							>
+								<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+								</svg>
+								<span>Client Orgs</span>
+							</a>
+							<a
+								href="/admin/apps"
+								class={ "flex items-center gap-2.5 px-2.5 py-1.5 rounded-r-md text-[13px] leading-5 transition-colors",
+									templ.KV("bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600", activeTab == "apps"),
+									templ.KV("text-slate-700 hover:bg-slate-200/70 hover:text-slate-900 font-medium", activeTab != "apps") }
+							>
+								<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+								</svg>
+								<span>Applications</span>
+							</a>
+							<a
+								href="/admin/keys"
+								class={ "flex items-center gap-2.5 px-2.5 py-1.5 rounded-r-md text-[13px] leading-5 transition-colors",
+									templ.KV("bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600", activeTab == "keys"),
+									templ.KV("text-slate-700 hover:bg-slate-200/70 hover:text-slate-900 font-medium", activeTab != "keys") }
+							>
+								<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+								</svg>
+								<span>API Keys</span>
+							</a>
+							<a
+								href="/admin/headers"
+								class={ "flex items-center gap-2.5 px-2.5 py-1.5 rounded-r-md text-[13px] leading-5 transition-colors",
+									templ.KV("bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600", activeTab == "headers"),
+									templ.KV("text-slate-700 hover:bg-slate-200/70 hover:text-slate-900 font-medium", activeTab != "headers") }
+							>
+								<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+								</svg>
+								<span>Custom Headers</span>
+							</a>
+						</div>
+
+						<!-- Domain 2: Routing Intelligence -->
+						<div class="space-y-1">
+							<div class="px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+								Routing Intelligence
+							</div>
+							<a
+								href="/admin/complexity"
+								class={ "flex items-center gap-2.5 px-2.5 py-1.5 rounded-r-md text-[13px] leading-5 transition-colors",
+									templ.KV("bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600", activeTab == "complexity"),
+									templ.KV("text-slate-700 hover:bg-slate-200/70 hover:text-slate-900 font-medium", activeTab != "complexity") }
+							>
+								<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+								</svg>
+								<span>Complexity Routing</span>
+							</a>
+							<a
+								href="/admin/rules"
+								class={ "flex items-center gap-2.5 px-2.5 py-1.5 rounded-r-md text-[13px] leading-5 transition-colors",
+									templ.KV("bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600", activeTab == "rules"),
+									templ.KV("text-slate-700 hover:bg-slate-200/70 hover:text-slate-900 font-medium", activeTab != "rules") }
+							>
+								<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+								</svg>
+								<span>Routing Rules</span>
+							</a>
+							<a
+								href="/admin/models"
+								class={ "flex items-center gap-2.5 px-2.5 py-1.5 rounded-r-md text-[13px] leading-5 transition-colors",
+									templ.KV("bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600", activeTab == "models"),
+									templ.KV("text-slate-700 hover:bg-slate-200/70 hover:text-slate-900 font-medium", activeTab != "models") }
+							>
+								<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+								</svg>
+								<span>Models Registry</span>
+							</a>
+						</div>
+
+						<!-- Domain 3: Infrastructure & Compute -->
+						<div class="space-y-1">
+							<div class="px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+								Infrastructure &amp; Compute
+							</div>
+							<a
+								href="/admin/clusters"
+								class={ "flex items-center gap-2.5 px-2.5 py-1.5 rounded-r-md text-[13px] leading-5 transition-colors",
+									templ.KV("bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600", activeTab == "clusters"),
+									templ.KV("text-slate-700 hover:bg-slate-200/70 hover:text-slate-900 font-medium", activeTab != "clusters") }
+							>
+								<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+								</svg>
+								<span>Compute Clusters</span>
+							</a>
+							<a
+								href="/admin/queue"
+								class={ "flex items-center gap-2.5 px-2.5 py-1.5 rounded-r-md text-[13px] leading-5 transition-colors",
+									templ.KV("bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600", activeTab == "queue"),
+									templ.KV("text-slate-700 hover:bg-slate-200/70 hover:text-slate-900 font-medium", activeTab != "queue") }
+							>
+								<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+								</svg>
+								<span>Active Queue</span>
+							</a>
+						</div>
+
+						<!-- Domain 4: Observability & Reference -->
+						<div class="space-y-1">
+							<div class="px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+								Observability &amp; Docs
+							</div>
+							<a
+								href="/admin/metrics"
+								class={ "flex items-center gap-2.5 px-2.5 py-1.5 rounded-r-md text-[13px] leading-5 transition-colors",
+									templ.KV("bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600", activeTab == "metrics"),
+									templ.KV("text-slate-700 hover:bg-slate-200/70 hover:text-slate-900 font-medium", activeTab != "metrics") }
+							>
+								<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+								</svg>
+								<span>Telemetry</span>
+							</a>
+							<a
+								href="/admin/costs"
+								class={ "flex items-center gap-2.5 px-2.5 py-1.5 rounded-r-md text-[13px] leading-5 transition-colors",
+									templ.KV("bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600", activeTab == "costs"),
+									templ.KV("text-slate-700 hover:bg-slate-200/70 hover:text-slate-900 font-medium", activeTab != "costs") }
+							>
+								<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+								</svg>
+								<span>Cost Analytics</span>
+							</a>
+							<a
+								href="/admin/docs"
+								class={ "flex items-center gap-2.5 px-2.5 py-1.5 rounded-r-md text-[13px] leading-5 transition-colors",
+									templ.KV("bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600", activeTab == "docs"),
+									templ.KV("text-slate-700 hover:bg-slate-200/70 hover:text-slate-900 font-medium", activeTab != "docs") }
+							>
+								<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+								</svg>
+								<span>Documentation</span>
+							</a>
 						</div>
 					</div>
 
-					<!-- Mobile Navigation Links -->
-					<div class="flex flex-1 flex-col overflow-y-auto px-4 py-6 bg-white">
-						@mobileNavLinks(currentTab)
+					<!-- Sidebar Footer -->
+					<div class="p-4 border-t border-slate-200 bg-slate-100">
+						<div class="flex items-center justify-between">
+							<span class="text-xs font-medium text-slate-600">ADC / Project Auth</span>
+							<a
+								href="/logout"
+								class="inline-flex items-center gap-1.5 rounded-md bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 border border-slate-300 shadow-sm hover:bg-slate-50 transition"
+							>
+								Sign Out
+							</a>
+						</div>
 					</div>
+				</aside>
 
-					<!-- Mobile Footer / Sign Out -->
-					<div class="border-t border-gray-150 p-4 bg-gray-50">
-						<a href="/logout" class="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition">
-							<svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-							</svg>
-							Sign Out
-						</a>
-					</div>
+				<!-- Panel 2: Center Main Workspace -->
+				<div class="flex-1 min-w-0 flex flex-col overflow-hidden bg-slate-50">
+					<!-- Compact Top Header with Intent Pills & Drawer Toggle -->
+					<header class="h-14 shrink-0 bg-white border-b border-slate-200 px-6 flex items-center justify-between gap-4">
+						<div class="flex items-center gap-3 min-w-0">
+							<span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Workspace</span>
+							<span class="text-slate-300">/</span>
+							<span class="text-sm font-semibold text-slate-900 truncate">{ title }</span>
+						</div>
+
+						<!-- Compact Proxy Endpoint Pill -->
+						<div class="hidden sm:flex items-center gap-2">
+							<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200" data-code-snippet>
+								<span class="h-1.5 w-1.5 rounded-full bg-emerald-600"></span>
+								Proxy: <code class="font-mono text-[11px] text-slate-900">{ ProxyURL() }</code>
+								<button
+									type="button"
+									onclick="copyCodeSnippet(this)"
+									title="Copy proxy URL"
+									aria-label="Copy to clipboard"
+									class="copy-snippet-btn ml-0.5 p-0.5 rounded hover:bg-slate-200 text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
+								>
+									<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+									</svg>
+								</button>
+							</span>
+						</div>
+
+						<!-- Right Contextual Drawer Toggle Button -->
+						<div class="flex items-center pl-3 border-l border-slate-200 -mr-2">
+							<button
+								id="context-drawer-toggle"
+								type="button"
+								onclick="toggleContextDrawer()"
+								aria-expanded="false"
+								aria-controls="context-drawer"
+								title="Open right inspector drawer"
+								class="inline-flex items-center gap-1.5 rounded-l-md rounded-r-sm bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700 border border-slate-300 shadow-xs hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition cursor-pointer"
+							>
+								<svg id="context-drawer-chevron" class="w-3.5 h-3.5 text-slate-400 transition-transform duration-200" fill="none" stroke="currentColor" stroke-width="2.25" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+								</svg>
+								<svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+									<rect x="3" y="4" width="18" height="16" rx="2" stroke-linecap="round" stroke-linejoin="round" />
+									<line x1="15" y1="4" x2="15" y2="20" stroke-linecap="round" stroke-linejoin="round" />
+								</svg>
+								<span>Inspector</span>
+							</button>
+						</div>
+					</header>
+
+					<!-- Scrollable Main Content -->
+					if activeTab == "docs" {
+						<main id="main-workspace" class="flex-1 min-h-0 flex overflow-hidden">
+							@content
+						</main>
+					} else {
+						<main id="main-workspace" class="flex-1 overflow-y-auto px-6 py-8">
+							<div class="max-w-7xl mx-auto">
+								@content
+							</div>
+						</main>
+					}
 				</div>
+
+				<!-- Panel 3: Right Expandable Contextual Drawer (w-96, Crisp Slate) -->
+				<aside id="context-drawer" class="hidden w-96 shrink-0 bg-slate-100 border-l border-slate-200 flex flex-col justify-between overflow-y-auto">
+					<div class="p-5 space-y-6">
+						<div class="flex items-center justify-between border-b border-slate-200 pb-3">
+							<div>
+								<h2 class="text-sm font-bold text-slate-900">Contextual Inspector &amp; Docs</h2>
+								<p class="text-xs text-slate-500">Live route evaluation &amp; proxy integration</p>
+							</div>
+							<button
+								type="button"
+								onclick="toggleContextDrawer()"
+								class="rounded-md p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition"
+								title="Close drawer"
+							>
+								<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+								</svg>
+							</button>
+						</div>
+
+						<!-- Live Route & Complexity Inspector Widget -->
+						<div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-3">
+							<div class="flex items-center justify-between">
+								<span class="text-xs font-bold uppercase tracking-wider text-blue-700">Route &amp; Complexity Inspector</span>
+							</div>
+							<form
+								hx-post="/admin/complexity/inspect"
+								hx-target="#drawer-inspector-results"
+								hx-swap="innerHTML"
+								class="space-y-3"
+							>
+								<div>
+									<label for="drawer-app-id" class="block text-xs font-medium text-slate-700">App Scope (Optional ID)</label>
+									<input
+										type="text"
+										id="drawer-app-id"
+										name="app_id"
+										placeholder="e.g. customer-chat-prod (blank for defaults)"
+										class="mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono"
+									/>
+								</div>
+								<div>
+									<label for="drawer-prompt" class="block text-xs font-medium text-slate-700">Sample Prompt Payload</label>
+									<textarea
+										id="drawer-prompt"
+										name="prompt"
+										rows="3"
+										required
+										placeholder="Enter a prompt to test complexity tier &amp; model selection..."
+										class="mt-1 block w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-900 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+									></textarea>
+								</div>
+								<div class="flex items-center gap-4 text-xs text-slate-700">
+									<label class="inline-flex items-center gap-1.5 cursor-pointer">
+										<input type="checkbox" name="has_multimodal" value="true" class="rounded border-slate-300 text-blue-600 focus:ring-blue-600" />
+										<span>Multimodal</span>
+									</label>
+									<label class="inline-flex items-center gap-1.5 cursor-pointer">
+										<input type="checkbox" name="has_tools" value="true" class="rounded border-slate-300 text-blue-600 focus:ring-blue-600" />
+										<span>Tools / Function Call</span>
+									</label>
+								</div>
+								<button
+									type="submit"
+									class="w-full rounded-md bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 transition"
+								>
+									Evaluate Route
+								</button>
+							</form>
+							<div id="drawer-inspector-results" class="text-xs"></div>
+						</div>
+
+						<!-- Quick API & SDK Reference Card -->
+						<div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-3">
+							<div class="flex items-center justify-between">
+								<span class="text-xs font-bold uppercase tracking-wider text-slate-700">Quick API &amp; SDK Reference</span>
+								<a href="/admin/docs" class="text-xs font-semibold text-blue-600 hover:text-blue-700">Full Docs &rarr;</a>
+							</div>
+							<div class="text-xs text-slate-600 space-y-1">
+								<div>Proxy Base URL (Gemini &amp; OpenAI `/v1` Compatible):</div>
+								<div class="relative group flex items-center gap-1.5" data-code-snippet>
+									<code class="block flex-1 rounded bg-slate-100 px-2 py-1 pr-8 text-[11px] font-mono text-slate-900 border border-slate-200 break-all">{ ProxyURL() }</code>
+									<button
+										type="button"
+										onclick="copyCodeSnippet(this)"
+										title="Copy to clipboard"
+										aria-label="Copy to clipboard"
+										class="copy-snippet-btn absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded bg-white/90 hover:bg-slate-200 text-slate-500 hover:text-slate-900 border border-slate-300 transition-colors cursor-pointer"
+									>
+										<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+										</svg>
+									</button>
+								</div>
+							</div>
+							<div class="space-y-1.5">
+								<div class="text-xs font-semibold text-slate-700">Python (OpenAI SDK · /v1/chat/completions)</div>
+								<div class="relative group" data-code-snippet>
+									<button
+										type="button"
+										onclick="copyCodeSnippet(this)"
+										title="Copy to clipboard"
+										aria-label="Copy to clipboard"
+										class="copy-snippet-btn absolute top-2 right-2 p-1.5 rounded-md bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer"
+									>
+										<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+										</svg>
+									</button>
+									<pre class="rounded-lg bg-slate-900 text-slate-50 p-3 pr-10 text-[11px] font-mono overflow-x-auto leading-relaxed"><code>{ fmt.Sprintf("from openai import OpenAI\n\nclient = OpenAI(\n    api_key=\"YOUR_ROUTER_KEY\",\n    base_url=\"%s/v1\"\n)\nresp = client.chat.completions.create(\n    model=\"gemini-dynamic\",  # or gemini-3.8-flash\n    messages=[{\"role\": \"user\", \"content\": \"Hello!\"}]\n)\nprint(resp.choices[0].message.content)", ProxyURL()) }</code></pre>
+								</div>
+							</div>
+							<div class="space-y-1.5">
+								<div class="text-xs font-semibold text-slate-700">cURL (OpenAI Spec `/v1/chat/completions`)</div>
+								<div class="relative group" data-code-snippet>
+									<button
+										type="button"
+										onclick="copyCodeSnippet(this)"
+										title="Copy to clipboard"
+										aria-label="Copy to clipboard"
+										class="copy-snippet-btn absolute top-2 right-2 p-1.5 rounded-md bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer"
+									>
+										<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+										</svg>
+									</button>
+									<pre class="rounded-lg bg-slate-900 text-slate-50 p-3 pr-10 text-[11px] font-mono overflow-x-auto leading-relaxed"><code>{ fmt.Sprintf("curl -X POST \"%s/v1/chat/completions\" \\\n  -H \"Authorization: Bearer YOUR_ROUTER_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"model\":\"gemini-dynamic\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello\"}]}'", ProxyURL()) }</code></pre>
+								</div>
+							</div>
+							<div class="space-y-1.5">
+								<div class="text-xs font-semibold text-slate-700">LangChain (`langchain_openai`) &amp; LiteLLM (`litellm`)</div>
+								<div class="relative group" data-code-snippet>
+									<button
+										type="button"
+										onclick="copyCodeSnippet(this)"
+										title="Copy to clipboard"
+										aria-label="Copy to clipboard"
+										class="copy-snippet-btn absolute top-2 right-2 p-1.5 rounded-md bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer"
+									>
+										<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+										</svg>
+									</button>
+									<pre class="rounded-lg bg-slate-900 text-slate-50 p-3 pr-10 text-[11px] font-mono overflow-x-auto leading-relaxed"><code>{ fmt.Sprintf("from langchain_openai import ChatOpenAI\nimport litellm\n\nllm = ChatOpenAI(\n    model=\"gemini-dynamic\",\n    api_key=\"YOUR_ROUTER_KEY\",\n    base_url=\"%s/v1\"\n)\n# Or with LiteLLM:\nres = litellm.completion(\n    model=\"openai/gemini-dynamic\",\n    api_base=\"%s/v1\",\n    api_key=\"YOUR_ROUTER_KEY\",\n    messages=[{\"role\": \"user\", \"content\": \"Hi\"}]\n)", ProxyURL(), ProxyURL()) }</code></pre>
+								</div>
+							</div>
+							<div class="space-y-1.5">
+								<div class="text-xs font-semibold text-slate-700">TypeScript / Node.js (`openai` SDK)</div>
+								<div class="relative group" data-code-snippet>
+									<button
+										type="button"
+										onclick="copyCodeSnippet(this)"
+										title="Copy to clipboard"
+										aria-label="Copy to clipboard"
+										class="copy-snippet-btn absolute top-2 right-2 p-1.5 rounded-md bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer"
+									>
+										<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+										</svg>
+									</button>
+									<pre class="rounded-lg bg-slate-900 text-slate-50 p-3 pr-10 text-[11px] font-mono overflow-x-auto leading-relaxed"><code>{ fmt.Sprintf("import OpenAI from \"openai\";\n\nconst client = new OpenAI({\n  apiKey: \"YOUR_ROUTER_KEY\",\n  baseURL: \"%s/v1\",\n});\nconst res = await client.chat.completions.create({\n  model: \"gemini-3.8-flash\",\n  messages: [{ role: \"user\", content: \"Hello!\" }],\n});", ProxyURL()) }</code></pre>
+								</div>
+							</div>
+							<div class="space-y-1.5">
+								<div class="text-xs font-semibold text-slate-700">Python (`google-genai` SDK)</div>
+								<div class="relative group" data-code-snippet>
+									<button
+										type="button"
+										onclick="copyCodeSnippet(this)"
+										title="Copy to clipboard"
+										aria-label="Copy to clipboard"
+										class="copy-snippet-btn absolute top-2 right-2 p-1.5 rounded-md bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer"
+									>
+										<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+										</svg>
+									</button>
+									<pre class="rounded-lg bg-slate-900 text-slate-50 p-3 pr-10 text-[11px] font-mono overflow-x-auto leading-relaxed"><code>{ fmt.Sprintf("from google import genai\n\nclient = genai.Client(\n    api_key=\"YOUR_ROUTER_KEY\",\n    http_options={\"api_endpoint\": \"%s\"}\n)\nresp = client.models.generate_content(\n    model=\"gemini-3.8-flash\",\n    contents=\"Hello Smart Router!\"\n)", ProxyURL()) }</code></pre>
+								</div>
+							</div>
+							<div class="space-y-1.5">
+								<div class="text-xs font-semibold text-slate-700">cURL (Gemini Native `:generateContent`)</div>
+								<div class="relative group" data-code-snippet>
+									<button
+										type="button"
+										onclick="copyCodeSnippet(this)"
+										title="Copy to clipboard"
+										aria-label="Copy to clipboard"
+										class="copy-snippet-btn absolute top-2 right-2 p-1.5 rounded-md bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer"
+									>
+										<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+										</svg>
+									</button>
+									<pre class="rounded-lg bg-slate-900 text-slate-50 p-3 pr-10 text-[11px] font-mono overflow-x-auto leading-relaxed"><code>{ fmt.Sprintf("curl -X POST \"%s/v1beta/models/gemini-3.8-flash:generateContent\" \\\n  -H \"x-goog-api-key: YOUR_ROUTER_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"contents\":[{\"parts\":[{\"text\":\"Hello\"}]}]}'", ProxyURL()) }</code></pre>
+								</div>
+							</div>
+						</div>
+
+						<!-- Contrastive-LM Cluster & Provider Setup Card -->
+						<div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-2.5">
+							<div class="flex items-center justify-between">
+								<span class="text-xs font-bold uppercase tracking-wider text-indigo-900">Contrastive-LM Cluster Setup</span>
+								<a href="/admin/complexity" class="text-xs font-semibold text-indigo-600 hover:text-indigo-700">Configure &rarr;</a>
+							</div>
+							<p class="text-xs text-slate-600 leading-relaxed">
+								Bind <code class="font-mono bg-slate-100 px-1 py-0.5 rounded">contrastive-lm</code> to a project-local cluster runner (<code class="font-mono bg-slate-100 px-1 py-0.5 rounded">CLM_ENDPOINT</code>) or register a Direct Endpoint with model <code class="font-mono bg-slate-100 px-1 py-0.5 rounded">contrastive-lm</code> in <a href="/admin/clusters" class="text-blue-600 underline">Cluster Nodes</a>.
+							</p>
+						</div>
+					</div>
+				</aside>
 			</div>
 
-			<!-- ========================================== -->
-			<!-- DESKTOP SIDEBAR (Persistent Navigation)    -->
-			<!-- ========================================== -->
-			<aside class="desktop-sidebar sidebar-transition hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 border-r border-gray-200 bg-white h-full shadow-xs z-30 relative">
-				<!-- Floating edge collapse trigger button -->
-				<button id="toggle-sidebar-btn" type="button" class="absolute top-20 -right-3.5 bg-white border border-gray-200 text-gray-500 hover:text-gray-700 shadow-md rounded-full w-7 h-7 flex items-center justify-center z-40 cursor-pointer active:scale-95 transition-all duration-200 focus:outline-none">
-					<svg class="sidebar-chevron w-4 h-4 transition-transform duration-300" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-					</svg>
-				</button>
-
-				<!-- Sidebar Header / Logo Brand -->
-				<div class="flex h-16 shrink-0 items-center justify-between px-6 border-b border-gray-200 bg-white">
-					<div class="flex items-center gap-2">
-						<!-- Full Logo (Expanded mode) -->
-						<div class="sidebar-logo-full flex items-center text-lg font-bold tracking-tight">
-							<span class="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Smart Router</span>
-						</div>
-						<!-- Mini Logo (Collapsed mode) -->
-						<div class="sidebar-logo-mini hidden items-center text-lg font-bold tracking-tight">
-							<span class="text-blue-600 font-bold">S</span><span class="text-indigo-600 font-bold">R</span>
-						</div>
-						<span class="sidebar-text inline-flex items-center rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 ring-1 ring-inset ring-blue-700/10">
-							Admin
-						</span>
-					</div>
-				</div>
-
-				<!-- Desktop Grouped Navigation Links -->
-				<nav class="flex-1 flex flex-col overflow-y-auto px-4 py-6 space-y-6 bg-white">
-					@groupedNavLinks(currentTab)
-				</nav>
-
-				<!-- Sidebar Footer / Profile & Sign Out -->
-				<div class="border-t border-gray-200 p-4 bg-gray-50/80 flex flex-col gap-3">
-					<a href="/logout" title="Sign Out" class="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-xs hover:bg-gray-50 transition active:scale-[0.98]">
-						<svg class="w-5 h-5 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-						</svg>
-						<span class="sidebar-btn-text sidebar-text">Sign Out</span>
-					</a>
-					<div class="sidebar-footer-copyright text-center text-[10px] text-gray-400 font-sans">
-						&copy; 2026 Smart Router
-					</div>
-				</div>
-			</aside>
-
-			<!-- ========================================== -->
-			<!-- MAIN CONTENT WRAPPER                       -->
-			<!-- ========================================== -->
-			<div class="main-wrapper sidebar-transition flex-1 flex flex-col overflow-hidden md:pl-64">
-				<!-- Top Header Panel -->
-				<header class="h-16 shrink-0 border-b border-gray-200 bg-white sticky top-0 z-20 px-4 sm:px-6 lg:px-8 flex items-center justify-between shadow-xs">
-					<!-- Left Side: Menu Toggler & Page Title -->
-					<div class="flex items-center gap-4">
-						<!-- Mobile Hamburger Menu Toggle -->
-						<button id="open-mobile-menu-btn" type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-md text-gray-500 hover:text-gray-600 border border-gray-200 bg-white hover:bg-gray-50 shadow-xs md:hidden focus:outline-none">
-							<span class="sr-only">Open sidebar</span>
-							<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-							</svg>
-						</button>
-
-						<!-- Dynamic Page Title -->
-						<h1 class="text-lg font-bold tracking-tight text-gray-900">{ title }</h1>
-					</div>
-
-					<!-- Right Side: Local Status Indicator & Profile Link -->
-					<div class="flex items-center gap-4">
-						<!-- Premium Toggle for Metrics Simulation -->
-						<form action="/admin/toggle-simulation" method="POST" class="flex items-center gap-2 border border-gray-200 rounded-lg px-2.5 py-1 bg-gray-50 shadow-2xs hover:bg-gray-100/50 transition">
-							<span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Simulate Metrics</span>
-							if IsSimulating(ctx) {
-								<input type="hidden" name="simulate" value="false" />
-								<button type="submit" class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none bg-blue-600">
-									<span class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out translate-x-4"></span>
-								</button>
-							} else {
-								<input type="hidden" name="simulate" value="true" />
-								<button type="submit" class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none bg-gray-250">
-									<span class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out translate-x-0"></span>
-								</button>
-							}
-						</form>
-
-						<!-- Local Env Badge -->
-						if IsLocalDev() {
-							<span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/10 shadow-xs">
-								<span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-								Local Server
-							</span>
-						} else {
-							<span class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/10 shadow-xs">
-								<span class="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse"></span>
-								Cloud Server
-							</span>
-						}
-						
-						<!-- Local Documentation Link -->
-						<a href="/admin/docs" class={ "hidden sm:inline-flex items-center rounded-lg px-3 py-1.5 text-xs font-semibold transition shadow-2xs", 
-							templ.KV("bg-blue-50 text-blue-700 ring-1 ring-blue-700/10 hover:bg-blue-100/60", currentTab == "docs"),
-							templ.KV("bg-gray-50 text-gray-600 ring-1 ring-gray-500/10 hover:bg-gray-100", currentTab != "docs") }>
-							<svg class="w-3.5 h-3.5 mr-1.5 text-blue-600 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-16.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-16.25v16.25" />
-							</svg>
-							Docs
-						</a>
-
-						<!-- GitHub Link -->
-						<a href="https://github.com/davenportjw/geminirouter" target="_blank" class="hidden sm:inline-flex items-center rounded-lg bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10 hover:bg-gray-100 hover:text-gray-900 transition shadow-2xs">
-							<svg class="w-3.5 h-3.5 mr-1.5 text-gray-600 fill-current shrink-0" viewBox="0 0 16 16" version="1.1" aria-hidden="true">
-								<path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
-							</svg>
-							GitHub
-						</a>
-					</div>
-				</header>
-
-				<!-- Main Scrollable Area -->
-				<main class="flex-grow overflow-y-auto bg-gray-50 focus:outline-none">
-					<div class="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-						@content
-					</div>
-				</main>
-			</div>
-
-			<!-- ========================================== -->
-			<!-- RESPONSIVE & COLLAPSIBLE SIDEBAR SCRIPTS   -->
-			<!-- ========================================== -->
 			<script>
-				(function() {
-					// Mobile Drawer toggler
-					const openBtn = document.getElementById('open-mobile-menu-btn');
-					const closeBtn = document.getElementById('close-mobile-menu-btn');
-					const drawer = document.getElementById('mobile-menu-drawer');
-					const panel = document.getElementById('mobile-menu-panel');
-					const backdrop = document.getElementById('mobile-menu-backdrop');
-
-					function openMenu() {
-						drawer.classList.remove('opacity-0', 'pointer-events-none');
-						drawer.classList.add('opacity-100', 'pointer-events-auto');
-						panel.classList.remove('-translate-x-full');
-						panel.classList.add('translate-x-0');
-					}
-
-					function closeMenu() {
-						drawer.classList.remove('opacity-100', 'pointer-events-auto');
-						drawer.classList.add('opacity-0', 'pointer-events-none');
-						panel.classList.remove('translate-x-0');
-						panel.classList.add('-translate-x-full');
-					}
-
-					if (openBtn && closeBtn && drawer && panel) {
-						openBtn.addEventListener('click', openMenu);
-						closeBtn.addEventListener('click', closeMenu);
-						if (backdrop) {
-							backdrop.addEventListener('click', closeMenu);
-						}
-					}
-
-					// Desktop Collapsible sidebar toggler
-					const toggleBtn = document.getElementById('toggle-sidebar-btn');
+				function toggleContextDrawer() {
+					const drawer = document.getElementById('context-drawer');
+					if (!drawer) return;
+					const isHidden = drawer.classList.toggle('hidden');
+					const isOpen = !isHidden;
+					const toggleBtn = document.getElementById('context-drawer-toggle');
+					const chevron = document.getElementById('context-drawer-chevron');
 					if (toggleBtn) {
-						toggleBtn.addEventListener('click', function() {
-							const wasCollapsed = document.body.classList.contains('sidebar-collapsed');
-							if (wasCollapsed) {
-								document.body.classList.remove('sidebar-collapsed');
-								localStorage.setItem('sidebar-collapsed', 'false');
-							} else {
-								document.body.classList.add('sidebar-collapsed');
-								localStorage.setItem('sidebar-collapsed', 'true');
-							}
-						});
+						toggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+						toggleBtn.setAttribute('title', isOpen ? 'Close right inspector drawer' : 'Open right inspector drawer');
+						toggleBtn.classList.toggle('bg-blue-50', isOpen);
+						toggleBtn.classList.toggle('text-blue-700', isOpen);
+						toggleBtn.classList.toggle('border-blue-300', isOpen);
+						toggleBtn.classList.toggle('bg-slate-50', !isOpen);
+						toggleBtn.classList.toggle('text-slate-700', !isOpen);
+						toggleBtn.classList.toggle('border-slate-300', !isOpen);
 					}
-				})();
+					if (chevron) {
+						chevron.classList.toggle('rotate-180', isOpen);
+						chevron.classList.toggle('text-blue-600', isOpen);
+						chevron.classList.toggle('text-slate-400', !isOpen);
+					}
+				}
+
+				function copyCodeSnippet(btn) {
+					if (!btn) return;
+					let text = btn.getAttribute('data-copy-text');
+					if (!text) {
+						const container = btn.closest('[data-code-snippet]') || btn.parentElement;
+						const codeEl = container ? container.querySelector('code, pre') : null;
+						text = codeEl ? codeEl.innerText : '';
+					}
+					if (!text) return;
+
+					const showCopiedFeedback = () => {
+						const originalHTML = btn.getAttribute('data-orig-html') || btn.innerHTML;
+						if (!btn.getAttribute('data-orig-html')) {
+							btn.setAttribute('data-orig-html', originalHTML);
+						}
+						const originalTitle = btn.getAttribute('title') || 'Copy to clipboard';
+						btn.innerHTML = '<svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>';
+						btn.setAttribute('title', 'Copied!');
+						setTimeout(() => {
+							btn.innerHTML = btn.getAttribute('data-orig-html') || originalHTML;
+							btn.setAttribute('title', originalTitle);
+						}, 1500);
+					};
+
+					if (navigator.clipboard && navigator.clipboard.writeText) {
+						navigator.clipboard.writeText(text).then(showCopiedFeedback).catch(() => {
+							fallbackCopyText(text, showCopiedFeedback);
+						});
+					} else {
+						fallbackCopyText(text, showCopiedFeedback);
+					}
+				}
+
+				function fallbackCopyText(text, onSuccess) {
+					const ta = document.createElement('textarea');
+					ta.value = text;
+					ta.style.position = 'fixed';
+					ta.style.opacity = '0';
+					document.body.appendChild(ta);
+					ta.select();
+					try {
+						document.execCommand('copy');
+						if (onSuccess) onSuccess();
+					} catch (e) {}
+					document.body.removeChild(ta);
+				}
+
+				function initMarkdownCopyButtons() {
+					document.querySelectorAll('.markdown-content pre').forEach((pre) => {
+						if (pre.parentElement && pre.parentElement.hasAttribute('data-code-snippet')) return;
+						if (pre.querySelector('.copy-snippet-btn')) return;
+						pre.style.position = 'relative';
+						pre.setAttribute('data-code-snippet', '');
+						const btn = document.createElement('button');
+						btn.type = 'button';
+						btn.className = 'copy-snippet-btn absolute top-2.5 right-2.5 p-1.5 rounded-md bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer';
+						btn.setAttribute('title', 'Copy to clipboard');
+						btn.setAttribute('aria-label', 'Copy to clipboard');
+						btn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>';
+						btn.onclick = function() { copyCodeSnippet(btn); };
+						pre.appendChild(btn);
+					});
+				}
+
+				document.addEventListener('DOMContentLoaded', initMarkdownCopyButtons);
+				document.body.addEventListener('htmx:afterSwap', initMarkdownCopyButtons);
 			</script>
 		</body>
 	</html>
 }
 
-// Helper template component to render desktop grouped navigation list
-templ groupedNavLinks(currentTab string) {
-	<!-- CONFIG & ACCESS GROUP -->
-	<div class="space-y-2">
-		<h3 class="sidebar-group-header px-3 text-[10px] font-bold uppercase tracking-wider text-gray-400 transition-all duration-200">
-			Config & Access
-		</h3>
-		<div class="space-y-1">
-			@sidebarLink("/admin/clients", "Client Organizations", "clients", currentTab) {
-				<svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94-3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
-				</svg>
-			}
-			@sidebarLink("/admin/apps", "Applications", "apps", currentTab) {
-				<svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-				</svg>
-			}
-			@sidebarLink("/admin/keys", "Access Credentials", "keys", currentTab) {
-				<svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m-3.418-4.018A15.03 15.03 0 0012 2.692V12m0 0l-1.907 1.907A1.83 1.83 0 019 14.414V16H7v2H5v2h2a2 2 0 002-2v-1.586A1.83 1.83 0 019.586 16H12" />
-				</svg>
-			}
-		</div>
-	</div>
-
-	<!-- TRAFFIC ROUTING GROUP -->
-	<div class="space-y-2">
-		<h3 class="sidebar-group-header px-3 text-[10px] font-bold uppercase tracking-wider text-gray-400 transition-all duration-200">
-			Traffic Routing
-		</h3>
-		<div class="space-y-1">
-			@sidebarLink("/admin/rules", "Routing Rules", "rules", currentTab) {
-				<svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-				</svg>
-			}
-			@sidebarLink("/admin/complexity", "Complexity Routing", "complexity", currentTab) {
-				<svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l.707-.707m2.828 9.9a5 5 0 113.536 0V21h-3.536v-3.536z" />
-				</svg>
-			}
-			@sidebarLink("/admin/headers", "Custom Headers", "headers", currentTab) {
-				<svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h7" />
-				</svg>
-			}
-		</div>
-	</div>
-
-	<!-- MODELS REGISTRY & CLUSTERS GROUP -->
-	<div class="space-y-2">
-		<h3 class="sidebar-group-header px-3 text-[10px] font-bold uppercase tracking-wider text-gray-400 transition-all duration-200">
-			Models & Clusters
-		</h3>
-		<div class="space-y-1">
-			@sidebarLink("/admin/models", "Models Registry", "models", currentTab) {
-				<svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-				</svg>
-			}
-			@sidebarLink("/admin/clusters", "Local Clusters", "clusters", currentTab) {
-				<svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
-				</svg>
-			}
-		</div>
-	</div>
-
-	<!-- OBSERVABILITY GROUP -->
-	<div class="space-y-2">
-		<h3 class="sidebar-group-header px-3 text-[10px] font-bold uppercase tracking-wider text-gray-400 transition-all duration-200">
-			Observability
-		</h3>
-		<div class="space-y-1">
-			@sidebarLink("/admin/metrics", "Monitoring Stats", "metrics", currentTab) {
-				<svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-				</svg>
-			}
-			@sidebarLink("/admin/costs", "Cost Analytics", "costs", currentTab) {
-				<svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-				</svg>
-			}
-			@sidebarLink("/admin/queue", "Request Queue", "queue", currentTab) {
-				<svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h12" />
-				</svg>
-			}
-		</div>
-	</div>
-}
-
-// Helper template component to render mobile grouped navigation list
-templ mobileNavLinks(currentTab string) {
-	@groupedNavLinks(currentTab)
-}
-
-// Extensible, highly polished Sidebar Link element
-templ sidebarLink(href string, text string, tabKey string, currentTab string) {
-	<a href={ templ.SafeURL(href) } title={ text } class={ "sidebar-link-element group flex items-center gap-3 rounded-lg border-l-4 py-2.5 px-3 text-sm font-medium transition-all duration-200 active:scale-[0.99]", 
-		templ.KV("border-blue-600 bg-blue-50/80 text-blue-700 font-semibold shadow-2xs", currentTab == tabKey), 
-		templ.KV("border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900 hover:border-gray-300/60", currentTab != tabKey) }>
-		{ children... }
-		<span class="sidebar-text truncate transition-all duration-200">{ text }</span>
-	</a>
-}
-
-templ FormErrorAlert(message string) {
-	<div class="rounded-md bg-red-50 p-4 border border-red-200 mb-4 text-left shadow-sm">
-		<div class="flex">
-			<div class="flex-shrink-0">
-				<svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-					<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" />
-				</svg>
-			</div>
-			<div class="ml-3">
-				<h3 class="text-sm font-bold text-red-800">Operation Failed</h3>
-				<div class="mt-1 text-xs text-red-700 font-medium">
-					{ message }
-				</div>
+templ FormErrorAlert(errMsg string) {
+	<div id="error-alert-container" hx-swap-oob="true">
+		<div class="mb-4 rounded-lg bg-red-50 p-3.5 text-xs font-medium text-red-800 border border-red-200 flex items-center gap-2">
+			<svg class="h-4 w-4 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+			</svg>
+			<div>
+				<strong class="font-bold">Operation Failed:</strong> <span>{ errMsg }</span>
 			</div>
 		</div>
 	</div>
 }
-
 

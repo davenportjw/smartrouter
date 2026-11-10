@@ -1,6 +1,8 @@
 package proxy
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"io"
@@ -16,8 +18,9 @@ import (
 
 	"fmt"
 	store "geminirouter/backend/config"
-	"geminirouter/pkg/config"
 	"geminirouter/frontend/dashboard"
+	"geminirouter/pkg/config"
+	"geminirouter/pkg/decision"
 
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/oauth2"
@@ -44,9 +47,19 @@ func (m *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 	return http.DefaultTransport.RoundTrip(req)
 }
 
+func TestMain(m *testing.M) {
+	tmpDir, err := os.MkdirTemp("", "smartrouter-proxy-test-*")
+	if err == nil {
+		_ = os.Setenv("LOCAL_DATA_DIR", tmpDir)
+		defer os.RemoveAll(tmpDir)
+	}
+	os.Exit(m.Run())
+}
+
 func TestRouterProxyCompatibility(t *testing.T) {
 	// Setup temporary local dev database environment
 	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 
 	ctx := context.Background()
 	store, err := store.NewConfigStore(ctx, "test-project")
@@ -230,11 +243,12 @@ func TestRouterProxyCompatibility(t *testing.T) {
 	}
 
 	// Clean up test config DB file if created
-	os.RemoveAll("data/local_db.json")
+	// local_db isolated via LOCAL_DATA_DIR in TestMain
 }
 
 func TestRouterProxyCustomHeaders(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 
 	ctx := context.Background()
 	store, err := store.NewConfigStore(ctx, "test-project")
@@ -375,11 +389,12 @@ func TestRouterProxyCustomHeaders(t *testing.T) {
 		})
 	}
 
-	os.RemoveAll("data/local_db.json")
+	// local_db isolated via LOCAL_DATA_DIR in TestMain
 }
 
 func TestRouterProxyHeaderRouting(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 
 	ctx := context.Background()
 	store, err := store.NewConfigStore(ctx, "test-project")
@@ -530,11 +545,12 @@ func TestRouterProxyHeaderRouting(t *testing.T) {
 		})
 	}
 
-	os.RemoveAll("data/local_db.json")
+	// local_db isolated via LOCAL_DATA_DIR in TestMain
 }
 
 func TestRouterProxyAppCentricFlows(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 
 	ctx := context.Background()
 	store, err := store.NewConfigStore(ctx, "test-project")
@@ -637,11 +653,12 @@ func TestRouterProxyAppCentricFlows(t *testing.T) {
 		t.Errorf("expected routed target model to be 'gemini-2.5-pro', but got %q", lastRoutedModel)
 	}
 
-	os.RemoveAll("data/local_db.json")
+	// local_db isolated via LOCAL_DATA_DIR in TestMain
 }
 
 func TestRouterProxyGoogleIdentityAuth(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 
 	ctx := context.Background()
 	store, err := store.NewConfigStore(ctx, "test-project")
@@ -756,11 +773,12 @@ func TestRouterProxyGoogleIdentityAuth(t *testing.T) {
 		t.Errorf("expected status 401 for malformed OIDC JWT, got %d", rr3.Code)
 	}
 
-	os.RemoveAll("data/local_db.json")
+	// local_db isolated via LOCAL_DATA_DIR in TestMain
 }
 
 func TestRequestSchedulerOrdering(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 	t.Setenv("ROUTER_CONCURRENCY_LIMIT", "1")
 	t.Setenv("ROUTER_MAX_QUEUE_SIZE", "5")
 
@@ -866,11 +884,12 @@ func TestRequestSchedulerOrdering(t *testing.T) {
 	}
 	orderMu.Unlock()
 
-	os.RemoveAll("data/local_db.json")
+	// local_db isolated via LOCAL_DATA_DIR in TestMain
 }
 
 func TestRequestSchedulerQueueFull(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 	t.Setenv("ROUTER_CONCURRENCY_LIMIT", "1")
 	t.Setenv("ROUTER_MAX_QUEUE_SIZE", "1")
 
@@ -929,11 +948,12 @@ func TestRequestSchedulerQueueFull(t *testing.T) {
 	}
 
 	close(blockChan)
-	os.RemoveAll("data/local_db.json")
+	// local_db isolated via LOCAL_DATA_DIR in TestMain
 }
 
 func TestRequestSchedulerClientDisconnect(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 	t.Setenv("ROUTER_CONCURRENCY_LIMIT", "1")
 	t.Setenv("ROUTER_MAX_QUEUE_SIZE", "5")
 
@@ -998,11 +1018,12 @@ func TestRequestSchedulerClientDisconnect(t *testing.T) {
 	}
 	mu.Unlock()
 
-	os.RemoveAll("data/local_db.json")
+	// local_db isolated via LOCAL_DATA_DIR in TestMain
 }
 
 func TestProxyUpstream429Retry(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 
 	ctx := context.Background()
 	store, _ := store.NewConfigStore(ctx, "test-project")
@@ -1057,11 +1078,12 @@ func TestProxyUpstream429Retry(t *testing.T) {
 	}
 	mu.Unlock()
 
-	os.RemoveAll("data/local_db.json")
+	// local_db isolated via LOCAL_DATA_DIR in TestMain
 }
 
 func TestProxyComplexityRoutingHeuristics(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 
 	ctx := context.Background()
 	store, _ := store.NewConfigStore(ctx, "test-project")
@@ -1179,11 +1201,12 @@ func TestProxyComplexityRoutingHeuristics(t *testing.T) {
 		})
 	}
 
-	os.RemoveAll("data/local_db.json")
+	// local_db isolated via LOCAL_DATA_DIR in TestMain
 }
 
 func TestProxyComplexityRoutingValidation(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 
 	ctx := context.Background()
 	store, _ := store.NewConfigStore(ctx, "test-project")
@@ -1245,11 +1268,12 @@ func TestProxyComplexityRoutingValidation(t *testing.T) {
 		t.Errorf("expected status code INVALID_ARGUMENT, got: %q", out.Error.Status)
 	}
 
-	os.RemoveAll("data/local_db.json")
+	// local_db isolated via LOCAL_DATA_DIR in TestMain
 }
 
 func TestProxyComplexityRoutingLLMClassifier(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 
 	ctx := context.Background()
 	store, _ := store.NewConfigStore(ctx, "test-project")
@@ -1355,11 +1379,12 @@ func TestProxyComplexityRoutingLLMClassifier(t *testing.T) {
 		t.Errorf("expected LLM routed target model to be 'gemini-2.5-pro', got %q", routed)
 	}
 
-	os.RemoveAll("data/local_db.json")
+	// local_db isolated via LOCAL_DATA_DIR in TestMain
 }
 
 func TestProxyComplexityRoutingAdditionalInstructions(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 
 	ctx := context.Background()
 	store, _ := store.NewConfigStore(ctx, "test-project")
@@ -1469,11 +1494,12 @@ func TestProxyComplexityRoutingAdditionalInstructions(t *testing.T) {
 		t.Errorf("expected AdditionalInstructions to be passed to semantic classifier, but it was not found in system instructions")
 	}
 
-	os.RemoveAll("data/local_db.json")
+	// local_db isolated via LOCAL_DATA_DIR in TestMain
 }
 
 func TestProxyAppOptOutDynamicRouting(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 
 	ctx := context.Background()
 	store, _ := store.NewConfigStore(ctx, "test-project")
@@ -1554,13 +1580,14 @@ func TestProxyAppOptOutDynamicRouting(t *testing.T) {
 		t.Errorf("expected request to bypass dynamic routing and target gemini-2.5-flash-lite directly, but it got routed to %q", routed)
 	}
 
-	os.RemoveAll("data/local_db.json")
+	// local_db isolated via LOCAL_DATA_DIR in TestMain
 }
 
 
 
 func TestProxyDynamicRoutingSuite(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 
 	ctx := context.Background()
 	store, _ := store.NewConfigStore(ctx, "test-project")
@@ -1716,11 +1743,12 @@ func TestProxyDynamicRoutingSuite(t *testing.T) {
 		})
 	}
 
-	os.RemoveAll("data/local_db.json")
+	// local_db isolated via LOCAL_DATA_DIR in TestMain
 }
 
 func TestProxyRegionalModelRouting(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 
 	ctx := context.Background()
 	store, err := store.NewConfigStore(ctx, "test-project")
@@ -1809,7 +1837,7 @@ func TestProxyRegionalModelRouting(t *testing.T) {
 		t.Errorf("expected rewritten path to be %q, got %q", expectedPath, path)
 	}
 
-	os.RemoveAll("data/local_db.json")
+	// local_db isolated via LOCAL_DATA_DIR in TestMain
 }
 
 type hostCapturingRoundTripper struct {
@@ -1838,6 +1866,7 @@ func (m *mockGCPRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 
 func TestProxyModelDiscoveryAndRoutingWorkflow(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 
 	ctx := context.Background()
 	store, err := store.NewConfigStore(ctx, "test-project")
@@ -1944,6 +1973,9 @@ func TestProxyModelDiscoveryAndRoutingWorkflow(t *testing.T) {
 
 	if wRec.Code != http.StatusSeeOther {
 		t.Fatalf("expected status 303 redirect from RefreshModels, got %d", wRec.Code)
+	}
+	if !dash.WaitForRefresh(5 * time.Second) {
+		t.Fatalf("timed out waiting for background RefreshModels to complete")
 	}
 
 	// 3. Verify models and endpoints were discovered and persisted
@@ -2055,7 +2087,7 @@ func TestProxyModelDiscoveryAndRoutingWorkflow(t *testing.T) {
 		t.Errorf("expected model option %s@us-central1 to be deleted from registry", targetModelID)
 	}
 
-	os.RemoveAll("data/local_db.json")
+	// local_db isolated via LOCAL_DATA_DIR in TestMain
 }
 
 func TestExtractLocationFromResourceName(t *testing.T) {
@@ -2084,6 +2116,7 @@ func TestExtractLocationFromResourceName(t *testing.T) {
 
 func TestProxySmallestCompatibleLocationRouting(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 
 	ctx := context.Background()
 	store, err := store.NewConfigStore(ctx, "test-project")
@@ -2200,11 +2233,12 @@ func TestProxySmallestCompatibleLocationRouting(t *testing.T) {
 		t.Errorf("expected Scenario B rewritten path to be %q, got %q", expectedPath2, path2)
 	}
 
-	os.RemoveAll("data/local_db.json")
+	// local_db isolated via LOCAL_DATA_DIR in TestMain
 }
 
 func TestProxyIncompatibleLocationRouting(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 
 	ctx := context.Background()
 	store, err := store.NewConfigStore(ctx, "test-project")
@@ -2283,11 +2317,12 @@ func TestProxyIncompatibleLocationRouting(t *testing.T) {
 		t.Errorf("expected incompatible model rewritten path to be %q, got %q", expectedPath, path)
 	}
 
-	os.RemoveAll("data/local_db.json")
+	// local_db isolated via LOCAL_DATA_DIR in TestMain
 }
 
 func TestPublisherModelsDiscovery(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 
 	ctx := context.Background()
 	store, err := store.NewConfigStore(ctx, "test-project")
@@ -2352,6 +2387,9 @@ func TestPublisherModelsDiscovery(t *testing.T) {
 	if wRec.Code != http.StatusSeeOther {
 		t.Fatalf("expected 303 redirect from RefreshModels, got %d", wRec.Code)
 	}
+	if !dash.WaitForRefresh(5 * time.Second) {
+		t.Fatalf("timed out waiting for background RefreshModels to complete")
+	}
 
 	// Fetch newly discovered/cached models in the store
 	refreshedModels, err := store.GetAllModels(ctx)
@@ -2403,11 +2441,12 @@ func TestPublisherModelsDiscovery(t *testing.T) {
 		t.Errorf("newly discovered foundation model should be inactive by default")
 	}
 
-	os.RemoveAll("data/local_db.json")
+	// local_db isolated via LOCAL_DATA_DIR in TestMain
 }
 
 func TestFirstStartDiscoveryBootstrap(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 
 	ctx := context.Background()
 	store, err := store.NewConfigStore(ctx, "test-project")
@@ -2498,11 +2537,12 @@ func TestFirstStartDiscoveryBootstrap(t *testing.T) {
 		t.Errorf("bootstrapped foundation model should be inactive by default")
 	}
 
-	os.RemoveAll("data/local_db.json")
+	// local_db isolated via LOCAL_DATA_DIR in TestMain
 }
 
 func TestDiscoveryRegistryObsoleteDisabling(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 
 	ctx := context.Background()
 	store, err := store.NewConfigStore(ctx, "test-project")
@@ -2612,7 +2652,7 @@ func TestDiscoveryRegistryObsoleteDisabling(t *testing.T) {
 		t.Errorf("expected display name 'Gemini 3.1 Pro (Obsolete)', got %q", m31Pro.DisplayName)
 	}
 
-	os.RemoveAll("data/local_db.json")
+	// local_db isolated via LOCAL_DATA_DIR in TestMain
 }
 
 func TestStaticLocationsResolution(t *testing.T) {
@@ -2668,6 +2708,7 @@ func TestStaticLocationsResolution(t *testing.T) {
 
 func TestModelRefreshLocationCorrectionAndDisabling(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 
 	ctx := context.Background()
 	store, err := store.NewConfigStore(ctx, "test-project")
@@ -2775,11 +2816,12 @@ func TestModelRefreshLocationCorrectionAndDisabling(t *testing.T) {
 		t.Errorf("expected gemini-3.5-pro@us-central1 to be scrubbed/not registered since it failed all verifications")
 	}
 
-	os.RemoveAll("data/local_db.json")
+	// local_db isolated via LOCAL_DATA_DIR in TestMain
 }
 
 func TestSimplifiedModelDiscoveryAndRoutingCompoundKey(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 
 	ctx := context.Background()
 	store, err := store.NewConfigStore(ctx, "test-project")
@@ -2846,6 +2888,9 @@ func TestSimplifiedModelDiscoveryAndRoutingCompoundKey(t *testing.T) {
 	wRec := httptest.NewRecorder()
 	reqRefresh := httptest.NewRequest("POST", "/admin/models/refresh", nil)
 	dash.RefreshModels(wRec, reqRefresh)
+	if !dash.WaitForRefresh(5 * time.Second) {
+		t.Fatalf("timed out waiting for background RefreshModels to complete")
+	}
 
 	// Verify that us-central1, us, and global models are registered as separate options!
 	refreshedModels, err := store.GetAllModels(ctx)
@@ -2931,11 +2976,12 @@ func TestSimplifiedModelDiscoveryAndRoutingCompoundKey(t *testing.T) {
 		t.Errorf("expected routed model to be 'gemini-2.5-flash', got %q", lastRoutedModel)
 	}
 
-	os.RemoveAll("data/local_db.json")
+	// local_db isolated via LOCAL_DATA_DIR in TestMain
 }
 
 func TestProxyGlobalLocationRouting(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 
 	ctx := context.Background()
 	store, err := store.NewConfigStore(ctx, "test-project")
@@ -3015,11 +3061,12 @@ func TestProxyGlobalLocationRouting(t *testing.T) {
 		t.Errorf("expected rewritten path to be %q, got %q", expectedPath, path)
 	}
 
-	os.RemoveAll("data/local_db.json")
+	// local_db isolated via LOCAL_DATA_DIR in TestMain
 }
 
 func TestProxyModelOverloadQueuingAndAPI(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 	t.Setenv("ROUTER_CONCURRENCY_LIMIT", "10")
 	t.Setenv("ROUTER_MAX_QUEUE_SIZE", "5")
 
@@ -3111,11 +3158,14 @@ func TestProxyModelOverloadQueuingAndAPI(t *testing.T) {
 	// Set it to also believe it's overloaded
 	rpBlocked.Scheduler.overloadedModels["gemini-2.5-flash"] = time.Now().Add(15 * time.Second)
 
+	var wg sync.WaitGroup
 	// Launch the request to block
 	reqBlock := httptest.NewRequest("POST", "/v1/models/gemini-2.5-flash:generateContent?key=key-1", nil)
 	reqBlock.Header.Set("x-goog-api-key", "key-1")
 	rrBlock := httptest.NewRecorder()
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		rpBlocked.ServeHTTP(rrBlock, reqBlock)
 	}()
 
@@ -3131,9 +3181,17 @@ func TestProxyModelOverloadQueuingAndAPI(t *testing.T) {
 	reqHigh.Header.Set("x-goog-api-key", "key-1")
 	rrHigh := httptest.NewRecorder()
 
-	go func() { rpBlocked.ServeHTTP(rrLow, reqLow) }()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		rpBlocked.ServeHTTP(rrLow, reqLow)
+	}()
 	time.Sleep(50 * time.Millisecond)
-	go func() { rpBlocked.ServeHTTP(rrHigh, reqHigh) }()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		rpBlocked.ServeHTTP(rrHigh, reqHigh)
+	}()
 	time.Sleep(100 * time.Millisecond)
 
 	// 3. Verify the queue snapshot API output
@@ -3155,7 +3213,7 @@ func TestProxyModelOverloadQueuingAndAPI(t *testing.T) {
 
 	// 4. Unblock! They should run and succeed.
 	close(blockChan)
-	time.Sleep(200 * time.Millisecond)
+	wg.Wait()
 
 	if rrLow.Code != http.StatusOK {
 		t.Errorf("expected low priority request to succeed with 200, got %d", rrLow.Code)
@@ -3169,11 +3227,12 @@ func TestProxyModelOverloadQueuingAndAPI(t *testing.T) {
 		t.Errorf("expected gemini-2.5-flash overloaded status to be cleared")
 	}
 
-	os.RemoveAll("data/local_db.json")
+	// local_db isolated via LOCAL_DATA_DIR in TestMain
 }
 
 func TestProxyTPMRateLimitingAndOptOut(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 
 	ctx := context.Background()
 	store, err := store.NewConfigStore(ctx, "test-project")
@@ -3305,7 +3364,7 @@ func TestProxyTPMRateLimitingAndOptOut(t *testing.T) {
 		t.Errorf("expected second request to succeed due to refund adjustment, got %d: %s", rr4.Code, rr4.Body.String())
 	}
 
-	os.RemoveAll("data/local_db.json")
+	// local_db isolated via LOCAL_DATA_DIR in TestMain
 }
 
 func TestClusterQueuePriority(t *testing.T) {
@@ -3360,6 +3419,7 @@ func TestClusterQueueTTL(t *testing.T) {
 
 func TestClusterProxyE2E(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 
 	ctx := context.Background()
 	store, err := store.NewConfigStore(ctx, "test-project")
@@ -3429,15 +3489,2076 @@ func TestClusterProxyE2E(t *testing.T) {
 		t.Errorf("expected response to contain candidate text, got: %s", rr.Body.String())
 	}
 
-	os.RemoveAll("data/local_db.json")
+	// local_db isolated via LOCAL_DATA_DIR in TestMain
 }
 
+func TestTDD_SmartRouting_PerPromptOverrides(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
+	ctx := context.Background()
+	cfgStore, err := store.NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to init config store: %v", err)
+	}
 
+	_ = cfgStore.SaveClient(ctx, config.Client{ID: "client-smart", Tier: "premium"})
+	_ = cfgStore.SaveApp(ctx, config.App{
+		ID:       "app-smart",
+		ClientID: "client-smart",
+		Complexity: config.ComplexityRouting{
+			Enabled:      true,
+			SimpleModel:  "gemini-3.5-flash-lite",
+			MediumModel:  "gemini-3.8-flash",
+			ComplexModel: "gemini-3.1-pro",
+		},
+	})
+	_ = cfgStore.SaveKey(ctx, config.APIKey{
+		KeyHash: config.HashKey("key-smart-override"),
+		AppID:   "app-smart",
+		Status:  "active",
+	})
+	_ = cfgStore.DeleteHeader(ctx, "header-1")
 
+	var lastTargetModel string
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		parts := strings.Split(r.URL.Path, "/models/")
+		if len(parts) >= 2 {
+			lastTargetModel = strings.Split(parts[1], ":")[0]
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"candidates": [{"content": {"parts": [{"text": "OK"}]}}]}`))
+	}))
+	defer backend.Close()
 
+	backendURL, _ := url.Parse(backend.URL)
+	rp, _ := NewRouterProxy(cfgStore, "test-project", "us-central1")
+	rp.TokenSource = &mockTokenSource{}
+	rp.Target = backendURL
+	rp.Proxy.Transport = &mockRoundTripper{Target: backendURL}
 
+	// 1. Direct Per-Prompt Model Override via Header X-Router-Model
+	req1 := httptest.NewRequest("POST", "/v1/models/gemini-dynamic:generateContent?key=key-smart-override", strings.NewReader(`{"contents":[{"parts":[{"text":"hello"}]}]}`))
+	req1.Header.Set("X-Router-Model", "gemini-3.1-pro")
+	rr1 := httptest.NewRecorder()
+	rp.ServeHTTP(rr1, req1)
 
+	if rr1.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr1.Code, rr1.Body.String())
+	}
+	if lastTargetModel != "gemini-3.1-pro" {
+		t.Errorf("expected routed model gemini-3.1-pro, got %s", lastTargetModel)
+	}
+	if rr1.Header().Get("X-Router-Engine-Used") != "prompt_override" {
+		t.Errorf("expected engine prompt_override, got %s", rr1.Header().Get("X-Router-Engine-Used"))
+	}
 
+	// 2. Direct Per-Prompt Complexity Override via Header X-Router-Complexity: simple
+	req2 := httptest.NewRequest("POST", "/v1/models/gemini-dynamic:generateContent?key=key-smart-override", strings.NewReader(`{"contents":[{"parts":[{"text":"complex algorithmic proof with matrices"}]}]}`))
+	req2.Header.Set("X-Router-Complexity", "simple")
+	rr2 := httptest.NewRecorder()
+	rp.ServeHTTP(rr2, req2)
+
+	if rr2.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr2.Code, rr2.Body.String())
+	}
+	if lastTargetModel != "gemini-3.5-flash-lite" {
+		t.Errorf("expected routed model gemini-3.5-flash-lite for simple override, got %s", lastTargetModel)
+	}
+
+	// 3. Direct Per-Prompt Engine Override via Header X-Router-Engine: clm
+	req3 := httptest.NewRequest("POST", "/v1/models/gemini-dynamic:generateContent?key=key-smart-override", strings.NewReader(`{"contents":[{"parts":[{"text":"What is 2+2?"}]}]}`))
+	req3.Header.Set("X-Router-Engine", "clm")
+	rr3 := httptest.NewRecorder()
+	rp.ServeHTTP(rr3, req3)
+
+	if rr3.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr3.Code, rr3.Body.String())
+	}
+	if rr3.Header().Get("X-Router-Engine-Used") != "clm" {
+		t.Errorf("expected engine clm, got %s", rr3.Header().Get("X-Router-Engine-Used"))
+	}
+}
+
+func TestTDD_SmartRouting_SessionAffinity(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
+	ctx := context.Background()
+	cfgStore, err := store.NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to init config store: %v", err)
+	}
+
+	_ = cfgStore.SaveClient(ctx, config.Client{ID: "client-sess", Tier: "premium"})
+	_ = cfgStore.SaveApp(ctx, config.App{
+		ID:       "app-sess",
+		ClientID: "client-sess",
+		Complexity: config.ComplexityRouting{
+			Enabled:      true,
+			SimpleModel:  "gemini-3.5-flash-lite",
+			MediumModel:  "gemini-3.8-flash",
+			ComplexModel: "gemini-3.1-pro",
+		},
+	})
+	_ = cfgStore.SaveKey(ctx, config.APIKey{
+		KeyHash: config.HashKey("key-session-smart"),
+		AppID:   "app-sess",
+		Status:  "active",
+	})
+	_ = cfgStore.DeleteHeader(ctx, "header-1")
+
+	var lastTargetModel string
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		parts := strings.Split(r.URL.Path, "/models/")
+		if len(parts) >= 2 {
+			lastTargetModel = strings.Split(parts[1], ":")[0]
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"candidates": [{"content": {"parts": [{"text": "OK"}]}}]}`))
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+	rp, _ := NewRouterProxy(cfgStore, "test-project", "us-central1")
+	rp.TokenSource = &mockTokenSource{}
+	rp.Target = backendURL
+	rp.Proxy.Transport = &mockRoundTripper{Target: backendURL}
+
+	sessionID := "conv-user-12345"
+
+	// Turn 1: Complex coding prompt -> dynamic Jev routes to gemini-3.1-pro
+	req1 := httptest.NewRequest("POST", "/v1/models/gemini-dynamic:generateContent?key=key-session-smart", strings.NewReader(`{"contents":[{"parts":[{"text":"func RunDistributedRaftElection() error {\n return nil \n}\nOptimize this Go consensus algorithm"}]}]}`))
+	req1.Header.Set("X-Session-ID", sessionID)
+	req1.Header.Set("X-Session-Policy", "lock")
+	rr1 := httptest.NewRecorder()
+	rp.ServeHTTP(rr1, req1)
+
+	if rr1.Code != http.StatusOK {
+		t.Fatalf("Turn 1 failed: %d: %s", rr1.Code, rr1.Body.String())
+	}
+	if lastTargetModel != "gemini-3.1-pro" {
+		t.Errorf("Turn 1 expected gemini-3.1-pro, got %s", lastTargetModel)
+	}
+	if rr1.Header().Get("X-Session-Turn") != "1" {
+		t.Errorf("expected session turn 1, got %s", rr1.Header().Get("X-Session-Turn"))
+	}
+
+	// Turn 2: Short prompt ("Thanks!") -> Sticky session lock should KEEP gemini-3.1-pro!
+	req2 := httptest.NewRequest("POST", "/v1/models/gemini-dynamic:generateContent?key=key-session-smart", strings.NewReader(`{"contents":[{"parts":[{"text":"Thanks! Looks great."}]}]}`))
+	req2.Header.Set("X-Session-ID", sessionID)
+	rr2 := httptest.NewRecorder()
+	rp.ServeHTTP(rr2, req2)
+
+	if rr2.Code != http.StatusOK {
+		t.Fatalf("Turn 2 failed: %d: %s", rr2.Code, rr2.Body.String())
+	}
+	if lastTargetModel != "gemini-3.1-pro" {
+		t.Errorf("Turn 2 expected sticky model gemini-3.1-pro, got %s", lastTargetModel)
+	}
+	if rr2.Header().Get("X-Router-Engine-Used") != "session_lock" {
+		t.Errorf("Turn 2 expected engine session_lock, got %s", rr2.Header().Get("X-Router-Engine-Used"))
+	}
+	if rr2.Header().Get("X-Session-Turn") != "2" {
+		t.Errorf("expected session turn 2, got %s", rr2.Header().Get("X-Session-Turn"))
+	}
+
+	// Turn 1 for new session with explicit X-Session-Model
+	reqInit := httptest.NewRequest("POST", "/v1/models/gemini-dynamic:generateContent?key=key-session-smart", strings.NewReader(`{"contents":[{"parts":[{"text":"Start conversation"}]}]}`))
+	reqInit.Header.Set("X-Session-ID", "conv-locked-flash")
+	reqInit.Header.Set("X-Session-Model", "gemini-3.8-flash")
+	rrInit := httptest.NewRecorder()
+	rp.ServeHTTP(rrInit, reqInit)
+
+	if rrInit.Code != http.StatusOK {
+		t.Fatalf("reqInit failed: %d", rrInit.Code)
+	}
+	if lastTargetModel != "gemini-3.8-flash" {
+		t.Errorf("expected explicit session model gemini-3.8-flash, got %s", lastTargetModel)
+	}
+}
+
+func TestTDD_SmartRouting_AgentTaskSwitching(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
+	ctx := context.Background()
+	cfgStore, err := store.NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to init config store: %v", err)
+	}
+
+	_ = cfgStore.SaveClient(ctx, config.Client{ID: "client-agent", Tier: "premium"})
+	_ = cfgStore.SaveApp(ctx, config.App{
+		ID:       "app-agent",
+		ClientID: "client-agent",
+		Complexity: config.ComplexityRouting{
+			Enabled:      true,
+			SimpleModel:  "gemini-3.5-flash-lite",
+			MediumModel:  "gemini-3.8-flash",
+			ComplexModel: "gemini-3.1-pro",
+		},
+	})
+	_ = cfgStore.SaveKey(ctx, config.APIKey{
+		KeyHash: config.HashKey("key-agent-smart"),
+		AppID:   "app-agent",
+		Status:  "active",
+	})
+	_ = cfgStore.DeleteHeader(ctx, "header-1")
+
+	var lastTargetModel string
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		parts := strings.Split(r.URL.Path, "/models/")
+		if len(parts) >= 2 {
+			lastTargetModel = strings.Split(parts[1], ":")[0]
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"candidates": [{"content": {"parts": [{"text": "OK"}]}}]}`))
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+	rp, _ := NewRouterProxy(cfgStore, "test-project", "us-central1")
+	rp.TokenSource = &mockTokenSource{}
+	rp.Target = backendURL
+	rp.Proxy.Transport = &mockRoundTripper{Target: backendURL}
+
+	// 1. Agent sets task: coding -> routes to gemini-3.1-pro
+	req1 := httptest.NewRequest("POST", "/v1/models/gemini-dynamic:generateContent?key=key-agent-smart", strings.NewReader(`{"contents":[{"parts":[{"text":"Implement the user profile view"}]}]}`))
+	req1.Header.Set("X-Agent-Task", "code_generation")
+	rr1 := httptest.NewRecorder()
+	rp.ServeHTTP(rr1, req1)
+
+	if rr1.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr1.Code, rr1.Body.String())
+	}
+	if lastTargetModel != "gemini-3.1-pro" {
+		t.Errorf("expected gemini-3.1-pro for code task, got %s", lastTargetModel)
+	}
+	if rr1.Header().Get("X-Router-Engine-Used") != "task_mapping" {
+		t.Errorf("expected engine task_mapping, got %s", rr1.Header().Get("X-Router-Engine-Used"))
+	}
+
+	// 2. Agent switches task to: triage -> routes to gemini-3.5-flash-lite
+	req2 := httptest.NewRequest("POST", "/v1/models/gemini-dynamic:generateContent?key=key-agent-smart", strings.NewReader(`{"contents":[{"parts":[{"text":"Filter incoming error logs"}]}]}`))
+	req2.Header.Set("X-Agent-Task", "triage")
+	rr2 := httptest.NewRecorder()
+	rp.ServeHTTP(rr2, req2)
+
+	if rr2.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr2.Code, rr2.Body.String())
+	}
+	if lastTargetModel != "gemini-3.5-flash-lite" {
+		t.Errorf("expected gemini-3.5-flash-lite for triage task, got %s", lastTargetModel)
+	}
+
+	// 3. Agent switches task to: summarization -> routes to gemini-3.8-flash
+	req3 := httptest.NewRequest("POST", "/v1/models/gemini-dynamic:generateContent?key=key-agent-smart", strings.NewReader(`{"contents":[{"parts":[{"text":"Summarize the results in 2 bullets"}]}]}`))
+	req3.Header.Set("X-Agent-Task", "summarization")
+	rr3 := httptest.NewRecorder()
+	rp.ServeHTTP(rr3, req3)
+
+	if rr3.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr3.Code, rr3.Body.String())
+	}
+	if lastTargetModel != "gemini-3.8-flash" {
+		t.Errorf("expected gemini-3.8-flash for summarization task, got %s", lastTargetModel)
+	}
+}
+
+func TestTDD_SmartRouting_JevAndCLMEngines(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
+	ctx := context.Background()
+	cfgStore, err := store.NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to init config store: %v", err)
+	}
+
+	_ = cfgStore.SaveClient(ctx, config.Client{ID: "client-engines", Tier: "premium"})
+	_ = cfgStore.SaveApp(ctx, config.App{
+		ID:       "app-engines",
+		ClientID: "client-engines",
+		Complexity: config.ComplexityRouting{
+			Enabled:      true,
+			Engine:       "jev",
+			SimpleModel:  "gemini-3.5-flash-lite",
+			MediumModel:  "gemini-3.8-flash",
+			ComplexModel: "gemini-3.1-pro",
+		},
+	})
+	_ = cfgStore.SaveKey(ctx, config.APIKey{
+		KeyHash: config.HashKey("key-engine-test"),
+		AppID:   "app-engines",
+		Status:  "active",
+	})
+	_ = cfgStore.DeleteHeader(ctx, "header-1")
+
+	var lastTargetModel string
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		parts := strings.Split(r.URL.Path, "/models/")
+		if len(parts) >= 2 {
+			lastTargetModel = strings.Split(parts[1], ":")[0]
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"candidates": [{"content": {"parts": [{"text": "OK"}]}}]}`))
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+	rp, _ := NewRouterProxy(cfgStore, "test-project", "us-central1")
+	rp.TokenSource = &mockTokenSource{}
+	rp.Target = backendURL
+	rp.Proxy.Transport = &mockRoundTripper{Target: backendURL}
+
+	// 1. Jev Engine with Simple Prompt
+	reqSimple := httptest.NewRequest("POST", "/v1/models/gemini-dynamic:generateContent?key=key-engine-test", strings.NewReader(`{"contents":[{"parts":[{"text":"Hello world!"}]}]}`))
+	rrSimple := httptest.NewRecorder()
+	rp.ServeHTTP(rrSimple, reqSimple)
+
+	if rrSimple.Code != http.StatusOK {
+		t.Fatalf("Jev simple failed: %d", rrSimple.Code)
+	}
+	if lastTargetModel != "gemini-3.5-flash-lite" {
+		t.Errorf("Jev simple expected gemini-3.5-flash-lite, got %s", lastTargetModel)
+	}
+	if rrSimple.Header().Get("X-Router-Engine-Used") != "jev" {
+		t.Errorf("expected engine jev, got %s", rrSimple.Header().Get("X-Router-Engine-Used"))
+	}
+
+	// 2. Jev Engine with Complex Code Prompt
+	reqComplex := httptest.NewRequest("POST", "/v1/models/gemini-dynamic:generateContent?key=key-engine-test", strings.NewReader("{\"contents\":[{\"parts\":[{\"text\":\"```go\\nfunc ComputeEigenvalues(m [][]float64) []float64 {\\nreturn nil\\n}\\n```\\nSolve the mathematical algorithm with O(N^3) time complexity.\"}]}]}"))
+	rrComplex := httptest.NewRecorder()
+	rp.ServeHTTP(rrComplex, reqComplex)
+
+	if rrComplex.Code != http.StatusOK {
+		t.Fatalf("Jev complex failed: %d", rrComplex.Code)
+	}
+	if lastTargetModel != "gemini-3.1-pro" {
+		t.Errorf("Jev complex expected gemini-3.1-pro, got %s", lastTargetModel)
+	}
+
+	// 3. Switch to CLM Engine via app config
+	app, _ := cfgStore.LookupApp("app-engines")
+	app.Complexity.Engine = "clm"
+	_ = cfgStore.SaveApp(ctx, app)
+
+	reqCLM := httptest.NewRequest("POST", "/v1/models/gemini-dynamic:generateContent?key=key-engine-test", strings.NewReader("{\"contents\":[{\"parts\":[{\"text\":\"```python\\ndef solve(): pass\\n```\\nAnalyze the asymptotic upper bound and proofs.\"}]}]}"))
+	rrCLM := httptest.NewRecorder()
+	rp.ServeHTTP(rrCLM, reqCLM)
+
+	if rrCLM.Code != http.StatusOK {
+		t.Fatalf("CLM failed: %d", rrCLM.Code)
+	}
+	if lastTargetModel != "gemini-3.1-pro" {
+		t.Errorf("CLM expected gemini-3.1-pro, got %s", lastTargetModel)
+	}
+	if rrCLM.Header().Get("X-Router-Engine-Used") != "clm" {
+		t.Errorf("expected engine clm, got %s", rrCLM.Header().Get("X-Router-Engine-Used"))
+	}
+}
+
+func TestIndividualModelsByOfferedLocation(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
+	ctx := context.Background()
+	cfgStore, err := store.NewConfigStore(ctx, "davenport-boutique")
+	if err != nil {
+		t.Fatalf("failed to init config store: %v", err)
+	}
+	_ = cfgStore.DeleteRule(ctx, "rule-1")
+	_ = cfgStore.DeleteHeader(ctx, "header-1")
+
+	_ = cfgStore.SaveClient(ctx, config.Client{ID: "client-model-loc-test", Tier: "premium"})
+	_ = cfgStore.SaveApp(ctx, config.App{
+		ID:       "app-model-loc-test",
+		ClientID: "client-model-loc-test",
+	})
+	_ = cfgStore.SaveKey(ctx, config.APIKey{
+		KeyHash: config.HashKey("key-model-loc-test"),
+		AppID:   "app-model-loc-test",
+		Status:  "active",
+	})
+
+	testCases := []struct {
+		model    string
+		location string
+	}{
+		// Gemini 3.8
+		{"gemini-3.8-flash", "global"},
+		{"gemini-3.8-flash", "us"},
+		{"gemini-3.8-flash", "us-central1"},
+		{"gemini-3.8-flash", "europe-west1"},
+
+		// Gemini 3.5
+		{"gemini-3.5-flash", "global"},
+		{"gemini-3.5-flash", "us"},
+		{"gemini-3.5-flash", "us-central1"},
+		{"gemini-3.5-flash", "europe-west9"},
+		{"gemini-3.5-flash", "europe-west1"},
+
+		{"gemini-3.5-flash-lite", "global"},
+		{"gemini-3.5-flash-lite", "us"},
+		{"gemini-3.5-flash-lite", "us-central1"},
+
+		// Gemini 3.1
+		{"gemini-3.1-pro", "global"},
+		{"gemini-3.1-pro", "us"},
+		{"gemini-3.1-pro", "us-central1"},
+
+		{"gemini-3.1-flash-lite", "global"},
+		{"gemini-3.1-flash-lite", "us"},
+		{"gemini-3.1-flash-lite", "us-central1"},
+
+		// Gemini 2.5
+		{"gemini-2.5-flash", "us-central1"},
+		{"gemini-2.5-flash", "us"},
+		{"gemini-2.5-flash", "global"},
+
+		{"gemini-2.5-pro", "us-central1"},
+		{"gemini-2.5-pro", "us"},
+		{"gemini-2.5-pro", "global"},
+
+		{"gemini-2.5-flash-lite", "us-central1"},
+		{"gemini-2.5-flash-lite", "us"},
+		{"gemini-2.5-flash-lite", "global"},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(fmt.Sprintf("%s_in_%s", tc.model, tc.location), func(t *testing.T) {
+			var capturedUpstreamPath string
+
+			backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				capturedUpstreamPath = r.URL.Path
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(`{"candidates": [{"content": {"parts": [{"text": "Hello from model test"}]}}]}`))
+			}))
+			defer backend.Close()
+
+			backendURL, _ := url.Parse(backend.URL)
+			rp, err := NewRouterProxy(cfgStore, "davenport-boutique", "us-central1")
+			if err != nil {
+				t.Fatalf("failed to create proxy: %v", err)
+			}
+			rp.TokenSource = &mockTokenSource{}
+			rp.Target = backendURL
+
+			// Capture the Director's target host before Transport rewrites to backend
+			var directorHost string
+			origDirector := rp.Proxy.Director
+			rp.Proxy.Director = func(req *http.Request) {
+				origDirector(req)
+				directorHost = req.Host
+			}
+
+			rp.Proxy.Transport = &mockRoundTripper{Target: backendURL}
+
+			// Configure explicit routing rule targeting model and location
+			ruleID := fmt.Sprintf("rule-%s-%s", tc.model, tc.location)
+			rule := config.RoutingRule{
+				ID:             ruleID,
+				AppID:          "app-model-loc-test",
+				ModelPattern:   tc.model,
+				ClientTier:     "all",
+				TargetModel:    tc.model,
+				TargetLocation: tc.location,
+				PriorityWeight: 10,
+			}
+			_ = cfgStore.SaveRule(ctx, rule)
+			defer cfgStore.DeleteRule(ctx, ruleID)
+
+			req := httptest.NewRequest("POST", fmt.Sprintf("/v1/models/%s:generateContent?key=key-model-loc-test", tc.model), strings.NewReader(`{"contents":[{"parts":[{"text":"ping"}]}]}`))
+			rr := httptest.NewRecorder()
+
+			rp.ServeHTTP(rr, req)
+
+			if rr.Code != http.StatusOK {
+				t.Fatalf("expected HTTP 200, got %d: %s", rr.Code, rr.Body.String())
+			}
+
+			// 1. Verify response headers
+			if routedModel := rr.Header().Get("X-Routed-Model"); routedModel != tc.model {
+				t.Errorf("X-Routed-Model mismatch: expected %q, got %q", tc.model, routedModel)
+			}
+			if routedLoc := rr.Header().Get("X-Routed-Model-Location"); routedLoc != tc.location {
+				t.Errorf("X-Routed-Model-Location mismatch: expected %q, got %q", tc.location, routedLoc)
+			}
+
+			// 2. Verify rewritten URL path
+			expectedPath := fmt.Sprintf("/v1/projects/davenport-boutique/locations/%s/publishers/google/models/%s:generateContent", tc.location, tc.model)
+			if capturedUpstreamPath != expectedPath {
+				t.Errorf("Upstream URL path mismatch:\nexpected: %s\ngot:      %s", expectedPath, capturedUpstreamPath)
+			}
+
+			// 3. Verify director target host
+			expectedHost := config.GetVertexEndpointHost(tc.location)
+			if tc.location != "us-central1" || config.IsMultiRegionOrGlobal(tc.location) {
+				if directorHost != expectedHost {
+					t.Errorf("Director target host mismatch: expected %q, got %q", expectedHost, directorHost)
+				}
+			}
+		})
+	}
+}
+
+func TestClusterQueue_CloseAndCancelOnDisconnect(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
+	ctx := context.Background()
+	cfgStore, err := store.NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to init store: %v", err)
+	}
+	_ = cfgStore.DeleteRule(ctx, "rule-1")
+	_ = cfgStore.DeleteHeader(ctx, "header-1")
+	_ = cfgStore.SaveClient(ctx, config.Client{ID: "c-q", Tier: "premium"})
+	_ = cfgStore.SaveApp(ctx, config.App{ID: "app-q", ClientID: "c-q", RPM: 100, TPM: 100000, Priority: "high"})
+	_ = cfgStore.SaveKey(ctx, config.APIKey{KeyHash: config.HashKey("key-q"), AppID: "app-q", Status: "active"})
+	_ = cfgStore.SaveModel(ctx, config.ModelConfig{ID: "gemma-4-9b", Location: "local-cluster", Active: true})
+
+	rp, err := NewRouterProxy(cfgStore, "test-project", "us-central1")
+	if err != nil {
+		t.Fatalf("failed to init proxy: %v", err)
+	}
+	defer rp.Queue.Close()
+
+	reqCtx, cancel := context.WithCancel(context.Background())
+	req := httptest.NewRequest("POST", "/v1/models/gemma-4-9b:generateContent?key=key-q", strings.NewReader(`{"contents":[{"parts":[{"text":"hi"}]}]}`)).WithContext(reqCtx)
+	rr := httptest.NewRecorder()
+
+	done := make(chan struct{})
+	go func() {
+		rp.ServeHTTP(rr, req)
+		close(done)
+	}()
+
+	// Wait until job is enqueued in rp.Queue
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if len(rp.Queue.GetQueueSnapshot()) == 1 {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if len(rp.Queue.GetQueueSnapshot()) != 1 {
+		t.Fatalf("expected 1 job in cluster queue before cancel")
+	}
+
+	// Cancel client context and verify job is removed from queue
+	cancel()
+	<-done
+
+	if len(rp.Queue.GetQueueSnapshot()) != 0 {
+		t.Errorf("expected cluster queue to be empty after client disconnect, got %d items", len(rp.Queue.GetQueueSnapshot()))
+	}
+}
+
+func TestProxyFallbackModelFailover(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
+	ctx := context.Background()
+	cfgStore, _ := store.NewConfigStore(ctx, "test-project")
+	_ = cfgStore.DeleteRule(ctx, "rule-1")
+	_ = cfgStore.DeleteHeader(ctx, "header-1")
+
+	_ = cfgStore.SaveClient(ctx, config.Client{ID: "c-fb", Tier: "premium"})
+	_ = cfgStore.SaveApp(ctx, config.App{ID: "app-fb", ClientID: "c-fb", RPM: 100, TPM: 100000})
+	_ = cfgStore.SaveKey(ctx, config.APIKey{KeyHash: config.HashKey("key-fb"), AppID: "app-fb", Status: "active"})
+	_ = cfgStore.SaveRule(ctx, config.RoutingRule{
+		ID:             "rule-fb",
+		AppID:          "app-fb",
+		ModelPattern:   "gemini-3.1-pro",
+		ClientTier:     "all",
+		TargetModel:    "gemini-3.1-pro",
+		TargetLocation: "us-central1",
+		FallbackModel:  "gemini-2.5-flash",
+		PriorityWeight: 10,
+	})
+
+	var requestedPaths []string
+	var mu sync.Mutex
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		requestedPaths = append(requestedPaths, r.URL.Path)
+		mu.Unlock()
+		if strings.Contains(r.URL.Path, "/models/gemini-3.1-pro:") {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte(`{"error":{"message":"primary model overloaded"}}`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"fallback response"}]}}]}`))
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+	rp, _ := NewRouterProxy(cfgStore, "test-project", "us-central1")
+	rp.TokenSource = &mockTokenSource{}
+	rp.Target = backendURL
+	rp.Proxy.Transport = &mockRoundTripper{Target: backendURL}
+
+	req := httptest.NewRequest("POST", "/v1/models/gemini-3.1-pro:generateContent?key=key-fb", strings.NewReader(`{"contents":[{"parts":[{"text":"hello"}]}]}`))
+	rr := httptest.NewRecorder()
+	rp.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK from fallback model, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if rr.Header().Get("X-Router-Fallback-Triggered") != "true" {
+		t.Errorf("expected X-Router-Fallback-Triggered=true, got %q", rr.Header().Get("X-Router-Fallback-Triggered"))
+	}
+	if rr.Header().Get("X-Routed-Model") != "gemini-2.5-flash" {
+		t.Errorf("expected X-Routed-Model=gemini-2.5-flash after failover, got %q", rr.Header().Get("X-Routed-Model"))
+	}
+}
+
+func TestProxyUnregisteredModelLocationSuffixStripping(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
+	ctx := context.Background()
+	cfgStore, _ := store.NewConfigStore(ctx, "test-project")
+	_ = cfgStore.DeleteRule(ctx, "rule-1")
+	_ = cfgStore.DeleteHeader(ctx, "header-1")
+
+	// Delete all seeded models so LookupActiveModel returns false
+	models, _ := cfgStore.GetAllModels(ctx)
+	for _, m := range models {
+		_ = cfgStore.DeleteModel(ctx, m.ID)
+	}
+
+	_ = cfgStore.SaveClient(ctx, config.Client{ID: "c-strip", Tier: "premium"})
+	_ = cfgStore.SaveApp(ctx, config.App{ID: "app-strip", ClientID: "c-strip", RPM: 100, TPM: 100000})
+	_ = cfgStore.SaveKey(ctx, config.APIKey{KeyHash: config.HashKey("key-strip"), AppID: "app-strip", Status: "active"})
+
+	var upstreamPath string
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamPath = r.URL.Path
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"candidates":[]}`))
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+	rp, _ := NewRouterProxy(cfgStore, "test-project", "us-central1")
+	rp.TokenSource = &mockTokenSource{}
+	rp.Target = backendURL
+	rp.Proxy.Transport = &mockRoundTripper{Target: backendURL}
+
+	req := httptest.NewRequest("POST", "/v1/models/gemini-3.8-flash@us:generateContent?key=key-strip", strings.NewReader(`{"contents":[{"parts":[{"text":"hi"}]}]}`))
+	rr := httptest.NewRecorder()
+	rp.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	if rr.Header().Get("X-Routed-Model") != "gemini-3.8-flash" {
+		t.Errorf("expected stripped model 'gemini-3.8-flash', got %q", rr.Header().Get("X-Routed-Model"))
+	}
+	if rr.Header().Get("X-Routed-Model-Location") != "us" {
+		t.Errorf("expected location 'us' from @us suffix, got %q", rr.Header().Get("X-Routed-Model-Location"))
+	}
+	if strings.Contains(upstreamPath, "@us") {
+		t.Errorf("upstream path should not contain @us suffix, got %q", upstreamPath)
+	}
+}
+
+func TestProxyLLMClassifierCacheAndLocationHost(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
+	ctx := context.Background()
+	cfgStore, _ := store.NewConfigStore(ctx, "test-project")
+	_ = cfgStore.DeleteRule(ctx, "rule-1")
+	_ = cfgStore.DeleteHeader(ctx, "header-1")
+
+	_ = cfgStore.SaveClient(ctx, config.Client{ID: "c-llm", Tier: "premium"})
+	_ = cfgStore.SaveApp(ctx, config.App{
+		ID:       "app-llm",
+		ClientID: "c-llm",
+		RPM:      100,
+		TPM:      100000,
+		Complexity: config.ComplexityRouting{
+			Enabled:          true,
+			Engine:           "llm",
+			UseLLMClassifier: true,
+			ClassifierModel:  "gemini-3.5-flash-lite@global",
+			SimpleModel:      "gemini-3.5-flash-lite",
+			MediumModel:      "gemini-3.8-flash",
+			ComplexModel:     "gemini-3.1-pro",
+		},
+	})
+	_ = cfgStore.SaveKey(ctx, config.APIKey{KeyHash: config.HashKey("key-llm"), AppID: "app-llm", Status: "active"})
+
+	var classifierCalls int
+	var classifierPaths []string
+	var mu sync.Mutex
+
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		if strings.Contains(r.URL.Path, "gemini-3.5-flash-lite") && classifierCalls == 0 {
+			classifierCalls++
+			classifierPaths = append(classifierPaths, r.URL.Path)
+			mu.Unlock()
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"{\"complexity\":\"medium\"}"}]}}]}`))
+			return
+		}
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"ok"}]}}]}`))
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+	rp, _ := NewRouterProxy(cfgStore, "test-project", "us-central1")
+	rp.TokenSource = &mockTokenSource{}
+	rp.Target = backendURL
+	rp.Proxy.Transport = &mockRoundTripper{Target: backendURL}
+	rp.ClassifierClient = backend.Client()
+
+	// Request 1: misses cache, invokes classifier
+	body := `{"contents":[{"parts":[{"text":"Summarize this quarterly report."}]}]}`
+	req1 := httptest.NewRequest("POST", "/v1/models/gemini-dynamic:generateContent?key=key-llm", strings.NewReader(body))
+	rr1 := httptest.NewRecorder()
+	rp.ServeHTTP(rr1, req1)
+	if rr1.Code != http.StatusOK {
+		t.Fatalf("req1 failed: %d", rr1.Code)
+	}
+
+	// Request 2: identical prompt -> should hit classifierCache without calling upstream classifier a second time
+	req2 := httptest.NewRequest("POST", "/v1/models/gemini-dynamic:generateContent?key=key-llm", strings.NewReader(body))
+	rr2 := httptest.NewRecorder()
+	rp.ServeHTTP(rr2, req2)
+	if rr2.Code != http.StatusOK {
+		t.Fatalf("req2 failed: %d", rr2.Code)
+	}
+
+	mu.Lock()
+	calls := classifierCalls
+	paths := classifierPaths
+	mu.Unlock()
+
+	if calls != 1 {
+		t.Errorf("expected classifier to be called once due to caching, got %d", calls)
+	}
+	if len(paths) > 0 && strings.Contains(paths[0], "@global") {
+		t.Errorf("expected @global suffix to be stripped from classifier URL path, got %q", paths[0])
+	}
+}
+
+func TestProxyOversizedBodyAndSafeJSONError(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
+	ctx := context.Background()
+	cfgStore, _ := store.NewConfigStore(ctx, "test-project")
+	_ = cfgStore.SaveClient(ctx, config.Client{ID: "c-err", Tier: "premium"})
+	_ = cfgStore.SaveApp(ctx, config.App{ID: "app-err", ClientID: "c-err", RPM: 100, TPM: 100000})
+	_ = cfgStore.SaveKey(ctx, config.APIKey{KeyHash: config.HashKey("key-err"), AppID: "app-err", Status: "active"})
+	_ = cfgStore.SaveHeader(ctx, config.CustomHeader{
+		ID:          "h-quote",
+		AppID:       "app-err",
+		Name:        "X-Quote-Header",
+		Description: `Must not break "JSON" encoding`,
+		Required:    true,
+	})
+
+	rp, _ := NewRouterProxy(cfgStore, "test-project", "us-central1")
+	rp.TokenSource = &mockTokenSource{}
+
+	// 1. Test missing header with quotes in description produces valid JSON
+	req1 := httptest.NewRequest("POST", "/v1/models/gemini-3.8-flash:generateContent?key=key-err", strings.NewReader(`{}`))
+	rr1 := httptest.NewRecorder()
+	rp.ServeHTTP(rr1, req1)
+	if rr1.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rr1.Code)
+	}
+	var errPayload map[string]interface{}
+	if err := json.Unmarshal(rr1.Body.Bytes(), &errPayload); err != nil {
+		t.Errorf("expected valid JSON error response when description contains quotes, got error %v on body: %s", err, rr1.Body.String())
+	}
+
+	// 2. Test reader error on body returns 413 Request Entity Too Large
+	errReader := &failingReader{err: fmt.Errorf("http: request body too large")}
+	req2 := httptest.NewRequest("POST", "/v1/models/gemini-3.8-flash:generateContent?key=key-err", errReader)
+	rr2 := httptest.NewRecorder()
+	rp.ServeHTTP(rr2, req2)
+	if rr2.Code != http.StatusRequestEntityTooLarge {
+		t.Errorf("expected 413 Request Entity Too Large on unreadable/oversized body, got %d", rr2.Code)
+	}
+}
+
+type failingReader struct {
+	err error
+}
+
+func (f *failingReader) Read(p []byte) (int, error) {
+	return 0, f.err
+}
+
+func TestProxyStickyTurnSessionPolicyE2E(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
+	ctx := context.Background()
+	cfgStore, _ := store.NewConfigStore(ctx, "test-project")
+	_ = cfgStore.DeleteRule(ctx, "rule-1")
+	_ = cfgStore.DeleteHeader(ctx, "header-1")
+
+	_ = cfgStore.SaveClient(ctx, config.Client{ID: "c-sticky", Tier: "premium"})
+	_ = cfgStore.SaveApp(ctx, config.App{
+		ID:       "app-sticky",
+		ClientID: "c-sticky",
+		RPM:      100,
+		TPM:      100000,
+		Complexity: config.ComplexityRouting{
+			Enabled:         true,
+			Engine:          "heuristics",
+			SimpleModel:     "gemini-3.5-flash-lite",
+			MediumModel:     "gemini-3.8-flash",
+			ComplexModel:    "gemini-3.1-pro",
+			SimpleCharLimit: 20,
+			MediumCharLimit: 80,
+		},
+	})
+	_ = cfgStore.SaveKey(ctx, config.APIKey{KeyHash: config.HashKey("key-sticky"), AppID: "app-sticky", Status: "active"})
+
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"ok"}]}}]}`))
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+	rp, _ := NewRouterProxy(cfgStore, "test-project", "us-central1")
+	rp.TokenSource = &mockTokenSource{}
+	rp.Target = backendURL
+	rp.Proxy.Transport = &mockRoundTripper{Target: backendURL}
+
+	sendTurn := func(prompt string) string {
+		body := fmt.Sprintf(`{"contents":[{"parts":[{"text":%q}]}]}`, prompt)
+		req := httptest.NewRequest("POST", "/v1/models/gemini-dynamic:generateContent?key=key-sticky", strings.NewReader(body))
+		req.Header.Set("X-Session-ID", "sess-sticky-e2e")
+		req.Header.Set("X-Session-Policy", "sticky-turn")
+		rr := httptest.NewRecorder()
+		rp.ServeHTTP(rr, req)
+		if rr.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+		}
+		return rr.Header().Get("X-Routed-Model")
+	}
+
+	// Turn 1: simple prompt -> gemini-3.5-flash-lite
+	if m := sendTurn("Hi"); m != "gemini-3.5-flash-lite" {
+		t.Fatalf("Turn 1 expected gemini-3.5-flash-lite, got %q", m)
+	}
+	// Turn 2: complex prompt (> 80 chars) -> upgrades immediately to gemini-3.1-pro
+	if m := sendTurn(strings.Repeat("Complex architectural analysis prompt ", 4)); m != "gemini-3.1-pro" {
+		t.Fatalf("Turn 2 expected upgrade to gemini-3.1-pro, got %q", m)
+	}
+	// Turn 3: simple prompt -> cooldown 1/3 keeps gemini-3.1-pro
+	if m := sendTurn("Thanks"); m != "gemini-3.1-pro" {
+		t.Fatalf("Turn 3 expected sticky lock to gemini-3.1-pro, got %q", m)
+	}
+	// Turn 4: simple prompt -> cooldown 2/3 keeps gemini-3.1-pro
+	if m := sendTurn("Ok"); m != "gemini-3.1-pro" {
+		t.Fatalf("Turn 4 expected sticky lock to gemini-3.1-pro, got %q", m)
+	}
+	// Turn 5: simple prompt -> cooldown 3/3 keeps gemini-3.1-pro
+	if m := sendTurn("Hold"); m != "gemini-3.1-pro" {
+		t.Fatalf("Turn 5 expected sticky lock to gemini-3.1-pro, got %q", m)
+	}
+	// Turn 6: simple prompt -> 3 turns elapsed since upgrade, controlled downgrade to gemini-3.5-flash-lite
+	if m := sendTurn("Bye"); m != "gemini-3.5-flash-lite" {
+		t.Fatalf("Turn 6 expected controlled downgrade to gemini-3.5-flash-lite, got %q", m)
+	}
+}
+
+func TestTDD_SmartRouting_FastinoAndContrastiveLMAndConditionalRules(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
+	ctx := context.Background()
+	cfgStore, err := store.NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to init config store: %v", err)
+	}
+	_ = cfgStore.DeleteHeader(ctx, "header-1")
+
+	_ = cfgStore.SaveClient(ctx, config.Client{ID: "client-fc", Tier: "premium"})
+	_ = cfgStore.SaveApp(ctx, config.App{
+		ID:       "app-fc",
+		ClientID: "client-fc",
+		Complexity: config.ComplexityRouting{
+			Enabled:      true,
+			Engine:       "fastino",
+			SimpleModel:  "gemini-3.5-flash-lite",
+			MediumModel:  "gemini-3.8-flash",
+			ComplexModel: "gemini-3.1-pro",
+		},
+	})
+	_ = cfgStore.SaveKey(ctx, config.APIKey{
+		KeyHash: config.HashKey("key-fc-test"),
+		AppID:   "app-fc",
+		Status:  "active",
+	})
+
+	var lastTargetModel string
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		parts := strings.Split(r.URL.Path, "/models/")
+		if len(parts) >= 2 {
+			lastTargetModel = strings.Split(parts[1], ":")[0]
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"candidates": [{"content": {"parts": [{"text": "OK"}]}}]}`))
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+	rp, _ := NewRouterProxy(cfgStore, "test-project", "us-central1")
+	rp.TokenSource = &mockTokenSource{}
+	rp.Target = backendURL
+	rp.Proxy.Transport = &mockRoundTripper{Target: backendURL}
+
+	// 1. Fastino Engine with simple prompt
+	reqFastinoSimple := httptest.NewRequest("POST", "/v1/models/gemini-dynamic:generateContent?key=key-fc-test", strings.NewReader(`{"contents":[{"parts":[{"text":"Hello!"}]}]}`))
+	rrFastinoSimple := httptest.NewRecorder()
+	rp.ServeHTTP(rrFastinoSimple, reqFastinoSimple)
+	if rrFastinoSimple.Code != http.StatusOK {
+		t.Fatalf("Fastino simple failed: %d: %s", rrFastinoSimple.Code, rrFastinoSimple.Body.String())
+	}
+	if lastTargetModel != "gemini-3.5-flash-lite" {
+		t.Errorf("Fastino simple expected gemini-3.5-flash-lite, got %s", lastTargetModel)
+	}
+	if rrFastinoSimple.Header().Get("X-Router-Engine-Used") != "fastino" {
+		t.Errorf("expected X-Router-Engine-Used=fastino, got %s", rrFastinoSimple.Header().Get("X-Router-Engine-Used"))
+	}
+
+	// 2. X-Router-Engine: contrastive-lm override with complex code prompt
+	reqCLM := httptest.NewRequest("POST", "/v1/models/gemini-dynamic:generateContent?key=key-fc-test", strings.NewReader("{\"contents\":[{\"parts\":[{\"text\":\"```go\\nfunc DistributedPaxos() {}\\n```\\nProve safety and liveness in O(N^2) message complexity.\"}]}]}"))
+	reqCLM.Header.Set("X-Router-Engine", "contrastive-lm")
+	rrCLM := httptest.NewRecorder()
+	rp.ServeHTTP(rrCLM, reqCLM)
+	if rrCLM.Code != http.StatusOK {
+		t.Fatalf("Contrastive-LM failed: %d", rrCLM.Code)
+	}
+	if lastTargetModel != "gemini-3.1-pro" {
+		t.Errorf("Contrastive-LM expected gemini-3.1-pro, got %s", lastTargetModel)
+	}
+	if rrCLM.Header().Get("X-Router-Engine-Used") != "contrastive-lm" {
+		t.Errorf("expected X-Router-Engine-Used=contrastive-lm, got %s", rrCLM.Header().Get("X-Router-Engine-Used"))
+	}
+
+	// 3. Conditional RoutingRule using ComplexityTier, DecisionEngine, and MinConfidence
+	_ = cfgStore.SaveRule(ctx, config.RoutingRule{
+		ID:             "rule-fastino-complex-override",
+		AppID:          "app-fc",
+		ModelPattern:   "*",
+		ClientTier:     "all",
+		ComplexityTier: "complex",
+		DecisionEngine: "fastino",
+		MinConfidence:  0.50,
+		TargetModel:    "gemini-2.5-pro",
+		TargetLocation: "us-central1",
+		PriorityWeight: 20,
+	})
+
+	reqRuleComplex := httptest.NewRequest("POST", "/v1/models/gemini-dynamic:generateContent?key=key-fc-test", strings.NewReader("{\"contents\":[{\"parts\":[{\"text\":\"```python\\ndef backprop(): pass\\n```\\nDerive the Hessian matrix and O(N^3) complexity step by step.\"}]}]}"))
+	rrRuleComplex := httptest.NewRecorder()
+	rp.ServeHTTP(rrRuleComplex, reqRuleComplex)
+	if rrRuleComplex.Code != http.StatusOK {
+		t.Fatalf("Rule complex failed: %d", rrRuleComplex.Code)
+	}
+	if lastTargetModel != "gemini-2.5-pro" {
+		t.Errorf("expected conditional rule to override complex Fastino prompt to gemini-2.5-pro, got %s", lastTargetModel)
+	}
+}
+
+func TestTDD_ContrastiveLMClusterDirectEndpointRouting(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
+	ctx := context.Background()
+	cfgStore, err := store.NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to init config store: %v", err)
+	}
+	_ = cfgStore.DeleteHeader(ctx, "header-1")
+
+	defer func() {
+		decision.SetEngineClusterConfig("contrastive-lm", "", "local", "")
+		decision.DeleteEngineSecret("contrastive-lm")
+	}()
+
+	var clusterHits int
+	var clusterAuth string
+	clmClusterSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		clusterHits++
+		clusterAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		// Force even a 2-character greeting to "complex" so we prove the cluster endpoint was used instead of local anchor scoring
+		_, _ = w.Write([]byte(`[
+			{"rank": 1, "candidate": "complex: deep reasoning and code", "prob": 0.98, "score": 15.0},
+			{"rank": 2, "candidate": "medium: standard summarization", "prob": 0.01, "score": 1.0},
+			{"rank": 3, "candidate": "simple: short greeting", "prob": 0.01, "score": 0.1}
+		]`))
+	}))
+	defer clmClusterSrv.Close()
+
+	// Register Contrastive-LM cluster in Providers["local"] and secret vault
+	decision.SetEngineSecret("contrastive-lm", "clm-cluster-bearer-token-9001")
+	localProv := config.ProviderConfig{
+		ID:          config.ProviderLocal,
+		DisplayName: "Local / Open-Weights Clusters",
+		Enabled:     true,
+	}
+	decision.ApplyDecisionProviderToLocalConfig(&localProv, "contrastive-lm", clmClusterSrv.URL, "cluster", "clm-cluster-default", "CLM_API_KEY")
+	if err := cfgStore.SaveProvider(ctx, localProv); err != nil {
+		t.Fatalf("failed to save local provider with CLM cluster: %v", err)
+	}
+
+	// Reset in-memory cluster config to verify RouterProxy syncs it dynamically from Store.GetAllProviders()["local"]
+	decision.SetEngineClusterConfig("contrastive-lm", "", "local", "")
+
+	_ = cfgStore.SaveClient(ctx, config.Client{ID: "client-clm-cluster", Tier: "premium"})
+	_ = cfgStore.SaveApp(ctx, config.App{
+		ID:       "app-clm-cluster",
+		ClientID: "client-clm-cluster",
+		Complexity: config.ComplexityRouting{
+			Enabled:      true,
+			Engine:       "contrastive-lm",
+			CLMEndpoint:  "", // Empty per-app endpoint: must resolve from Providers["local"] cluster registration
+			SimpleModel:  "gemini-3.5-flash-lite",
+			MediumModel:  "gemini-3.8-flash",
+			ComplexModel: "gemini-3.1-pro",
+		},
+	})
+	_ = cfgStore.SaveKey(ctx, config.APIKey{
+		KeyHash: config.HashKey("key-clm-cluster-test"),
+		AppID:   "app-clm-cluster",
+		Status:  "active",
+	})
+
+	var lastTargetModel string
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		parts := strings.Split(r.URL.Path, "/models/")
+		if len(parts) >= 2 {
+			lastTargetModel = strings.Split(parts[1], ":")[0]
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"candidates": [{"content": {"parts": [{"text": "OK"}]}}]}`))
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+	rp, _ := NewRouterProxy(cfgStore, "test-project", "us-central1")
+	rp.TokenSource = &mockTokenSource{}
+	rp.Target = backendURL
+	rp.Proxy.Transport = &mockRoundTripper{Target: backendURL}
+
+	req := httptest.NewRequest("POST", "/v1/models/gemini-dynamic:generateContent?key=key-clm-cluster-test", strings.NewReader(`{"contents":[{"parts":[{"text":"Hi"}]}]}`))
+	rr := httptest.NewRecorder()
+	rp.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if clusterHits != 1 {
+		t.Fatalf("expected Contrastive-LM cluster server to be called once, got %d", clusterHits)
+	}
+	if clusterAuth != "Bearer clm-cluster-bearer-token-9001" {
+		t.Errorf("expected Bearer clm-cluster-bearer-token-9001 sent to cluster runner, got %q", clusterAuth)
+	}
+	if lastTargetModel != "gemini-3.1-pro" {
+		t.Errorf("expected cluster rank response to route 'Hi' to complex model gemini-3.1-pro, got %s", lastTargetModel)
+	}
+}
+
+func TestTDD_OpenAIChatCompletionsAndModels(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
+	ctx := context.Background()
+
+	cfgStore, err := store.NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to init config store: %v", err)
+	}
+	_ = cfgStore.DeleteHeader(ctx, "header-1")
+
+	_ = cfgStore.SaveClient(ctx, config.Client{ID: "client-openai", Name: "OpenAI SDK Client", Tier: "premium"})
+	_ = cfgStore.SaveApp(ctx, config.App{
+		ID:       "app-openai",
+		ClientID: "client-openai",
+		Name:     "OpenAI Compatible App",
+		RPM:      500,
+		TPM:      500000,
+		Priority: "high",
+		Complexity: config.ComplexityRouting{
+			Enabled:                true,
+			Engine:                 "jev",
+			SimpleModel:            "gemini-3.5-flash-lite",
+			MediumModel:            "gemini-3.8-flash",
+			ComplexModel:           "gemini-3.1-pro",
+			ForceComplexTools:      true,
+			ForceComplexMultimodal: true,
+		},
+	})
+	_ = cfgStore.SaveKey(ctx, config.APIKey{
+		KeyHash:  config.HashKey("key-openai-test"),
+		AppID:    "app-openai",
+		ClientID: "client-openai",
+		Status:   "active",
+	})
+
+	var lastPath string
+	var lastQuery string
+	var lastReqBody []byte
+	var simulateToolResponse bool
+	var simulateStreamResponse bool
+	var simulateGzipResponse bool
+
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		lastPath = r.URL.Path
+		lastQuery = r.URL.RawQuery
+		lastReqBody, _ = io.ReadAll(r.Body)
+
+		if simulateGzipResponse {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("Content-Encoding", "gzip")
+			w.WriteHeader(http.StatusOK)
+			var gzBuf bytes.Buffer
+			gz := gzip.NewWriter(&gzBuf)
+			_, _ = gz.Write([]byte(`{
+				"candidates": [{
+					"content": {
+						"role": "model",
+						"parts": [{"text": "Hello from Gzipped Vertex AI!"}]
+					},
+					"finishReason": "STOP"
+				}],
+				"usageMetadata": {"promptTokenCount": 8, "candidatesTokenCount": 6, "totalTokenCount": 14}
+			}`))
+			_ = gz.Close()
+			_, _ = w.Write(gzBuf.Bytes())
+			return
+		}
+
+		if simulateStreamResponse {
+			w.Header().Set("Content-Type", "text/event-stream")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("data: {\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"Hello \"}]}}]}\n\n"))
+			_, _ = w.Write([]byte("data: {\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"from OpenAI stream!\"}]},\"finishReason\":\"STOP\"}],\"usageMetadata\":{\"promptTokenCount\":5,\"candidatesTokenCount\":4,\"totalTokenCount\":9}}\n\n"))
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if simulateToolResponse {
+			_, _ = w.Write([]byte(`{
+				"candidates": [{
+					"content": {
+						"role": "model",
+						"parts": [{
+							"functionCall": {
+								"name": "get_weather",
+								"args": {"location": "San Francisco, CA"}
+							}
+						}]
+					},
+					"finishReason": "STOP"
+				}],
+				"usageMetadata": {"promptTokenCount": 14, "candidatesTokenCount": 8, "totalTokenCount": 22}
+			}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{
+			"candidates": [{
+				"content": {
+					"role": "model",
+					"parts": [{"text": "Hello from Gemini Smart Router via OpenAI Spec!"}]
+				},
+				"finishReason": "STOP"
+			}],
+			"usageMetadata": {"promptTokenCount": 10, "candidatesTokenCount": 9, "totalTokenCount": 19}
+		}`))
+	}))
+	defer backend.Close()
+
+	backendURL, _ := url.Parse(backend.URL)
+	rp, err := NewRouterProxy(cfgStore, "test-project", "us-central1")
+	if err != nil {
+		t.Fatalf("failed to create RouterProxy: %v", err)
+	}
+	rp.TokenSource = &mockTokenSource{}
+	rp.Target = backendURL
+	rp.Proxy.Transport = &mockRoundTripper{Target: backendURL}
+
+	t.Run("OpenAI Non-Streaming Chat Completions with Dynamic Routing", func(t *testing.T) {
+		simulateToolResponse = false
+		simulateStreamResponse = false
+		openAIPayload := `{
+			"model": "gemini-dynamic",
+			"messages": [
+				{"role": "system", "content": "You are a concise assistant."},
+				{"role": "user", "content": "Hi"}
+			],
+			"temperature": 0.3,
+			"max_tokens": 128
+		}`
+		req := httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(openAIPayload))
+		req.Header.Set("Authorization", "Bearer key-openai-test")
+		req.Header.Set("Content-Type", "application/json")
+
+		rr := httptest.NewRecorder()
+		rp.ServeHTTP(rr, req)
+
+		if rr.Code != http.StatusOK {
+			t.Fatalf("expected 200 OK, got %d: %s", rr.Code, rr.Body.String())
+		}
+		if gotModel := rr.Header().Get("X-Routed-Model"); gotModel != "gemini-3.5-flash-lite" {
+			t.Errorf("expected X-Routed-Model=gemini-3.5-flash-lite for simple greeting, got %q", gotModel)
+		}
+		if !strings.Contains(lastPath, "/models/gemini-3.5-flash-lite:generateContent") {
+			t.Errorf("expected upstream path to target gemini-3.5-flash-lite:generateContent, got %q", lastPath)
+		}
+		if !strings.Contains(string(lastReqBody), "You are a concise assistant.") || !strings.Contains(string(lastReqBody), `"Hi"`) {
+			t.Errorf("expected translated Gemini payload to include systemInstruction and user content, got: %s", string(lastReqBody))
+		}
+
+		var chatResp struct {
+			ID      string `json:"id"`
+			Object  string `json:"object"`
+			Model   string `json:"model"`
+			Choices []struct {
+				Index   int `json:"index"`
+				Message struct {
+					Role    string `json:"role"`
+					Content string `json:"content"`
+				} `json:"message"`
+				FinishReason string `json:"finish_reason"`
+			} `json:"choices"`
+			Usage struct {
+				PromptTokens     int `json:"prompt_tokens"`
+				CompletionTokens int `json:"completion_tokens"`
+				TotalTokens      int `json:"total_tokens"`
+			} `json:"usage"`
+		}
+		if err := json.Unmarshal(rr.Body.Bytes(), &chatResp); err != nil {
+			t.Fatalf("failed to unmarshal OpenAI chat completion response: %v (body: %s)", err, rr.Body.String())
+		}
+		if chatResp.Object != "chat.completion" {
+			t.Errorf("expected object='chat.completion', got %q", chatResp.Object)
+		}
+		if chatResp.Model != "gemini-3.5-flash-lite" {
+			t.Errorf("expected model='gemini-3.5-flash-lite', got %q", chatResp.Model)
+		}
+		if len(chatResp.Choices) != 1 || chatResp.Choices[0].Message.Content != "Hello from Gemini Smart Router via OpenAI Spec!" {
+			t.Errorf("unexpected choices in OpenAI response: %+v", chatResp.Choices)
+		}
+		if chatResp.Usage.TotalTokens != 19 {
+			t.Errorf("expected total_tokens=19, got %d", chatResp.Usage.TotalTokens)
+		}
+	})
+
+	t.Run("OpenAI v1beta Path and Function Tool Calling", func(t *testing.T) {
+		simulateToolResponse = true
+		simulateStreamResponse = false
+		openAIToolPayload := `{
+			"model": "gemini-dynamic",
+			"messages": [
+				{"role": "user", "content": "What is the weather in San Francisco?"}
+			],
+			"tools": [
+				{
+					"type": "function",
+					"function": {
+						"name": "get_weather",
+						"description": "Get current weather for a location",
+						"parameters": {
+							"type": "object",
+							"properties": {
+								"location": {"type": "string"}
+							},
+							"required": ["location"]
+						}
+					}
+				}
+			]
+		}`
+		req := httptest.NewRequest("POST", "/v1beta/openai/chat/completions", strings.NewReader(openAIToolPayload))
+		req.Header.Set("Authorization", "Bearer key-openai-test")
+		req.Header.Set("Content-Type", "application/json")
+
+		rr := httptest.NewRecorder()
+		rp.ServeHTTP(rr, req)
+
+		if rr.Code != http.StatusOK {
+			t.Fatalf("expected 200 OK, got %d: %s", rr.Code, rr.Body.String())
+		}
+		// ForceComplexTools is true on app-openai, so presence of OpenAI tools must route to gemini-3.1-pro
+		if gotModel := rr.Header().Get("X-Routed-Model"); gotModel != "gemini-3.1-pro" {
+			t.Errorf("expected tool request to route to complex model gemini-3.1-pro, got %q", gotModel)
+		}
+
+		var toolResp struct {
+			Choices []struct {
+				Message struct {
+					Role      string `json:"role"`
+					ToolCalls []struct {
+						ID       string `json:"id"`
+						Type     string `json:"type"`
+						Function struct {
+							Name      string `json:"name"`
+							Arguments string `json:"arguments"`
+						} `json:"function"`
+					} `json:"tool_calls"`
+				} `json:"message"`
+				FinishReason string `json:"finish_reason"`
+			} `json:"choices"`
+		}
+		if err := json.Unmarshal(rr.Body.Bytes(), &toolResp); err != nil {
+			t.Fatalf("failed to unmarshal OpenAI tool call response: %v", err)
+		}
+		if len(toolResp.Choices) != 1 || len(toolResp.Choices[0].Message.ToolCalls) != 1 {
+			t.Fatalf("expected 1 tool call in OpenAI response, got: %s", rr.Body.String())
+		}
+		if toolResp.Choices[0].Message.ToolCalls[0].Function.Name != "get_weather" {
+			t.Errorf("expected tool call function name 'get_weather', got %q", toolResp.Choices[0].Message.ToolCalls[0].Function.Name)
+		}
+		if toolResp.Choices[0].FinishReason != "tool_calls" {
+			t.Errorf("expected finish_reason='tool_calls', got %q", toolResp.Choices[0].FinishReason)
+		}
+	})
+
+	t.Run("OpenAI Streaming Chat Completions SSE", func(t *testing.T) {
+		simulateToolResponse = false
+		simulateStreamResponse = true
+		openAIStreamPayload := `{
+			"model": "gemini-3.8-flash",
+			"messages": [{"role": "user", "content": "Stream hello"}],
+			"stream": true
+		}`
+		req := httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(openAIStreamPayload))
+		req.Header.Set("Authorization", "Bearer key-openai-test")
+		req.Header.Set("Content-Type", "application/json")
+
+		rr := httptest.NewRecorder()
+		rp.ServeHTTP(rr, req)
+
+		if rr.Code != http.StatusOK {
+			t.Fatalf("expected 200 OK for stream, got %d: %s", rr.Code, rr.Body.String())
+		}
+		if !strings.Contains(lastPath, ":streamGenerateContent") || !strings.Contains(lastQuery, "alt=sse") {
+			t.Errorf("expected upstream streamGenerateContent?alt=sse, got path=%q query=%q", lastPath, lastQuery)
+		}
+		bodyStr := rr.Body.String()
+		if !strings.Contains(bodyStr, `"object":"chat.completion.chunk"`) {
+			t.Errorf("expected SSE stream to contain chat.completion.chunk, got: %s", bodyStr)
+		}
+		if !strings.Contains(bodyStr, "from OpenAI stream!") {
+			t.Errorf("expected SSE stream to contain streamed text, got: %s", bodyStr)
+		}
+		if !strings.Contains(bodyStr, "data: [DONE]") {
+			t.Errorf("expected SSE stream to terminate with data: [DONE], got: %s", bodyStr)
+		}
+	})
+
+	t.Run("OpenAI Models List and Retrieve", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/v1/models", nil)
+		req.Header.Set("Authorization", "Bearer key-openai-test")
+		rr := httptest.NewRecorder()
+		rp.ServeHTTP(rr, req)
+
+		if rr.Code != http.StatusOK {
+			t.Fatalf("expected 200 OK on GET /v1/models, got %d: %s", rr.Code, rr.Body.String())
+		}
+		var listResp struct {
+			Object string `json:"object"`
+			Data   []struct {
+				ID      string `json:"id"`
+				Object  string `json:"object"`
+				OwnedBy string `json:"owned_by"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(rr.Body.Bytes(), &listResp); err != nil {
+			t.Fatalf("failed to unmarshal /v1/models response: %v", err)
+		}
+		if listResp.Object != "list" || len(listResp.Data) == 0 {
+			t.Errorf("expected object='list' and non-empty data, got: %s", rr.Body.String())
+		}
+		foundDynamic := false
+		for _, m := range listResp.Data {
+			if m.ID == "gemini-dynamic" {
+				foundDynamic = true
+				break
+			}
+		}
+		if !foundDynamic {
+			t.Errorf("expected GET /v1/models to include virtual model 'gemini-dynamic'")
+		}
+
+		// Also test GET /v1/models/gemini-3.8-flash single model retrieve
+		reqSingle := httptest.NewRequest("GET", "/v1/models/gemini-3.8-flash", nil)
+		reqSingle.Header.Set("Authorization", "Bearer key-openai-test")
+		rrSingle := httptest.NewRecorder()
+		rp.ServeHTTP(rrSingle, reqSingle)
+		if rrSingle.Code != http.StatusOK || !strings.Contains(rrSingle.Body.String(), `"id":"gemini-3.8-flash"`) {
+			t.Errorf("expected GET /v1/models/gemini-3.8-flash to return model object, got %d: %s", rrSingle.Code, rrSingle.Body.String())
+		}
+	})
+
+	t.Run("OpenAI Gzip Compressed Upstream Response Handling", func(t *testing.T) {
+		simulateToolResponse = false
+		simulateStreamResponse = false
+		simulateGzipResponse = true
+		defer func() { simulateGzipResponse = false }()
+
+		openAIReq := `{
+			"model": "gemini-dynamic",
+			"messages": [{"role": "user", "content": "Hi"}]
+		}`
+		req := httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(openAIReq))
+		req.Header.Set("Authorization", "Bearer key-openai-test")
+		req.Header.Set("Accept-Encoding", "gzip")
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+		rp.ServeHTTP(rr, req)
+
+		if rr.Code != http.StatusOK {
+			t.Fatalf("expected 200 OK, got %d: %s", rr.Code, rr.Body.String())
+		}
+		if rr.Header().Get("Content-Encoding") != "" {
+			t.Errorf("expected Content-Encoding header to be stripped after translating gzipped upstream response, got %q", rr.Header().Get("Content-Encoding"))
+		}
+		var oaiResp struct {
+			Object  string `json:"object"`
+			Choices []struct {
+				Message struct {
+					Content string `json:"content"`
+				} `json:"message"`
+			} `json:"choices"`
+		}
+		if err := json.Unmarshal(rr.Body.Bytes(), &oaiResp); err != nil {
+			t.Fatalf("failed to unmarshal OpenAI response from gzipped upstream: %v (raw: %s)", err, rr.Body.String())
+		}
+		if oaiResp.Object != "chat.completion" || len(oaiResp.Choices) == 0 || oaiResp.Choices[0].Message.Content != "Hello from Gzipped Vertex AI!" {
+			t.Errorf("expected translated OpenAI chat.completion from gzipped upstream, got: %s", rr.Body.String())
+		}
+	})
+}
+
+func TestNamedLocalClusterRoutingAndRunnerCapacityE2E(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
+
+	ctx := context.Background()
+	cfgStore, err := store.NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to initialize config store: %v", err)
+	}
+
+	// 1. Configure a named LocalCluster ("cluster-m4-pro") in Providers["local"]
+	localProv := config.ProviderConfig{
+		ID:          config.ProviderLocal,
+		DisplayName: "On-Premises Local Cluster",
+		Enabled:     true,
+		Regions: map[string]config.RegionConfig{
+			"local-cluster": {
+				Code:   "local-cluster",
+				Active: true,
+				LocalConfig: &config.LocalConfig{
+					Clusters: []config.LocalCluster{
+						{
+							ID:          "cluster-m4-pro",
+							Name:        "M4 Pro Studio Cluster",
+							QueueName:   "m4-pro-queue",
+							Description: "Dedicated Apple Silicon cluster for Gemma 4 26B",
+							MaxQueueAge: 90,
+						},
+					},
+				},
+			},
+		},
+	}
+	if err := cfgStore.SaveProvider(ctx, localProv); err != nil {
+		t.Fatalf("failed to save local provider: %v", err)
+	}
+
+	// 2. Register and update a runner assigned to "cluster-m4-pro" with custom capacity limits
+	if err := cfgStore.SaveRegisteredRunner(ctx, config.RunnerResponse{
+		Node: config.Node{
+			ID:                "node-m4-studio-1",
+			Name:              "M4 Max Studio Node",
+			Status:            "online",
+			MemoryAllocatedGB: 64,
+			ComputeGPUCores:   40,
+			SupportedModels:   []string{"gemma-4-26b"},
+			MaxModelSizeGB:    32,
+			MaxConcurrent:     4,
+		},
+		AssignedClusters: []string{"cluster-m4-pro"},
+	}); err != nil {
+		t.Fatalf("failed to save registered runner: %v", err)
+	}
+
+	// 3. Seed Client, App, API Key, and a Routing Rule targeting location "cluster-m4-pro"
+	_ = cfgStore.SaveClient(ctx, config.Client{ID: "client-m4", Tier: "premium"})
+	_ = cfgStore.SaveApp(ctx, config.App{ID: "app-m4", ClientID: "client-m4", Priority: "high", RPM: 100, TPM: 100000})
+	_ = cfgStore.SaveKey(ctx, config.APIKey{KeyHash: config.HashKey("key-m4-cluster"), AppID: "app-m4", ClientID: "client-m4", Status: "active"})
+	_ = cfgStore.DeleteRule(ctx, "rule-1")
+	_ = cfgStore.DeleteHeader(ctx, "header-1")
+
+	_ = cfgStore.SaveRule(ctx, config.RoutingRule{
+		ID:             "rule-m4-gemma4",
+		ModelPattern:   "gemma-4-26b",
+		ClientTier:     "all",
+		TargetModel:    "gemma-4-26b",
+		TargetLocation: "cluster-m4-pro",
+		PriorityWeight: 10,
+	})
+
+	q := NewClusterQueue(10, 5*time.Second)
+	rp, err := NewRouterProxy(cfgStore, "test-project", "us-central1")
+	if err != nil {
+		t.Fatalf("failed to initialize proxy: %v", err)
+	}
+	rp.Queue = q
+
+	// 4. Send request through RouterProxy.ServeHTTP
+	req := httptest.NewRequest("POST", "/v1/models/gemma-4-26b:generateContent?key=key-m4-cluster", strings.NewReader(`{"contents":[{"parts":[{"text":"Explain unified memory architecture"}]}]}`))
+	req.Header.Set("x-goog-api-key", "key-m4-cluster")
+	rr := httptest.NewRecorder()
+
+	done := make(chan struct{})
+	go func() {
+		rp.ServeHTTP(rr, req)
+		close(done)
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// 5. Verify a runner bound to a DIFFERENT cluster ("cluster-other") does not pick up the job
+	if jobOther, ok := q.Poll([]string{"gemma-4-26b"}, []string{"cluster-other"}); ok || jobOther != nil {
+		t.Fatalf("expected runner bound to cluster-other NOT to receive job for cluster-m4-pro")
+	}
+
+	// 6. Verify runner bound to "cluster-m4-pro" polls and resolves the job
+	job, ok := q.Poll([]string{"gemma-4-26b"}, []string{"cluster-m4-pro"})
+	if !ok || job == nil {
+		t.Fatalf("expected runner bound to cluster-m4-pro to poll job, but got none (rr.Code=%d, body=%s)", rr.Code, rr.Body.String())
+	}
+	if job.ClusterID != "cluster-m4-pro" {
+		t.Errorf("expected job.ClusterID='cluster-m4-pro', got %q", job.ClusterID)
+	}
+
+	q.Resolve(job.ID, config.QueueResult{
+		Payload:    []byte(`{"candidates":[{"content":{"parts":[{"text":"Unified memory shares high-bandwidth DRAM across CPU, GPU, and NPU."}]}}]}`),
+		StatusCode: http.StatusOK,
+	})
+
+	<-done
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK from proxy ServeHTTP, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if rr.Header().Get("X-Routed-Model-Location") != "cluster-m4-pro" {
+		t.Errorf("expected X-Routed-Model-Location='cluster-m4-pro', got %q", rr.Header().Get("X-Routed-Model-Location"))
+	}
+	if !strings.Contains(rr.Body.String(), "Unified memory shares high-bandwidth DRAM") {
+		t.Errorf("expected response body from cluster runner, got: %s", rr.Body.String())
+	}
+}
+
+func TestClusterQueuePollForNodeConcurrencyEnforcement(t *testing.T) {
+	q := NewClusterQueue(20, 10*time.Second)
+	defer q.Close()
+
+	for i := 1; i <= 3; i++ {
+		_, err := q.Enqueue(&config.QueueJob{
+			ID:        fmt.Sprintf("job-%d", i),
+			ClusterID: "cluster-a",
+			Model:     "gemma-4-4b",
+			Priority:  "high",
+			CreatedAt: time.Now(),
+		})
+		if err != nil {
+			t.Fatalf("failed to enqueue job-%d: %v", i, err)
+		}
+	}
+
+	// Node 1 has MaxConcurrent=2 -> can pop 2 jobs, 3rd poll must return false
+	j1, ok1 := q.PollForNode("node-1", []string{"gemma-4-4b"}, []string{"cluster-a"}, 2)
+	if !ok1 || j1 == nil || j1.AssignedNodeID != "node-1" {
+		t.Fatalf("expected node-1 to pop 1st job, got %v (ok=%v)", j1, ok1)
+	}
+	j2, ok2 := q.PollForNode("node-1", []string{"gemma-4-4b"}, []string{"cluster-a"}, 2)
+	if !ok2 || j2 == nil || j2.AssignedNodeID != "node-1" {
+		t.Fatalf("expected node-1 to pop 2nd job, got %v (ok=%v)", j2, ok2)
+	}
+	if j3, ok3 := q.PollForNode("node-1", []string{"gemma-4-4b"}, []string{"cluster-a"}, 2); ok3 || j3 != nil {
+		t.Fatalf("expected node-1 3rd poll to be blocked by MaxConcurrent=2, got %v", j3)
+	}
+
+	// Node 2 (different node) can still pop the 3rd job!
+	jNode2, okNode2 := q.PollForNode("node-2", []string{"gemma-4-4b"}, []string{"cluster-a"}, 1)
+	if !okNode2 || jNode2 == nil || jNode2.ID != "job-3" {
+		t.Fatalf("expected node-2 to pop job-3, got %v (ok=%v)", jNode2, okNode2)
+	}
+
+	// Resolving j1 frees a slot on node-1
+	q.Resolve(j1.ID, config.QueueResult{StatusCode: http.StatusOK})
+	_, _ = q.Enqueue(&config.QueueJob{
+		ID:        "job-4",
+		ClusterID: "cluster-a",
+		Model:     "gemma-4-4b",
+		Priority:  "high",
+		CreatedAt: time.Now(),
+	})
+	j4, ok4 := q.PollForNode("node-1", []string{"gemma-4-4b"}, []string{"cluster-a"}, 2)
+	if !ok4 || j4 == nil || j4.ID != "job-4" {
+		t.Fatalf("expected node-1 to pop job-4 after resolving j1, got %v (ok=%v)", j4, ok4)
+	}
+}
+
+func TestClusterQueueTierOrderingPerJobTTLAndSnapshot(t *testing.T) {
+	q := NewClusterQueue(20, 10*time.Second)
+	defer q.Close()
+
+	now := time.Now()
+	// Enqueue two high-priority jobs: free tier first, enterprise tier second
+	_, _ = q.Enqueue(&config.QueueJob{
+		ID:        "job-free",
+		ClusterID: "cluster-a",
+		AppID:     "app-free",
+		Model:     "gemma-4-4b",
+		Priority:  "high",
+		Tier:      "free",
+		CreatedAt: now,
+	})
+	_, _ = q.Enqueue(&config.QueueJob{
+		ID:        "job-ent",
+		ClusterID: "cluster-a",
+		AppID:     "app-ent",
+		Model:     "gemma-4-4b",
+		Priority:  "high",
+		Tier:      "enterprise",
+		CreatedAt: now.Add(10 * time.Millisecond),
+	})
+
+	// Enterprise tier job within the same priority bucket must be popped before Free tier job
+	first, ok := q.PollForNode("node-ent", []string{"gemma-4-4b"}, []string{"cluster-a"}, 2)
+	if !ok || first == nil || first.ID != "job-ent" {
+		t.Fatalf("expected enterprise tier job-ent to be popped before free tier job-free, got %v", first)
+	}
+
+	// Verify GetQueueSnapshot returns both in-flight ("processing") and queued ("queued") jobs
+	snap := q.GetQueueSnapshot()
+	if len(snap) != 2 {
+		t.Fatalf("expected 2 items in GetQueueSnapshot (1 processing, 1 queued), got %d", len(snap))
+	}
+	var sawProcessing, sawQueued bool
+	for _, item := range snap {
+		if item.QueueSource != "cluster" || item.ClusterID != "cluster-a" {
+			t.Errorf("expected QueueSource='cluster' and ClusterID='cluster-a', got %+v", item)
+		}
+		if item.Status == "processing" && item.AssignedNodeID == "node-ent" && item.AppID == "app-ent" {
+			sawProcessing = true
+		}
+		if item.Status == "queued" && item.AppID == "app-free" {
+			sawQueued = true
+		}
+	}
+	if !sawProcessing || !sawQueued {
+		t.Fatalf("expected both processing and queued snapshot items, got %+v", snap)
+	}
+
+	// Test per-job MaxAge TTL expiration
+	respCh, _ := q.Enqueue(&config.QueueJob{
+		ID:        "job-short-ttl",
+		ClusterID: "cluster-a",
+		Model:     "gemma-4-4b",
+		Priority:  "medium",
+		MaxAge:    20 * time.Millisecond,
+		CreatedAt: time.Now().Add(-50 * time.Millisecond),
+	})
+	q.cleanupExpiredJobs()
+	select {
+	case res := <-respCh:
+		if res.StatusCode != http.StatusGatewayTimeout {
+			t.Fatalf("expected 504 Gateway Timeout on per-job MaxAge expiry, got %d", res.StatusCode)
+		}
+	default:
+		t.Fatalf("expected expired job-short-ttl to receive timeout result on ResponseChan")
+	}
+}
+
+func TestRouterProxyClusterFallbackDirectEndpointAndOpenAIFormat(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
+
+	ctx := context.Background()
+	cfgStore, err := store.NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to init store: %v", err)
+	}
+
+	// Spin up a real local HTTP server acting as a DirectEndpoint (e.g., Ollama / vLLM / backup endpoint)
+	directBackend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id":"chatcmpl-direct","choices":[{"index":0,"message":{"role":"assistant","content":"Direct endpoint handled inference"}}],"usage":{"prompt_tokens":8,"completion_tokens":5,"total_tokens":13}}`))
+	}))
+	defer directBackend.Close()
+
+	// Configure 2 clusters:
+	// 1) "cluster-strict" with NO FallbackModel (must fail with 504 when queue times out)
+	// 2) "cluster-with-fallback" with FallbackModel="gemma-4-26b" and FallbackLocation="direct-vllm-ep"
+	// Plus DirectEndpoint "direct-vllm-ep" pointing to directBackend.URL
+	localProv := config.ProviderConfig{
+		ID:          config.ProviderLocal,
+		DisplayName: "Local Clusters",
+		Enabled:     true,
+		Regions: map[string]config.RegionConfig{
+			"local-cluster": {
+				Code:   "local-cluster",
+				Active: true,
+				LocalConfig: &config.LocalConfig{
+					Clusters: []config.LocalCluster{
+						{
+							ID:          "cluster-strict",
+							Name:        "Strict Local Cluster",
+							QueueName:   "strict-q",
+							MaxQueueAge: 50 * time.Millisecond,
+						},
+						{
+							ID:               "cluster-with-fallback",
+							Name:             "Cluster With User Fallback",
+							QueueName:        "fallback-q",
+							MaxQueueAge:      50 * time.Millisecond,
+							FallbackModel:    "gemma-4-26b",
+							FallbackLocation: "direct-vllm-ep",
+						},
+					},
+					DirectEndpoints: []config.DirectEndpoint{
+						{
+							ID:        "direct-vllm-ep",
+							Name:      "Direct vLLM Node",
+							URL:       directBackend.URL,
+							ModelName: "gemma-4-26b",
+							Engine:    "vllm",
+							Active:    true,
+							ClusterID: "direct-vllm-ep",
+						},
+					},
+				},
+			},
+		},
+	}
+	_ = cfgStore.SaveProvider(ctx, localProv)
+	_ = cfgStore.SaveClient(ctx, config.Client{ID: "cl-1", Tier: "enterprise"})
+	_ = cfgStore.SaveApp(ctx, config.App{ID: "app-1", ClientID: "cl-1", Priority: "high", RPM: 100, TPM: 100000})
+	_ = cfgStore.SaveKey(ctx, config.APIKey{KeyHash: config.HashKey("key-local-test"), AppID: "app-1", ClientID: "cl-1", Status: "active"})
+	_ = cfgStore.DeleteRule(ctx, "rule-1")
+	_ = cfgStore.DeleteHeader(ctx, "header-1")
+
+	// Rule 1: gemma-4-4b -> cluster-strict (no fallback)
+	_ = cfgStore.SaveRule(ctx, config.RoutingRule{
+		ID:             "rule-strict",
+		ModelPattern:   "gemma-4-4b",
+		ClientTier:     "all",
+		TargetModel:    "gemma-4-4b",
+		TargetLocation: "cluster-strict",
+		PriorityWeight: 10,
+	})
+	// Rule 2: gemma-4-31b -> cluster-with-fallback (falls back to gemma-4-26b @ direct-vllm-ep)
+	_ = cfgStore.SaveRule(ctx, config.RoutingRule{
+		ID:             "rule-fallback",
+		ModelPattern:   "gemma-4-31b",
+		ClientTier:     "all",
+		TargetModel:    "gemma-4-31b",
+		TargetLocation: "cluster-with-fallback",
+		PriorityWeight: 10,
+	})
+
+	q := NewClusterQueue(10, 50*time.Millisecond)
+	defer q.Close()
+	rp, err := NewRouterProxy(cfgStore, "test-project", "us-central1")
+	if err != nil {
+		t.Fatalf("failed to init proxy: %v", err)
+	}
+	rp.Queue = q
+
+	// Case A: Strict cluster with no runners and no FallbackModel -> must return 504 Gateway Timeout
+	reqStrict := httptest.NewRequest("POST", "/v1/models/gemma-4-4b:generateContent?key=key-local-test", strings.NewReader(`{"contents":[{"parts":[{"text":"hi"}]}]}`))
+	rrStrict := httptest.NewRecorder()
+	rp.ServeHTTP(rrStrict, reqStrict)
+	if rrStrict.Code != http.StatusGatewayTimeout {
+		t.Fatalf("expected 504 Gateway Timeout for strict cluster with no fallback, got %d: %s", rrStrict.Code, rrStrict.Body.String())
+	}
+
+	// Case B: Cluster with user-specified FallbackModel="gemma-4-26b" and FallbackLocation="direct-vllm-ep" -> falls back and succeeds!
+	reqFallback := httptest.NewRequest("POST", "/v1/models/gemma-4-31b:generateContent?key=key-local-test", strings.NewReader(`{"contents":[{"parts":[{"text":"hi"}]}]}`))
+	rrFallback := httptest.NewRecorder()
+	rp.ServeHTTP(rrFallback, reqFallback)
+	if rrFallback.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK via user-specified cluster fallback to direct endpoint, got %d: %s", rrFallback.Code, rrFallback.Body.String())
+	}
+	if rrFallback.Header().Get("X-Cluster-Fallback") != "true" {
+		t.Errorf("expected X-Cluster-Fallback='true' header, got %q", rrFallback.Header().Get("X-Cluster-Fallback"))
+	}
+	if !strings.Contains(rrFallback.Body.String(), "Direct endpoint handled inference") {
+		t.Errorf("expected fallback response from direct endpoint, got %s", rrFallback.Body.String())
+	}
+
+	// Case C: OpenAI /v1/chat/completions routed to local cluster queue translates Gemini runner payload back to OpenAI format
+	qOpenAI := NewClusterQueue(10, 2*time.Second)
+	defer qOpenAI.Close()
+	rp.Queue = qOpenAI
+	reqOAI := httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(`{"model":"gemma-4-4b","messages":[{"role":"user","content":"Hello OpenAI format"}]}`))
+	reqOAI.Header.Set("Authorization", "Bearer key-local-test")
+	rrOAI := httptest.NewRecorder()
+	doneOAI := make(chan struct{})
+	go func() {
+		rp.ServeHTTP(rrOAI, reqOAI)
+		close(doneOAI)
+	}()
+	time.Sleep(40 * time.Millisecond)
+	jobOAI, okOAI := qOpenAI.Poll([]string{"gemma-4-4b"}, []string{"cluster-strict"})
+	if !okOAI || jobOAI == nil {
+		t.Fatalf("expected OpenAI request to be enqueued on cluster-strict")
+	}
+	qOpenAI.Resolve(jobOAI.ID, config.QueueResult{
+		StatusCode: http.StatusOK,
+		Payload:    []byte(`{"candidates":[{"content":{"parts":[{"text":"Hello from Gemma 4 runner"}]}}]}`),
+	})
+	<-doneOAI
+	if rrOAI.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for OpenAI chat completion via cluster queue, got %d: %s", rrOAI.Code, rrOAI.Body.String())
+	}
+	if !strings.Contains(rrOAI.Body.String(), `"object":"chat.completion"`) || !strings.Contains(rrOAI.Body.String(), "Hello from Gemma 4 runner") {
+		t.Errorf("expected OpenAI chat.completion JSON response, got: %s", rrOAI.Body.String())
+	}
+}
+
+func TestTDD_StructuredLogEmittedOnAllProxyPaths(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", tempDir)
+
+	ctx := context.Background()
+	dbStore, err := store.NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to create store: %v", err)
+	}
+
+	directBackend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id":"chatcmpl-direct","choices":[{"index":0,"message":{"role":"assistant","content":"Direct response"}}],"usage":{"prompt_tokens":8,"completion_tokens":5,"total_tokens":13}}`))
+	}))
+	defer directBackend.Close()
+
+	localProv := config.ProviderConfig{
+		ID:          config.ProviderLocal,
+		DisplayName: "Local Clusters",
+		Enabled:     true,
+		Regions: map[string]config.RegionConfig{
+			"local-cluster": {
+				Code:   "local-cluster",
+				Active: true,
+				LocalConfig: &config.LocalConfig{
+					Clusters: []config.LocalCluster{
+						{
+							ID:          "cluster-strict-log",
+							Name:        "Strict Cluster Log",
+							QueueName:   "strict-log-q",
+							MaxQueueAge: 50 * time.Millisecond,
+						},
+						{
+							ID:               "cluster-fb-log",
+							Name:             "Fallback Cluster Log",
+							QueueName:        "fb-log-q",
+							MaxQueueAge:      50 * time.Millisecond,
+							FallbackModel:    "gemma-4-26b",
+							FallbackLocation: "ep-direct-log",
+						},
+					},
+					DirectEndpoints: []config.DirectEndpoint{
+						{
+							ID:        "ep-direct-log",
+							Name:      "Direct Endpoint Log",
+							URL:       directBackend.URL,
+							ModelName: "gemma-4-26b",
+							Engine:    "vllm",
+							Active:    true,
+							ClusterID: "ep-direct-log",
+						},
+					},
+				},
+			},
+		},
+	}
+	_ = dbStore.SaveProvider(ctx, localProv)
+	_ = dbStore.SaveClient(ctx, config.Client{ID: "client-log", Tier: "enterprise"})
+	_ = dbStore.SaveApp(ctx, config.App{ID: "app-log", ClientID: "client-log", Priority: "high", RPM: 100, TPM: 100000})
+	_ = dbStore.SaveKey(ctx, config.APIKey{KeyHash: config.HashKey("key-log-test"), AppID: "app-log", ClientID: "client-log", Status: "active"})
+	_ = dbStore.DeleteRule(ctx, "rule-1")
+	_ = dbStore.DeleteHeader(ctx, "header-1")
+
+	_ = dbStore.SaveRule(ctx, config.RoutingRule{
+		ID:             "rule-direct-log",
+		ModelPattern:   "gemma-4-26b",
+		ClientTier:     "all",
+		TargetModel:    "gemma-4-26b",
+		TargetLocation: "ep-direct-log",
+		PriorityWeight: 10,
+	})
+	_ = dbStore.SaveRule(ctx, config.RoutingRule{
+		ID:             "rule-strict-log",
+		ModelPattern:   "gemma-4-4b",
+		ClientTier:     "all",
+		TargetModel:    "gemma-4-4b",
+		TargetLocation: "cluster-strict-log",
+		PriorityWeight: 10,
+	})
+	_ = dbStore.SaveRule(ctx, config.RoutingRule{
+		ID:             "rule-fb-log",
+		ModelPattern:   "gemma-4-31b",
+		ClientTier:     "all",
+		TargetModel:    "gemma-4-31b",
+		TargetLocation: "cluster-fb-log",
+		PriorityWeight: 10,
+	})
+
+	q := NewClusterQueue(10, 50*time.Millisecond)
+	defer q.Close()
+	rp, err := NewRouterProxy(dbStore, "test-project", "us-central1")
+	if err != nil {
+		t.Fatalf("failed to init proxy: %v", err)
+	}
+	rp.Queue = q
+
+	readLogEntries := func(t *testing.T) []StructuredLog {
+		t.Helper()
+		logPath := tempDir + "/local_logs.jsonl"
+		raw, err := os.ReadFile(logPath)
+		if err != nil {
+			t.Fatalf("expected %s to exist and be readable, got err: %v", logPath, err)
+		}
+		lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
+		var out []StructuredLog
+		for _, line := range lines {
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
+			var sl StructuredLog
+			if err := json.Unmarshal([]byte(line), &sl); err != nil {
+				t.Fatalf("failed to unmarshal StructuredLog line %q: %v", line, err)
+			}
+			out = append(out, sl)
+		}
+		return out
+	}
+
+	// 1. Direct endpoint request -> must emit StructuredLog with status 200 and non-zero bytes
+	req1 := httptest.NewRequest("POST", "/v1/models/gemma-4-26b:generateContent?key=key-log-test", strings.NewReader(`{"contents":[{"parts":[{"text":"hi"}]}]}`))
+	rr1 := httptest.NewRecorder()
+	rp.ServeHTTP(rr1, req1)
+	if rr1.Code != http.StatusOK {
+		t.Fatalf("step 1 expected 200, got %d", rr1.Code)
+	}
+	logs := readLogEntries(t)
+	if len(logs) != 1 {
+		t.Fatalf("expected 1 StructuredLog entry after direct endpoint call, got %d", len(logs))
+	}
+	if logs[0].Status != http.StatusOK || logs[0].ModelOut != "gemma-4-26b" || logs[0].Client != "client-log" || logs[0].App != "app-log" || logs[0].BytesSent <= 0 {
+		t.Errorf("unexpected StructuredLog for direct endpoint: %+v", logs[0])
+	}
+
+	// 2. Cluster queue strict timeout (504) -> must emit StructuredLog with status 504
+	req2 := httptest.NewRequest("POST", "/v1/models/gemma-4-4b:generateContent?key=key-log-test", strings.NewReader(`{"contents":[{"parts":[{"text":"hi"}]}]}`))
+	rr2 := httptest.NewRecorder()
+	rp.ServeHTTP(rr2, req2)
+	if rr2.Code != http.StatusGatewayTimeout {
+		t.Fatalf("step 2 expected 504, got %d", rr2.Code)
+	}
+	logs = readLogEntries(t)
+	if len(logs) != 2 {
+		t.Fatalf("expected 2 StructuredLog entries after cluster timeout, got %d", len(logs))
+	}
+	if logs[1].Status != http.StatusGatewayTimeout || logs[1].ModelOut != "gemma-4-4b" {
+		t.Errorf("unexpected StructuredLog for cluster timeout: %+v", logs[1])
+	}
+
+	// 3. Cluster queue fallback to direct endpoint -> must emit StructuredLog with status 200 and fallback model
+	req3 := httptest.NewRequest("POST", "/v1/models/gemma-4-31b:generateContent?key=key-log-test", strings.NewReader(`{"contents":[{"parts":[{"text":"hi"}]}]}`))
+	rr3 := httptest.NewRecorder()
+	rp.ServeHTTP(rr3, req3)
+	if rr3.Code != http.StatusOK {
+		t.Fatalf("step 3 expected 200, got %d", rr3.Code)
+	}
+	logs = readLogEntries(t)
+	if len(logs) != 3 {
+		t.Fatalf("expected 3 StructuredLog entries after cluster fallback, got %d", len(logs))
+	}
+	if logs[2].Status != http.StatusOK || logs[2].ModelOut != "gemma-4-26b" || logs[2].BytesSent <= 0 {
+		t.Errorf("unexpected StructuredLog for cluster fallback: %+v", logs[2])
+	}
+
+	// 4. Cluster queue success -> must emit StructuredLog with status 200 and bytesWritten > 0
+	qSuccess := NewClusterQueue(10, 2*time.Second)
+	defer qSuccess.Close()
+	rp.Queue = qSuccess
+	req4 := httptest.NewRequest("POST", "/v1/models/gemma-4-4b:generateContent?key=key-log-test", strings.NewReader(`{"contents":[{"parts":[{"text":"hi"}]}]}`))
+	rr4 := httptest.NewRecorder()
+	done4 := make(chan struct{})
+	go func() {
+		rp.ServeHTTP(rr4, req4)
+		close(done4)
+	}()
+	time.Sleep(30 * time.Millisecond)
+	job4, ok4 := qSuccess.Poll([]string{"gemma-4-4b"}, []string{"cluster-strict-log"})
+	if !ok4 || job4 == nil {
+		t.Fatalf("expected cluster queue job to be polled")
+	}
+	qSuccess.Resolve(job4.ID, config.QueueResult{
+		StatusCode: http.StatusOK,
+		Payload:    []byte(`{"candidates":[{"content":{"parts":[{"text":"Cluster OK"}]}}]}`),
+	})
+	<-done4
+	logs = readLogEntries(t)
+	if len(logs) != 4 {
+		t.Fatalf("expected 4 StructuredLog entries after cluster success, got %d", len(logs))
+	}
+	if logs[3].Status != http.StatusOK || logs[3].ModelOut != "gemma-4-4b" || logs[3].BytesSent <= 0 {
+		t.Errorf("unexpected StructuredLog for cluster success: %+v", logs[3])
+	}
+
+	// 5. Early auth failure (401) -> must emit StructuredLog with status 401
+	req5 := httptest.NewRequest("POST", "/v1/models/gemini-2.5-flash:generateContent", strings.NewReader(`{"contents":[{"parts":[{"text":"hi"}]}]}`))
+	rr5 := httptest.NewRecorder()
+	rp.ServeHTTP(rr5, req5)
+	if rr5.Code != http.StatusUnauthorized {
+		t.Fatalf("step 5 expected 401, got %d", rr5.Code)
+	}
+	logs = readLogEntries(t)
+	if len(logs) != 5 {
+		t.Fatalf("expected 5 StructuredLog entries after 401 auth error, got %d", len(logs))
+	}
+	if logs[4].Status != http.StatusUnauthorized {
+		t.Errorf("unexpected StructuredLog for 401 error: %+v", logs[4])
+	}
+
+	// 6. GET /v1/models metadata discovery -> must NOT emit StructuredLog
+	req6 := httptest.NewRequest("GET", "/v1/models?key=key-log-test", nil)
+	rr6 := httptest.NewRecorder()
+	rp.ServeHTTP(rr6, req6)
+	if rr6.Code != http.StatusOK {
+		t.Fatalf("step 6 expected 200, got %d", rr6.Code)
+	}
+	logs = readLogEntries(t)
+	if len(logs) != 5 {
+		t.Fatalf("expected GET /v1/models not to emit StructuredLog, still 5 entries, got %d", len(logs))
+	}
+}
 
 
 

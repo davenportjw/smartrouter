@@ -18,6 +18,7 @@ templ RulesTab(rules []config.RoutingRule) {
 				<button
 					hx-get="/admin/rules/new"
 					hx-target="#modal-container"
+					onclick="document.querySelectorAll('[data-edit-row]').forEach(r => r.classList.remove('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30'))"
 					class="block rounded-md bg-blue-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-blue-500 transition"
 				>
 					Add Routing Rule
@@ -41,325 +42,368 @@ templ RulesTab(rules []config.RoutingRule) {
 			</div>
 		</div>
 
-		<!-- Rules Table -->
-		<div class="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
-			<div class="inline-block min-w-full align-middle">
-				<table class="min-w-full divide-y divide-gray-300">
-					<thead class="bg-gray-50">
-						<tr>
-							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Model Pattern</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Client Tier</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">App Boundary</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Header Condition</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Routed Model</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Location</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Fallback Target</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Priority Weight</th>
-							<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
-								<span class="sr-only">Actions</span>
-							</th>
-						</tr>
-					</thead>
-					<tbody class="divide-y divide-gray-200 bg-white">
-						if len(rules) == 0 {
+		<!-- Master-Detail Split View: Rules Table (Left) + Contextual Inspector Pane (Right) -->
+		<div data-layout="master-detail-split" class="flex flex-col lg:flex-row gap-6 items-start">
+			<!-- Left Master Pane: Rules Data Table -->
+			<div class="flex-1 min-w-0 w-full bg-white shadow-xs ring-1 ring-slate-900/5 sm:rounded-xl overflow-hidden">
+				<div class="overflow-x-auto">
+					<table class="min-w-full divide-y divide-gray-300">
+						<thead class="bg-gray-50">
 							<tr>
-								<td colspan="9" class="text-center py-8 text-sm text-gray-500 italic">
-									No routing rules active. All requests are mapped to their requested models directly.
-								</td>
+								<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Model Pattern</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Client Tier</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">App Boundary</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Header Condition</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Routed Model</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Location</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Fallback Target</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Priority Weight</th>
+								<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
+									<span class="sr-only">Actions</span>
+								</th>
 							</tr>
-						} else {
-							for _, item := range rules {
-								<tr class="hover:bg-gray-50 transition-colors">
-									<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6 font-mono font-semibold text-gray-900">
-										{ item.ModelPattern }
-									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm">
-										switch item.ClientTier {
-										case "all":
-											<span class="inline-flex items-center rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-800 ring-1 ring-inset ring-gray-600/20">
-												All Tiers
-											</span>
-										case "premium":
-											<span class="inline-flex items-center rounded-md bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10">
-												Premium
-											</span>
-										case "standard":
-											<span class="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
-												Standard
-											</span>
-										default:
-											<span class="inline-flex items-center rounded-md bg-yellow-50 px-2 py-1 text-xs font-medium text-yellow-800 ring-1 ring-inset ring-yellow-600/20">
-												Free
-											</span>
-										}
-									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm">
-										if item.AppID == "" || item.AppID == "all" {
-											<span class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
-												Global
-											</span>
-										} else {
-											<span class="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
-												{ item.AppID }
-											</span>
-										}
-									</td>
-									<td class="px-3 py-4 text-sm text-gray-600">
-										if item.HeaderName != "" {
-											<div class="flex flex-col font-mono text-xs">
-												<span class="font-semibold text-blue-600">{ item.HeaderName }</span>
-												if item.HeaderValue != "" {
-													<span class="text-gray-500">{ "== " + item.HeaderValue }</span>
-												} else {
-													<span class="text-gray-400 italic">(Present)</span>
-												}
-											</div>
-										} else {
-											<span class="text-gray-400 italic">None</span>
-										}
-									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900 font-medium font-mono text-xs">
-										{ item.TargetModel }
-									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 font-mono text-xs">
-										{ item.TargetLocation }
-									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 font-mono text-xs">
-										if item.FallbackModel != "" {
-											{ item.FallbackModel }
-										} else {
-											<span class="text-gray-400 italic">N/A</span>
-										}
-									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm text-center font-semibold text-gray-900">
-										{ intToString(item.PriorityWeight) }
-									</td>
-									<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-										<button
-											hx-get={ "/admin/rules/edit?id=" + item.ID }
-											hx-target="#modal-container"
-											class="text-blue-600 hover:text-blue-900 transition font-semibold mr-4"
-										>
-											Edit
-										</button>
-										<button
-											hx-delete={ "/admin/rules/delete?id=" + item.ID }
-											hx-confirm={ "Are you sure you want to remove routing rule for " + item.ModelPattern + "?" }
-											hx-target="closest tr"
-											hx-swap="outerHTML"
-											class="text-red-600 hover:text-red-900 transition font-semibold"
-										>
-											Delete
-										</button>
+						</thead>
+						<tbody class="divide-y divide-gray-200 bg-white">
+							if len(rules) == 0 {
+								<tr>
+									<td colspan="9" class="text-center py-8 text-sm text-gray-500 italic">
+										No routing rules active. All requests are mapped to their requested models directly.
 									</td>
 								</tr>
+							} else {
+								for _, item := range rules {
+									<tr data-edit-row={ item.ID } class="hover:bg-gray-50 transition-colors">
+										<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6 font-mono font-semibold text-gray-900">
+											{ item.ModelPattern }
+										</td>
+										<td class="whitespace-nowrap px-3 py-4 text-sm">
+											switch item.ClientTier {
+											case "all":
+												<span class="capitalize text-slate-700">All Tiers</span>
+											case "premium":
+												<span class="capitalize text-slate-700">Premium</span>
+											case "standard":
+												<span class="capitalize text-slate-700">Standard</span>
+											default:
+												<span class="capitalize text-slate-700">Free</span>
+											}
+										</td>
+										<td class="whitespace-nowrap px-3 py-4 text-sm">
+											if item.AppID == "" || item.AppID == "all" {
+												<span class="text-slate-600">Global</span>
+											} else {
+												<span class="font-mono text-xs text-slate-700">{ item.AppID }</span>
+											}
+										</td>
+										<td class="px-3 py-4 text-sm text-gray-600">
+											<div class="flex flex-col gap-1">
+												if item.HeaderName != "" {
+													<div class="flex flex-col font-mono text-xs">
+														<span class="font-semibold text-blue-600">{ item.HeaderName }</span>
+														if item.HeaderValue != "" {
+															<span class="text-gray-500">{ "== " + item.HeaderValue }</span>
+														} else {
+															<span class="text-gray-400 italic">(Present)</span>
+														}
+													</div>
+												}
+												if item.ComplexityTier != "" || item.DecisionEngine != "" || item.MinConfidence > 0 || item.TaskKind != "" {
+													<div class="flex flex-wrap gap-1 mt-0.5">
+														if item.DecisionEngine != "" {
+															<span class="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[11px] font-mono">{ "engine:" + item.DecisionEngine }</span>
+														}
+														if item.ComplexityTier != "" {
+															<span class="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[11px] font-mono">{ "tier:" + item.ComplexityTier }</span>
+														}
+														if item.MinConfidence > 0 {
+															<span class="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[11px] font-mono">{ "conf>=" + floatToString(item.MinConfidence) }</span>
+														}
+														if item.TaskKind != "" {
+															<span class="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[11px] font-mono">{ "task:" + item.TaskKind }</span>
+														}
+													</div>
+												}
+												if item.HeaderName == "" && item.ComplexityTier == "" && item.DecisionEngine == "" && item.MinConfidence <= 0 && item.TaskKind == "" {
+													<span class="text-gray-400 italic">None</span>
+												}
+											</div>
+										</td>
+										<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900 font-medium font-mono text-xs">
+											{ item.TargetModel }
+										</td>
+										<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 font-mono text-xs">
+											{ item.TargetLocation }
+										</td>
+										<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 font-mono text-xs">
+											if item.FallbackModel != "" {
+												{ item.FallbackModel }
+											} else {
+												<span class="text-gray-400 italic">N/A</span>
+											}
+										</td>
+										<td class="whitespace-nowrap px-3 py-4 text-sm text-center font-semibold text-gray-900">
+											{ intToString(item.PriorityWeight) }
+										</td>
+										<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+											<button
+												hx-get={ "/admin/rules/edit?id=" + item.ID }
+												hx-target="#modal-container"
+												onclick="document.querySelectorAll('[data-edit-row]').forEach(r => r.classList.remove('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30')); this.closest('tr').classList.add('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30')"
+												class="text-blue-600 hover:text-blue-900 transition font-semibold mr-4"
+											>
+												Edit
+											</button>
+											<button
+												hx-delete={ "/admin/rules/delete?id=" + item.ID }
+												hx-confirm={ "Are you sure you want to remove routing rule for " + item.ModelPattern + "?" }
+												hx-target="closest tr"
+												hx-swap="outerHTML"
+												class="text-red-600 hover:text-red-900 transition font-semibold"
+											>
+												Delete
+											</button>
+										</td>
+									</tr>
+								}
 							}
-						}
-					</tbody>
-				</table>
+						</tbody>
+					</table>
+				</div>
 			</div>
-		</div>
 
-		<!-- Modal Target Anchor -->
-		<div id="modal-container"></div>
+			<!-- Right Detail Inspector Pane -->
+			<aside id="modal-container" class="w-full lg:w-[440px] xl:w-[500px] shrink-0 lg:sticky lg:top-6 hidden [&:has(*)]:block"></aside>
+		</div>
 	</div>
 }
 
 templ RuleModal(apps []config.App, activeModels []config.ModelConfig, rule *config.RoutingRule) {
-	<!-- Modal backdrop -->
-	<div id="create-rule-modal" class="relative z-50" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-		<div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
-		
-		<div class="fixed inset-0 z-50 w-screen overflow-y-auto">
-			<div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-				
-				<!-- Modal Panel -->
-				<div class="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6 border border-gray-200">
-					<div class="absolute right-0 top-0 hidden pr-4 pt-4 sm:block">
-						<button
-							type="button"
-							onclick="document.getElementById('create-rule-modal').remove()"
-							class="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none"
-						>
-							<span class="sr-only">Close</span>
-							<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-							</svg>
-						</button>
+	<!-- Right-Hand Routing Rule Configuration Inspector Panel -->
+	<div id="create-rule-modal" class="rounded-xl bg-white shadow-md border border-slate-200 overflow-hidden max-h-[calc(100vh-5rem)] flex flex-col" aria-labelledby="modal-title" role="region">
+		<!-- Sticky Inspector Header Bar -->
+		<div class="bg-slate-100/90 border-b border-slate-200 px-5 py-3.5 flex items-center justify-between gap-3">
+			<div>
+				<div class="text-[11px] font-semibold uppercase tracking-wider text-blue-600">Routing Rule Inspector</div>
+				<h3 class="text-sm font-bold text-slate-900" id="modal-title">
+					if rule != nil {
+						Edit Dynamic Routing Rule
+					} else {
+						Add Dynamic Routing Rule
+					}
+				</h3>
+			</div>
+			<button
+				type="button"
+				onclick="document.querySelectorAll('[data-edit-row]').forEach(r => r.classList.remove('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30')); document.getElementById('create-rule-modal').remove()"
+				class="rounded-md p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 focus:outline-none transition"
+			>
+				<span class="sr-only">Close</span>
+				<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+				</svg>
+			</button>
+		</div>
+
+		<!-- Scrollable Inspector Body -->
+		<div class="p-5 overflow-y-auto">
+			<p class="text-xs text-gray-500">
+				if rule != nil {
+					Modify this smart target, client tier eligibility, and request priority weight constraints.
+				} else {
+					Define re-routing rules based on requested models, tiers, and application boundary constraints.
+				}
+			</p>
+
+			<form
+				hx-post="/admin/rules/create"
+				class="mt-4 space-y-4"
+			>
+				<div id="error-alert-container"></div>
+				if rule != nil {
+					<input type="hidden" name="id" value={ rule.ID } />
+				}
+				<div class="grid grid-cols-2 gap-4">
+					<div>
+						<label for="model_pattern" class="block text-xs font-medium text-gray-700">Model Request Pattern</label>
+						if rule != nil {
+							<input type="text" name="model_pattern" id="model_pattern" required value={ rule.ModelPattern } placeholder="e.g. * or gemini-2.5-pro" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
+						} else {
+							<input type="text" name="model_pattern" id="model_pattern" required placeholder="e.g. * or gemini-2.5-pro" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
+						}
 					</div>
-
-					<div class="sm:flex sm:items-start">
-						<div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
-							<h3 class="text-lg font-semibold leading-6 text-gray-900" id="modal-title">
-								if rule != nil {
-									Edit Dynamic Routing Rule
+					<div>
+						<label for="app_id" class="block text-xs font-medium text-gray-700">Target Application Scope</label>
+						<select name="app_id" id="app_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm">
+							if rule != nil && rule.AppID == "" {
+								<option value="" selected>Global (All Applications)</option>
+							} else {
+								<option value="">Global (All Applications)</option>
+							}
+							for _, a := range apps {
+								if rule != nil && rule.AppID == a.ID {
+									<option value={ a.ID } selected>{ a.Name } ({ a.ID })</option>
 								} else {
-									Add Dynamic Routing Rule
+									<option value={ a.ID }>{ a.Name } ({ a.ID })</option>
 								}
-							</h3>
-							<div class="mt-2">
-								<p class="text-xs text-gray-500">
-									if rule != nil {
-										Modify this smart target, client tier eligibility, and request priority weight constraints.
-									} else {
-										Define re-routing rules based on requested models, tiers, and application boundary constraints.
-									}
-								</p>
-							</div>
+							}
+						</select>
+					</div>
+				</div>
 
-							<form
-								hx-post="/admin/rules/create"
-								class="mt-6 space-y-4"
-							>
-								<div id="error-alert-container"></div>
-								if rule != nil {
-									<input type="hidden" name="id" value={ rule.ID } />
-								}
-								<div class="grid grid-cols-2 gap-4">
-									<div>
-										<label for="model_pattern" class="block text-xs font-medium text-gray-700">Model Request Pattern</label>
-										if rule != nil {
-											<input type="text" name="model_pattern" id="model_pattern" required value={ rule.ModelPattern } placeholder="e.g. * or gemini-2.5-pro" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
-										} else {
-											<input type="text" name="model_pattern" id="model_pattern" required placeholder="e.g. * or gemini-2.5-pro" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
-										}
-									</div>
-									<div>
-										<label for="app_id" class="block text-xs font-medium text-gray-700">Target Application Scope</label>
-										<select name="app_id" id="app_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm">
-											if rule != nil && rule.AppID == "" {
-												<option value="" selected>Global (All Applications)</option>
-											} else {
-												<option value="">Global (All Applications)</option>
-											}
-											for _, a := range apps {
-												if rule != nil && rule.AppID == a.ID {
-													<option value={ a.ID } selected>{ a.Name } ({ a.ID })</option>
-												} else {
-													<option value={ a.ID }>{ a.Name } ({ a.ID })</option>
-												}
-											}
-										</select>
-									</div>
-								</div>
+				<div class="grid grid-cols-2 gap-4">
+					<div>
+						<label for="client_tier" class="block text-xs font-medium text-gray-700">Client Tier Eligibility</label>
+						<select name="client_tier" id="client_tier" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm">
+							if rule != nil {
+								<option value="all" if rule.ClientTier == "all" { selected }>All Tiers</option>
+								<option value="free" if rule.ClientTier == "free" { selected }>Free Tier Only</option>
+								<option value="standard" if rule.ClientTier == "standard" { selected }>Standard Tier Only</option>
+								<option value="premium" if rule.ClientTier == "premium" { selected }>Premium Tier Only</option>
+							} else {
+								<option value="all">All Tiers</option>
+								<option value="free">Free Tier Only</option>
+								<option value="standard">Standard Tier Only</option>
+								<option value="premium">Premium Tier Only</option>
+							}
+						</select>
+					</div>
+					<div>
+						<label for="priority_weight" class="block text-xs font-medium text-gray-700">Priority Weight (1-10)</label>
+						if rule != nil {
+							<input type="number" name="priority_weight" id="priority_weight" min="1" max="10" value={ intToString(rule.PriorityWeight) } class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
+						} else {
+							<input type="number" name="priority_weight" id="priority_weight" min="1" max="10" value="1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
+						}
+					</div>
+				</div>
 
-								<div class="grid grid-cols-2 gap-4">
-									<div>
-										<label for="client_tier" class="block text-xs font-medium text-gray-700">Client Tier Eligibility</label>
-										<select name="client_tier" id="client_tier" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm">
-											if rule != nil {
-												<option value="all" if rule.ClientTier == "all" { selected }>All Tiers</option>
-												<option value="free" if rule.ClientTier == "free" { selected }>Free Tier Only</option>
-												<option value="standard" if rule.ClientTier == "standard" { selected }>Standard Tier Only</option>
-												<option value="premium" if rule.ClientTier == "premium" { selected }>Premium Tier Only</option>
-											} else {
-												<option value="all">All Tiers</option>
-												<option value="free">Free Tier Only</option>
-												<option value="standard">Standard Tier Only</option>
-												<option value="premium">Premium Tier Only</option>
-											}
-										</select>
-									</div>
-									<div>
-										<label for="priority_weight" class="block text-xs font-medium text-gray-700">Priority Weight (1-10)</label>
-										if rule != nil {
-											<input type="number" name="priority_weight" id="priority_weight" min="1" max="10" value={ intToString(rule.PriorityWeight) } class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
-										} else {
-											<input type="number" name="priority_weight" id="priority_weight" min="1" max="10" value="1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
-										}
-									</div>
-								</div>
+				<div class="bg-gray-50 rounded-md p-3 border border-slate-200 space-y-3">
+					<h4 class="text-xs font-bold uppercase tracking-wider text-gray-500">Header-Based Route Segmentation (Optional)</h4>
+					<div class="grid grid-cols-2 gap-3">
+						<div>
+							<label for="header_name" class="block text-[10px] font-medium text-gray-600">HTTP Header Name</label>
+							if rule != nil {
+								<input type="text" name="header_name" id="header_name" value={ rule.HeaderName } placeholder="e.g. X-Client-App-ID" class="mt-1 block w-full rounded-md bg-white border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-xs" />
+							} else {
+								<input type="text" name="header_name" id="header_name" placeholder="e.g. X-Client-App-ID" class="mt-1 block w-full rounded-md bg-white border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-xs" />
+							}
+						</div>
+						<div>
+							<label for="header_value" class="block text-[10px] font-medium text-gray-600">Value Match / Pattern</label>
+							if rule != nil {
+								<input type="text" name="header_value" id="header_value" value={ rule.HeaderValue } placeholder="e.g. prod-chat or /canary/" class="mt-1 block w-full rounded-md bg-white border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-xs" />
+							} else {
+								<input type="text" name="header_value" id="header_value" placeholder="e.g. prod-chat or /canary/" class="mt-1 block w-full rounded-md bg-white border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-xs" />
+							}
+						</div>
+					</div>
+					<p class="text-[10px] text-gray-400 leading-relaxed">
+						If header name is set, this rule only triggers when request contains it. Wrap value with slashes (e.g. <code class="bg-gray-100 text-gray-600 px-0.5 font-mono">/canary/</code>) to perform regex evaluation.
+					</p>
+				</div>
 
-								<div class="bg-gray-50 rounded-md p-3 border border-gray-150 space-y-3">
-									<h4 class="text-xs font-bold uppercase tracking-wider text-gray-500">Header-Based Route Segmentation (Optional)</h4>
-									<div class="grid grid-cols-2 gap-3">
-										<div>
-											<label for="header_name" class="block text-[10px] font-medium text-gray-600">HTTP Header Name</label>
-											if rule != nil {
-												<input type="text" name="header_name" id="header_name" value={ rule.HeaderName } placeholder="e.g. X-Client-App-ID" class="mt-1 block w-full rounded-md bg-white border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-xs" />
-											} else {
-												<input type="text" name="header_name" id="header_name" placeholder="e.g. X-Client-App-ID" class="mt-1 block w-full rounded-md bg-white border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-xs" />
-											}
-										</div>
-										<div>
-											<label for="header_value" class="block text-[10px] font-medium text-gray-600">Value Match / Pattern</label>
-											if rule != nil {
-												<input type="text" name="header_value" id="header_value" value={ rule.HeaderValue } placeholder="e.g. prod-chat or /canary/" class="mt-1 block w-full rounded-md bg-white border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-xs" />
-											} else {
-												<input type="text" name="header_value" id="header_value" placeholder="e.g. prod-chat or /canary/" class="mt-1 block w-full rounded-md bg-white border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-xs" />
-											}
-										</div>
-									</div>
-									<p class="text-[10px] text-gray-400 leading-relaxed">
-										If header name is set, this rule only triggers when request contains it. Wrap value with slashes (e.g. <code class="bg-gray-100 text-gray-600 px-0.5 font-mono">/canary/</code>) to perform regex evaluation.
-									</p>
-								</div>
-
-								<div class="grid grid-cols-2 gap-4">
-									<div>
-										<label for="target_model" class="block text-xs font-medium text-gray-700">Routed Target Model</label>
-										<select name="target_model" id="target_model" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm font-mono">
-											for _, m := range activeModels {
-												if rule != nil && rule.TargetModel == m.ID {
-													<option value={ m.ID } selected>{ m.DisplayName }</option>
-												} else {
-													<option value={ m.ID }>{ m.DisplayName }</option>
-												}
-											}
-										</select>
-									</div>
-									<div>
-										<label for="target_location" class="block text-xs font-medium text-gray-700">Target Location (GCP)</label>
-										if rule != nil {
-											<input type="text" name="target_location" id="target_location" required value={ rule.TargetLocation } class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm font-mono" />
-										} else {
-											<input type="text" name="target_location" id="target_location" required value="us-central1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm font-mono" />
-										}
-									</div>
-								</div>
-
-								<div class="grid grid-cols-1 gap-4">
-									<div>
-										<label for="fallback_model" class="block text-xs font-medium text-gray-700">Fallback Model (Optional)</label>
-										<select name="fallback_model" id="fallback_model" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm font-mono">
-											if rule != nil && rule.FallbackModel == "" {
-												<option value="" selected>None</option>
-											} else {
-												<option value="">None</option>
-											}
-											for _, m := range activeModels {
-												if rule != nil && rule.FallbackModel == m.ID {
-													<option value={ m.ID } selected>{ m.DisplayName }</option>
-												} else {
-													<option value={ m.ID }>{ m.DisplayName }</option>
-												}
-											}
-										</select>
-									</div>
-								</div>
-
-								<div class="mt-6 sm:mt-4 sm:flex sm:flex-row-reverse gap-3">
-									<button type="submit" class="inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:w-auto transition">
-										if rule != nil {
-											Save Routing Rule
-										} else {
-											Create Routing Rule
-										}
-									</button>
-									<button
-										type="button"
-										onclick="document.getElementById('create-rule-modal').remove()"
-										class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto transition"
-									>
-										Cancel
-									</button>
-								</div>
-							</form>
+				<div class="bg-indigo-50/40 rounded-md p-3 border border-indigo-200/80 space-y-3">
+					<h4 class="text-xs font-bold uppercase tracking-wider text-indigo-900">Classifier Decision Conditions (Optional)</h4>
+					<div class="grid grid-cols-2 gap-3">
+						<div>
+							<label for="decision_engine" class="block text-[10px] font-medium text-gray-600">Decision Engine Filter</label>
+							<select name="decision_engine" id="decision_engine" class="mt-1 block w-full rounded-md bg-white border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono">
+								<option value="" if rule == nil || rule.DecisionEngine == "" || rule.DecisionEngine == "all" { selected }>Any Engine</option>
+								<option value="jev" if rule != nil && rule.DecisionEngine == "jev" { selected }>Jev (SystemOne)</option>
+								<option value="fastino" if rule != nil && rule.DecisionEngine == "fastino" { selected }>Fastino (Pioneer)</option>
+								<option value="contrastive-lm" if rule != nil && (rule.DecisionEngine == "clm" || rule.DecisionEngine == "contrastive-lm") { selected }>Contrastive-LM (CLM)</option>
+								<option value="llm" if rule != nil && rule.DecisionEngine == "llm" { selected }>LLM Classifier</option>
+								<option value="heuristics" if rule != nil && rule.DecisionEngine == "heuristics" { selected }>Static Heuristics</option>
+							</select>
+						</div>
+						<div>
+							<label for="complexity_tier" class="block text-[10px] font-medium text-gray-600">Complexity Tier Match</label>
+							<select name="complexity_tier" id="complexity_tier" class="mt-1 block w-full rounded-md bg-white border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono">
+								<option value="" if rule == nil || rule.ComplexityTier == "" || rule.ComplexityTier == "all" { selected }>Any Tier</option>
+								<option value="simple" if rule != nil && rule.ComplexityTier == "simple" { selected }>Simple</option>
+								<option value="medium" if rule != nil && rule.ComplexityTier == "medium" { selected }>Medium</option>
+								<option value="complex" if rule != nil && rule.ComplexityTier == "complex" { selected }>Complex</option>
+							</select>
+						</div>
+						<div>
+							<label for="min_confidence" class="block text-[10px] font-medium text-gray-600">Min Confidence (0.0–1.0)</label>
+							if rule != nil && rule.MinConfidence > 0 {
+								<input type="number" step="0.05" min="0" max="1" name="min_confidence" id="min_confidence" value={ floatToString(rule.MinConfidence) } placeholder="0.75" class="mt-1 block w-full rounded-md bg-white border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono" />
+							} else {
+								<input type="number" step="0.05" min="0" max="1" name="min_confidence" id="min_confidence" placeholder="0.75" class="mt-1 block w-full rounded-md bg-white border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono" />
+							}
+						</div>
+						<div>
+							<label for="task_kind" class="block text-[10px] font-medium text-gray-600">Extracted Task Kind</label>
+							if rule != nil {
+								<input type="text" name="task_kind" id="task_kind" value={ rule.TaskKind } placeholder="code, triage, summarization" class="mt-1 block w-full rounded-md bg-white border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono" />
+							} else {
+								<input type="text" name="task_kind" id="task_kind" placeholder="code, triage, summarization" class="mt-1 block w-full rounded-md bg-white border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono" />
+							}
 						</div>
 					</div>
 				</div>
-				
-			</div>
+
+				<div class="grid grid-cols-2 gap-4">
+					<div>
+						<label for="target_model" class="block text-xs font-medium text-gray-700">Routed Target Model</label>
+						<select name="target_model" id="target_model" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm font-mono">
+							for _, m := range activeModels {
+								if rule != nil && rule.TargetModel == m.ID {
+									<option value={ m.ID } selected>{ m.DisplayName }</option>
+								} else {
+									<option value={ m.ID }>{ m.DisplayName }</option>
+								}
+							}
+						</select>
+					</div>
+					<div>
+						<label for="target_location" class="block text-xs font-medium text-gray-700">Target Location (GCP)</label>
+						if rule != nil {
+							<input type="text" name="target_location" id="target_location" required value={ rule.TargetLocation } class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm font-mono" />
+						} else {
+							<input type="text" name="target_location" id="target_location" required value="us-central1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm font-mono" />
+						}
+					</div>
+				</div>
+
+				<div class="grid grid-cols-1 gap-4">
+					<div>
+						<label for="fallback_model" class="block text-xs font-medium text-gray-700">Fallback Model (Optional)</label>
+						<select name="fallback_model" id="fallback_model" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm font-mono">
+							if rule != nil && rule.FallbackModel == "" {
+								<option value="" selected>None</option>
+							} else {
+								<option value="">None</option>
+							}
+							for _, m := range activeModels {
+								if rule != nil && rule.FallbackModel == m.ID {
+									<option value={ m.ID } selected>{ m.DisplayName }</option>
+								} else {
+									<option value={ m.ID }>{ m.DisplayName }</option>
+								}
+							}
+						</select>
+					</div>
+				</div>
+
+				<div class="mt-6 sm:mt-4 sm:flex sm:flex-row-reverse gap-3 border-t border-slate-200 pt-4">
+					<button type="submit" class="inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:w-auto transition">
+						if rule != nil {
+							Save Routing Rule
+						} else {
+							Create Routing Rule
+						}
+					</button>
+					<button
+						type="button"
+						onclick="document.querySelectorAll('[data-edit-row]').forEach(r => r.classList.remove('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30')); document.getElementById('create-rule-modal').remove()"
+						class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto transition"
+					>
+						Cancel
+					</button>
+				</div>
+			</form>
 		</div>
 	</div>
 }

@@ -1,5 +1,11 @@
 package templates
 
+import "strconv"
+
+func floatToString(val float64) string {
+	return strconv.FormatFloat(val, 'f', 2, 64)
+}
+
 // MetricsViewModel holds data to display in the Monitoring tab.
 type MetricsViewModel struct {
 	TotalRequests int
@@ -19,6 +25,7 @@ type CostTransaction struct {
 	ModelRouted   string  `json:"model_routed"`
 	InputTokens   int     `json:"input_tokens"`
 	OutputTokens  int     `json:"output_tokens"`
+	LatencyMs     int64   `json:"latency_ms"`
 	EstimatedCost float64 `json:"estimated_cost"`
 }
 
@@ -53,13 +60,16 @@ type CostsViewModel struct {
 
 // QueueSnapshotItem represents a request in the scheduling queue.
 type QueueSnapshotItem struct {
-	AppID       string `json:"app_id"`
-	Model       string `json:"model"`
-	Priority    string `json:"priority"`
-	Tier        string `json:"tier"`
-	Status      string `json:"status"`
-	ArrivalTime string `json:"arrival_time"`
-	DurationMs  int64  `json:"duration_ms"`
+	AppID          string `json:"app_id"`
+	Model          string `json:"model"`
+	Priority       string `json:"priority"`
+	Tier           string `json:"tier"`
+	Status         string `json:"status"`
+	ClusterID      string `json:"cluster_id,omitempty"`
+	AssignedNodeID string `json:"assigned_node_id,omitempty"`
+	QueueSource    string `json:"queue_source,omitempty"`
+	ArrivalTime    string `json:"arrival_time"`
+	DurationMs     int64  `json:"duration_ms"`
 }
 
 // DocItem represents a single markdown documentation file.

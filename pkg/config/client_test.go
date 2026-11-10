@@ -36,6 +36,10 @@ func TestAPIConfigStore(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/api/v1/cluster/queue/poll" && r.URL.Query().Get("empty") == "true" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		w.WriteHeader(http.StatusOK)
 
 		// Mock return payloads depending on path
@@ -66,6 +70,18 @@ func TestAPIConfigStore(t *testing.T) {
 			if r.Method == "GET" {
 				w.Write([]byte(`[{"id":"h-1","name":"X-Header"}]`))
 			}
+		case "/api/providers":
+			if r.Method == "GET" {
+				w.Write([]byte(`[{"id":"google","display_name":"Google Vertex AI","enabled":true}]`))
+			}
+		case "/api/v1/admin/runners":
+			if r.Method == "GET" {
+				w.Write([]byte(`[{"node":{"id":"run-1","name":"Runner 1","status":"online"},"assigned_clusters":["c-1"]}]`))
+			}
+		case "/api/v1/cluster/runners/heartbeat":
+			w.Write([]byte(`{"status":"ok","assigned_clusters":["c-1"]}`))
+		case "/api/v1/cluster/queue/poll":
+			w.Write([]byte(`{"id":"job-123","model":"gemma-4-9b","payload":"aGVsbG8="}`))
 		case "/api/queue":
 			w.Write([]byte(`[]`))
 		default:
@@ -301,6 +317,112 @@ func TestAPIConfigStore(t *testing.T) {
 		}
 		if len(status) != 0 {
 			t.Errorf("unexpected queue status response")
+		}
+	})
+
+	t.Run("GetAllProviders", func(t *testing.T) {
+		providers, err := store.GetAllProviders(ctx)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(providers) != 1 || providers[0].ID != ProviderGoogle {
+			t.Errorf("unexpected providers: %+v", providers)
+		}
+		if lastMethod != "GET" || lastPath != "/api/providers" {
+			t.Errorf("unexpected request: %s %s", lastMethod, lastPath)
+		}
+	})
+
+	t.Run("SaveProvider", func(t *testing.T) {
+		err := store.SaveProvider(ctx, ProviderConfig{ID: ProviderLocal, DisplayName: "Self Hosted"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if lastMethod != "POST" || lastPath != "/api/providers" {
+			t.Errorf("unexpected request: %s %s", lastMethod, lastPath)
+		}
+	})
+
+	t.Run("DeleteProvider", func(t *testing.T) {
+		err := store.DeleteProvider(ctx, "local")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if lastMethod != "DELETE" || lastPath != "/api/providers?id=local" {
+			t.Errorf("unexpected request: %s %s", lastMethod, lastPath)
+		}
+	})
+
+	t.Run("GetRegisteredRunnersAndGetAllRunners", func(t *testing.T) {
+		runners, err := store.GetRegisteredRunners(ctx)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(runners) != 1 || runners[0].Node.ID != "run-1" {
+			t.Errorf("unexpected runners: %+v", runners)
+		}
+		allRunners, err := store.GetAllRunners(ctx)
+		if err != nil || len(allRunners) != 1 {
+			t.Fatalf("GetAllRunners failed: %v", err)
+		}
+	})
+
+	t.Run("AttachRunnerToClusters", func(t *testing.T) {
+		err := store.AttachRunnerToClusters(ctx, "run-1", []string{"gemma-4-9b"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if lastMethod != "POST" || lastPath != "/api/v1/admin/runners/attach" {
+			t.Errorf("unexpected request: %s %s", lastMethod, lastPath)
+		}
+	})
+
+	t.Run("DeregisterRunner", func(t *testing.T) {
+		err := store.DeregisterRunner(ctx, "run-1")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if lastMethod != "DELETE" || lastPath != "/api/v1/admin/runners/deregister?id=run-1" {
+			t.Errorf("unexpected request: %s %s", lastMethod, lastPath)
+		}
+	})
+
+	t.Run("RegisterAndHeartbeatRunner", func(t *testing.T) {
+		err := store.RegisterRunner(ctx, Node{ID: "run-2", Name: "Node 2"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if lastMethod != "POST" || lastPath != "/api/v1/cluster/runners/register" {
+			t.Errorf("unexpected request: %s %s", lastMethod, lastPath)
+		}
+
+		assigned, err := store.HeartbeatRunner(ctx, Node{ID: "run-2", Status: "online"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(assigned) != 1 || assigned[0] != "c-1" {
+			t.Errorf("unexpected assigned clusters: %+v", assigned)
+		}
+		if lastMethod != "POST" || lastPath != "/api/v1/cluster/runners/heartbeat" {
+			t.Errorf("unexpected request: %s %s", lastMethod, lastPath)
+		}
+	})
+
+	t.Run("PollAndResolveQueueJob", func(t *testing.T) {
+		job, err := store.PollQueueJob(ctx, []string{"c-1"}, []string{"gemma-4-9b"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if job == nil || job.ID != "job-123" {
+			t.Errorf("unexpected job response: %+v", job)
+		}
+
+		err = store.ResolveQueueJob(ctx, "job-123", 200, `{"text":"hi"}`, "")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if lastMethod != "POST" || lastPath != "/api/v1/cluster/queue/resolve" {
+			t.Errorf("unexpected request: %s %s", lastMethod, lastPath)
 		}
 	})
 }

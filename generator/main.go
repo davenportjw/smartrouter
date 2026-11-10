@@ -6,15 +6,16 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
 	"net/http"
 	"os"
+	"sync/atomic"
 	"time"
 )
 
 var (
-	routerURL   string
-	clientKeys  = map[string]string{
+	routerURL    string
+	roundCounter uint64
+	clientKeys   = map[string]string{
 		"premium":  "gr_key_enterprise_123456789",
 		"standard": "gr_key_standard_987654321",
 		"free":     "gr_key_free_555555555",
@@ -49,16 +50,13 @@ type Part struct {
 func main() {
 	routerURL = os.Getenv("ROUTER_URL")
 	if routerURL == "" {
-		routerURL = "https://gemini-smart-router-txgsracloq-uc.a.run.app"
+		routerURL = "http://localhost:8080"
 	}
 
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
-
-	// Seed random generator
-	rand.Seed(time.Now().UnixNano())
 
 	// 1. Start background continuous traffic simulation loop
 	go runTrafficLoop()
@@ -75,7 +73,7 @@ func main() {
 
 func runTrafficLoop() {
 	log.Println("Background traffic simulation loop active.")
-	
+
 	// Wait a few seconds before initial round to let service settle
 	time.Sleep(5 * time.Second)
 
@@ -88,8 +86,9 @@ func runTrafficLoop() {
 			log.Printf("[Background Loop] Round completed successfully: %s", summary)
 		}
 
-		// Sleep for a randomized interval between 90 seconds and 240 seconds
-		sleepSec := 90 + rand.Intn(150)
+		// Deterministic interval cycle between 90 seconds and 240 seconds
+		step := int(atomic.LoadUint64(&roundCounter))
+		sleepSec := 90 + ((step * 37) % 150)
 		log.Printf("[Background Loop] Sleeping for %d seconds...", sleepSec)
 		time.Sleep(time.Duration(sleepSec) * time.Second)
 	}
@@ -132,55 +131,51 @@ func handleTrigger(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// executeSimulationRound selects a random client tier, model, headers, and sends requests
+// executeSimulationRound selects a deterministic client tier, model, headers, and sends requests
 func executeSimulationRound() (string, error) {
-	// 1. Choose Client Tier
-	// Weighted choice: Premium (60%), Standard (25%), Free (10%), Invalid (5%)
+	step := int(atomic.AddUint64(&roundCounter, 1))
+
+	// 1. Choose Client Tier deterministically (20-step cycle: 12 premium, 5 standard, 2 free, 1 invalid)
 	clientTier := "premium"
-	roll := rand.Float64()
-	if roll < 0.05 {
+	tierBucket := step % 20
+	if tierBucket == 0 {
 		clientTier = "invalid"
-	} else if roll < 0.15 {
+	} else if tierBucket <= 2 {
 		clientTier = "free"
-	} else if roll < 0.40 {
+	} else if tierBucket <= 7 {
 		clientTier = "standard"
 	}
 
-	// 2. Choose Model and Prompt
-	// Weighted choice for model:
-	// - 30%: Virtual model "gemini-dynamic" (triggers dynamic complexity routing)
-	// - 15%: "gemini-1.5-pro" (triggers rules-based dynamic routing with headers)
-	// - 40%: "gemini-2.5-flash"
-	// - 15%: "gemini-2.5-pro"
+	// 2. Choose Model and Prompt deterministically
 	var model string
 	var prompt string
 	var customHeaders map[string]string
 
-	modelRoll := rand.Float64()
-	if modelRoll < 0.30 {
+	modelBucket := step % 20
+	if modelBucket < 6 {
 		model = "gemini-dynamic"
 		// Vary prompt length to exercise simple/medium/complex complexity routing bands
-		promptRoll := rand.Float64()
-		if promptRoll < 0.33 {
+		switch step % 3 {
+		case 0:
 			prompt = "Hi" // simple
-		} else if promptRoll < 0.66 {
+		case 1:
 			prompt = "Explain the core difference between sync and async coding." // medium
-		} else {
+		default:
 			prompt = "Write a highly complex concurrent thread-safe scheduler pipeline in Go, providing robust comments and analysis." // complex
 		}
-	} else if modelRoll < 0.45 {
-		model = "gemini-1.5-pro"
-		prompt = prompts[rand.Intn(len(prompts))]
-		// Set rule header with 50% probability to trigger the custom VIP rule
-		if rand.Float64() < 0.50 {
+	} else if modelBucket < 9 {
+		model = "gemini-3.1-pro"
+		prompt = prompts[step%len(prompts)]
+		// Set rule header on alternate steps to trigger the custom VIP rule
+		if step%2 == 0 {
 			customHeaders = map[string]string{"X-Route-Priority": "gold"}
 		}
-	} else if modelRoll < 0.85 {
-		model = "gemini-2.5-flash"
-		prompt = prompts[rand.Intn(len(prompts))]
+	} else if modelBucket < 17 {
+		model = "gemini-3.8-flash"
+		prompt = prompts[step%len(prompts)]
 	} else {
-		model = "gemini-2.5-pro"
-		prompt = prompts[rand.Intn(len(prompts))]
+		model = "gemini-3.1-pro"
+		prompt = prompts[step%len(prompts)]
 	}
 
 	if clientTier == "invalid" {
@@ -188,8 +183,8 @@ func executeSimulationRound() (string, error) {
 		return sendRequest("gr_key_bad_invalid_key", model, prompt, "script-runner-1", false, customHeaders)
 	} else if clientTier == "free" {
 		// Test Free Tier client
-		// Occasionally (30% of the time) trigger a rate limit (429) by sending 6 requests in a quick burst!
-		if rand.Float64() < 0.30 {
+		// Every 3rd free tier round, trigger a rate limit (429) by sending 6 requests in a quick burst!
+		if step%3 == 0 {
 			log.Println("[Simulate] Simulating burst on Free Tier to trigger rate limits...")
 			var burstSummary string
 			for i := 0; i < 6; i++ {
@@ -207,20 +202,20 @@ func executeSimulationRound() (string, error) {
 	}
 
 	// Premium or Standard
-	// Roll for custom header validation:
-	// - 80%: Valid header
-	// - 10%: Invalid header value (triggers regex failure)
-	// - 10%: Missing custom header (triggers required failure)
-	headerRoll := rand.Float64()
+	// Deterministic cycle for custom header validation:
+	// - 8/10: Valid header
+	// - 1/10: Invalid header value (triggers regex failure)
+	// - 1/10: Missing custom header (triggers required failure)
+	headerBucket := step % 10
 	key := clientKeys[clientTier]
 	appID := "prod-app-main"
 	if clientTier == "standard" {
 		appID = "stage-web-ui"
 	}
 
-	if headerRoll < 0.80 {
+	if headerBucket < 8 {
 		return sendRequest(key, model, prompt, appID, false, customHeaders)
-	} else if headerRoll < 0.90 {
+	} else if headerBucket == 8 {
 		// Regex is ^[a-zA-Z0-9-]+$
 		invalidAppID := "app_with_underscores!"
 		return sendRequest(key, model, prompt, invalidAppID, false, customHeaders)

@@ -18,6 +18,7 @@ templ ClientsTab(clients []config.Client) {
 				<button
 					hx-get="/admin/clients/new"
 					hx-target="#modal-container"
+					onclick="document.querySelectorAll('[data-edit-row]').forEach(r => r.classList.remove('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30'))"
 					class="block rounded-md bg-blue-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-blue-500 transition"
 				>
 					Add Client Organization
@@ -26,7 +27,7 @@ templ ClientsTab(clients []config.Client) {
 		</div>
 
 		<!-- Premium Architecture Explanation Card -->
-		<div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5 shadow-xs">
+		<div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5 shadow-sm">
 			<div class="flex gap-4">
 				<div class="flex-shrink-0 p-2 bg-blue-500 text-white rounded-lg self-start">
 					<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
@@ -56,230 +57,222 @@ templ ClientsTab(clients []config.Client) {
 			</div>
 		</div>
 
-		<!-- Clients Data Table -->
-		<div class="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
-			<div class="inline-block min-w-full align-middle">
-				<table class="min-w-full divide-y divide-gray-300">
-					<thead class="bg-gray-50">
-						<tr>
-							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Organization Name</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Client ID (Slug)</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Billing Tier</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Priority Profile</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Fallback Limits (RPM/TPM)</th>
-							<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
-								<span class="sr-only">Actions</span>
-							</th>
-						</tr>
-					</thead>
-					<tbody class="divide-y divide-gray-200 bg-white">
-						if len(clients) == 0 {
+		<!-- Master-Detail Split View: Clients Table (Left) + Contextual Inspector Pane (Right) -->
+		<div data-layout="master-detail-split" class="flex flex-col lg:flex-row gap-6 items-start">
+			<!-- Left Master Pane: Clients Data Table -->
+			<div class="flex-1 min-w-0 w-full bg-white shadow-xs ring-1 ring-slate-900/5 sm:rounded-xl overflow-hidden">
+				<div class="overflow-x-auto">
+					<table class="min-w-full divide-y divide-gray-300">
+						<thead class="bg-gray-50">
 							<tr>
-								<td colspan="6" class="text-center py-8 text-sm text-gray-500 italic">
-									No Client Organizations configured. Please add an organization.
-								</td>
+								<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Organization Name</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Client ID (Slug)</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Billing Tier</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Priority Profile</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Fallback Limits (RPM/TPM)</th>
+								<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
+									<span class="sr-only">Actions</span>
+								</th>
 							</tr>
-						} else {
-							for _, client := range clients {
-								<tr class="hover:bg-gray-50 transition-colors">
-									<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6 font-semibold text-gray-900">
-										{ client.Name }
-									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm font-mono text-gray-500 text-xs">
-										{ client.ID }
-									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm">
-										<span class={ "inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset " + getTierBadgeStyle(client.Tier) }>
-											{ client.Tier }
-										</span>
-									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm">
-										<span class={ "inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset " + getPriorityBadgeStyle(client.Priority) }>
-											{ client.Priority }
-										</span>
-									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-mono text-xs">
-										<span class="font-semibold text-gray-950">{ intToString(client.RPM) }</span> RPM /
-										<span class="font-semibold text-gray-950">{ intToString(client.TPM) }</span> TPM
-									</td>
-									<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-										<button
-											hx-get={ "/admin/clients/edit?id=" + client.ID }
-											hx-target="#modal-container"
-											class="text-blue-600 hover:text-blue-900 transition font-semibold mr-4"
-										>
-											Edit
-										</button>
-										<button
-											hx-delete={ "/admin/clients/delete?id=" + client.ID }
-											hx-confirm={ "Are you sure you want to remove client organization " + client.Name + "? This will orphan any bound applications." }
-											hx-target="closest tr"
-											hx-swap="outerHTML"
-											class="text-red-600 hover:text-red-900 transition font-semibold"
-										>
-											Delete
-										</button>
+						</thead>
+						<tbody class="divide-y divide-gray-200 bg-white">
+							if len(clients) == 0 {
+								<tr>
+									<td colspan="6" class="text-center py-8 text-sm text-gray-500 italic">
+										No Client Organizations configured. Please add an organization.
 									</td>
 								</tr>
+							} else {
+								for _, client := range clients {
+									<tr data-edit-row={ client.ID } class="hover:bg-gray-50 transition-colors">
+										<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6 font-semibold text-gray-900">
+											{ client.Name }
+										</td>
+										<td class="whitespace-nowrap px-3 py-4 text-sm font-mono text-gray-500 text-xs">
+											{ client.ID }
+										</td>
+										<td class="whitespace-nowrap px-3 py-4 text-sm">
+											<span class={ "inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset " + getTierBadgeStyle(client.Tier) }>
+												{ client.Tier }
+											</span>
+										</td>
+										<td class="whitespace-nowrap px-3 py-4 text-sm">
+											<span class="capitalize text-slate-700 font-medium">{ client.Priority }</span>
+										</td>
+										<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-mono text-xs">
+											<span class="font-semibold text-gray-950">{ intToString(client.RPM) }</span> RPM /
+											<span class="font-semibold text-gray-950">{ intToString(client.TPM) }</span> TPM
+										</td>
+										<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+											<button
+												hx-get={ "/admin/clients/edit?id=" + client.ID }
+												hx-target="#modal-container"
+												onclick="document.querySelectorAll('[data-edit-row]').forEach(r => r.classList.remove('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30')); this.closest('tr').classList.add('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30')"
+												class="text-blue-600 hover:text-blue-900 transition font-semibold mr-4"
+											>
+												Edit
+											</button>
+											<button
+												hx-delete={ "/admin/clients/delete?id=" + client.ID }
+												hx-confirm={ "Are you sure you want to remove client organization " + client.Name + "? This will orphan any bound applications." }
+												hx-target="closest tr"
+												hx-swap="outerHTML"
+												class="text-red-600 hover:text-red-900 transition font-semibold"
+											>
+												Delete
+											</button>
+										</td>
+									</tr>
+								}
 							}
-						}
-					</tbody>
-				</table>
+						</tbody>
+					</table>
+				</div>
 			</div>
-		</div>
 
-		<!-- Modal Target Anchor -->
-		<div id="modal-container"></div>
+			<!-- Right Detail Inspector Pane -->
+			<aside id="modal-container" class="w-full lg:w-[400px] xl:w-[440px] shrink-0 lg:sticky lg:top-6 hidden [&:has(*)]:block"></aside>
+		</div>
 	</div>
 }
 
 templ ClientModal(client *config.Client) {
-	<!-- Modal backdrop -->
-	<div id="create-client-modal" class="relative z-50" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-		<div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
-		
-		<div class="fixed inset-0 z-50 w-screen overflow-y-auto">
-			<div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-				
-				<!-- Modal Panel -->
-				<div class="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6 border border-gray-200">
-					<div class="absolute right-0 top-0 hidden pr-4 pt-4 sm:block">
-						<button
-							type="button"
-							onclick="document.getElementById('create-client-modal').remove()"
-							class="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none"
-						>
-							<span class="sr-only">Close</span>
-							<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-							</svg>
-						</button>
+	<!-- Right-Hand Client Configuration Inspector Panel -->
+	<div id="create-client-modal" class="rounded-xl bg-white shadow-md border border-slate-200 overflow-hidden max-h-[calc(100vh-5rem)] flex flex-col" aria-labelledby="modal-title" role="region">
+		<!-- Sticky Inspector Header Bar -->
+		<div class="bg-slate-100/90 border-b border-slate-200 px-5 py-3.5 flex items-center justify-between gap-3">
+			<div>
+				<div class="text-[11px] font-semibold uppercase tracking-wider text-blue-600">Organization Inspector</div>
+				<h3 class="text-sm font-bold text-slate-900" id="modal-title">
+					if client != nil {
+						Edit Client Organization
+					} else {
+						Add Client Organization
+					}
+				</h3>
+			</div>
+			<button
+				type="button"
+				onclick="document.querySelectorAll('[data-edit-row]').forEach(r => r.classList.remove('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30')); document.getElementById('create-client-modal').remove()"
+				class="rounded-md p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 focus:outline-none transition"
+			>
+				<span class="sr-only">Close</span>
+				<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+				</svg>
+			</button>
+		</div>
+
+		<!-- Scrollable Inspector Body -->
+		<div class="p-5 overflow-y-auto">
+			<p class="text-xs text-gray-500">
+				if client != nil {
+					Update organization profile, billing tier, and fallback capacity limits.
+				} else {
+					Register a new parent subscriber organization or tenant account to allocate workloads under.
+				}
+			</p>
+
+			<!-- Creation Form -->
+			<form
+				hx-post="/admin/clients/create"
+				class="mt-4 space-y-4"
+			>
+				<div id="error-alert-container"></div>
+				<div class="grid grid-cols-2 gap-4">
+					<div>
+						<label for="client_id" class="block text-xs font-medium text-gray-700">Client ID (Slug)</label>
+						if client != nil {
+							<input type="text" name="client_id" id="client_id" required readonly value={ client.ID } class="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm cursor-not-allowed" />
+						} else {
+							<input type="text" name="client_id" id="client_id" required placeholder="e.g. internal-marketing" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
+						}
 					</div>
-
-					<div class="sm:flex sm:items-start">
-						<div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
-							<h3 class="text-lg font-semibold leading-6 text-gray-900" id="modal-title">
-								if client != nil {
-									Edit Client Organization
-								} else {
-									Add Client Organization
-								}
-							</h3>
-							<div class="mt-2">
-								<p class="text-xs text-gray-500">
-									if client != nil {
-										Update organization profile, billing tier, and fallback capacity limits.
-									} else {
-										Register a new parent subscriber organization or tenant account to allocate workloads under.
-									}
-								</p>
-							</div>
-
-							<!-- Creation Form -->
-							<form
-								hx-post="/admin/clients/create"
-								class="mt-6 space-y-4"
-							>
-								<div id="error-alert-container"></div>
-								<div class="grid grid-cols-2 gap-4">
-									<div>
-										<label for="client_id" class="block text-xs font-medium text-gray-700">Client ID (Slug)</label>
-										if client != nil {
-											<input type="text" name="client_id" id="client_id" required readonly value={ client.ID } class="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm cursor-not-allowed" />
-										} else {
-											<input type="text" name="client_id" id="client_id" required placeholder="e.g. internal-marketing" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
-										}
-									</div>
-									<div>
-										<label for="client_name" class="block text-xs font-medium text-gray-700">Organization Name</label>
-										if client != nil {
-											<input type="text" name="client_name" id="client_name" required value={ client.Name } placeholder="e.g. Marketing Department" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
-										} else {
-											<input type="text" name="client_name" id="client_name" required placeholder="e.g. Marketing Department" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
-										}
-									</div>
-								</div>
-
-								<div class="grid grid-cols-2 gap-4">
-									<div>
-										<label for="tier" class="block text-xs font-medium text-gray-700">Billing Subscription Tier</label>
-										<select name="tier" id="tier" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm">
-											if client != nil {
-												<option value="free" if client.Tier == "free" { selected }>Free Tier (Tie-breaker: Low)</option>
-												<option value="standard" if client.Tier == "standard" { selected }>Standard Tier (Tie-breaker: Medium)</option>
-												<option value="premium" if client.Tier == "premium" { selected }>Premium Tier (Tie-breaker: High)</option>
-											} else {
-												<option value="free">Free Tier (Tie-breaker: Low)</option>
-												<option value="standard" selected>Standard Tier (Tie-breaker: Medium)</option>
-												<option value="premium">Premium Tier (Tie-breaker: High)</option>
-											}
-										</select>
-										<p class="text-[10px] text-gray-500 mt-0.5">💡 Secondary tie-breaker weight in queueing priority (Premium=+3, Standard=+2, Free=+1).</p>
-									</div>
-									<div>
-										<label for="priority" class="block text-xs font-medium text-gray-700">Fallback Priority Profile</label>
-										<select name="priority" id="priority" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm">
-											if client != nil {
-												<option value="low" if client.Priority == "low" { selected }>Low (Non-critical)</option>
-												<option value="medium" if client.Priority == "medium" { selected }>Medium (Standard)</option>
-												<option value="high" if client.Priority == "high" { selected }>High (Mission Critical)</option>
-											} else {
-												<option value="low">Low (Non-critical)</option>
-												<option value="medium" selected>Medium (Standard)</option>
-												<option value="high">High (Mission Critical)</option>
-											}
-										</select>
-										<p class="text-[10px] text-gray-500 mt-0.5">💡 Default priority value preset used for creating nested applications.</p>
-									</div>
-								</div>
-
-								<div class="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded-md border border-gray-150">
-									<div class="col-span-2 text-xs font-medium text-gray-700 border-b border-gray-200 pb-1.5">
-										Fallback Capacity Limits (App Creation Defaults)
-									</div>
-									<div>
-										<label for="rpm" class="block text-xs font-medium text-gray-500">Default RPM</label>
-										if client != nil {
-											<input type="number" name="rpm" id="rpm" required value={ intToString(client.RPM) } min="1" max="10000" class="mt-1 block w-full bg-white rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-sm" />
-										} else {
-											<input type="number" name="rpm" id="rpm" required value="60" min="1" max="10000" class="mt-1 block w-full bg-white rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-sm" />
-										}
-									</div>
-									<div>
-										<label for="tpm" class="block text-xs font-medium text-gray-500">Default TPM</label>
-										if client != nil {
-											<input type="number" name="tpm" id="tpm" required value={ intToString(client.TPM) } min="1000" max="50000000" class="mt-1 block w-full bg-white rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-sm" />
-										} else {
-											<input type="number" name="tpm" id="tpm" required value="40000" min="1000" max="50000000" class="mt-1 block w-full bg-white rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-sm" />
-										}
-									</div>
-									<div class="col-span-2 text-[10px] text-gray-500 italic mt-1">
-										⚠️ Note: Smart Router rate limits are applied strictly at the Application boundary. Custom limits can be configured directly inside each Application profile.
-									</div>
-								</div>
-
-								<div class="mt-6 sm:mt-4 sm:flex sm:flex-row-reverse gap-3">
-									<button type="submit" class="inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:w-auto transition">
-										if client != nil {
-											Save Changes
-										} else {
-											Create Organization
-										}
-									</button>
-									<button
-										type="button"
-										onclick="document.getElementById('create-client-modal').remove()"
-										class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto transition"
-									>
-										Cancel
-									</button>
-								</div>
-							</form>
-						</div>
+					<div>
+						<label for="client_name" class="block text-xs font-medium text-gray-700">Organization Name</label>
+						if client != nil {
+							<input type="text" name="client_name" id="client_name" required value={ client.Name } placeholder="e.g. Marketing Department" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
+						} else {
+							<input type="text" name="client_name" id="client_name" required placeholder="e.g. Marketing Department" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-2 text-sm" />
+						}
 					</div>
 				</div>
-				
-			</div>
+
+				<div class="grid grid-cols-2 gap-4">
+					<div>
+						<label for="tier" class="block text-xs font-medium text-gray-700">Billing Subscription Tier</label>
+						<select name="tier" id="tier" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm">
+							if client != nil {
+								<option value="free" if client.Tier == "free" { selected }>Free Tier (Tie-breaker: Low)</option>
+								<option value="standard" if client.Tier == "standard" { selected }>Standard Tier (Tie-breaker: Medium)</option>
+								<option value="premium" if client.Tier == "premium" { selected }>Premium Tier (Tie-breaker: High)</option>
+							} else {
+								<option value="free">Free Tier (Tie-breaker: Low)</option>
+								<option value="standard" selected>Standard Tier (Tie-breaker: Medium)</option>
+								<option value="premium">Premium Tier (Tie-breaker: High)</option>
+							}
+						</select>
+						<p class="text-[10px] text-gray-500 mt-0.5">💡 Secondary tie-breaker weight in queueing priority (Premium=+3, Standard=+2, Free=+1).</p>
+					</div>
+					<div>
+						<label for="priority" class="block text-xs font-medium text-gray-700">Fallback Priority Profile</label>
+						<select name="priority" id="priority" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-sm">
+							if client != nil {
+								<option value="low" if client.Priority == "low" { selected }>Low (Non-critical)</option>
+								<option value="medium" if client.Priority == "medium" { selected }>Medium (Standard)</option>
+								<option value="high" if client.Priority == "high" { selected }>High (Mission Critical)</option>
+							} else {
+								<option value="low">Low (Non-critical)</option>
+								<option value="medium" selected>Medium (Standard)</option>
+								<option value="high">High (Mission Critical)</option>
+							}
+						</select>
+						<p class="text-[10px] text-gray-500 mt-0.5">💡 Default priority value preset used for creating nested applications.</p>
+					</div>
+				</div>
+
+				<div class="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded-md border border-slate-200">
+					<div class="col-span-2 text-xs font-medium text-gray-700 border-b border-gray-200 pb-1.5">
+						Fallback Capacity Limits (App Creation Defaults)
+					</div>
+					<div>
+						<label for="rpm" class="block text-xs font-medium text-gray-500">Default RPM</label>
+						if client != nil {
+							<input type="number" name="rpm" id="rpm" required value={ intToString(client.RPM) } min="1" max="10000" class="mt-1 block w-full bg-white rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-sm" />
+						} else {
+							<input type="number" name="rpm" id="rpm" required value="60" min="1" max="10000" class="mt-1 block w-full bg-white rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-sm" />
+						}
+					</div>
+					<div>
+						<label for="tpm" class="block text-xs font-medium text-gray-500">Default TPM</label>
+						if client != nil {
+							<input type="number" name="tpm" id="tpm" required value={ intToString(client.TPM) } min="1000" max="50000000" class="mt-1 block w-full bg-white rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-sm" />
+						} else {
+							<input type="number" name="tpm" id="tpm" required value="40000" min="1000" max="50000000" class="mt-1 block w-full bg-white rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-blue-600 p-1.5 text-sm" />
+						}
+					</div>
+					<div class="col-span-2 text-[10px] text-gray-500 italic mt-1">
+						⚠️ Note: Smart Router rate limits are applied strictly at the Application boundary. Custom limits can be configured directly inside each Application profile.
+					</div>
+				</div>
+
+				<div class="mt-6 sm:mt-4 sm:flex sm:flex-row-reverse gap-3 border-t border-slate-200 pt-4">
+					<button type="submit" class="inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:w-auto transition">
+						if client != nil {
+							Save Changes
+						} else {
+							Create Organization
+						}
+					</button>
+					<button
+						type="button"
+						onclick="document.querySelectorAll('[data-edit-row]').forEach(r => r.classList.remove('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30')); document.getElementById('create-client-modal').remove()"
+						class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto transition"
+					>
+						Cancel
+					</button>
+				</div>
+			</form>
 		</div>
 	</div>
 }

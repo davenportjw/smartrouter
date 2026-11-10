@@ -31,6 +31,8 @@ type AdminStore interface {
 
 	// Dynamic cluster runner administrative actions
 	GetRegisteredRunners(ctx context.Context) ([]RunnerResponse, error)
+	SaveRegisteredRunner(ctx context.Context, runner RunnerResponse) error
 	AttachRunnerToClusters(ctx context.Context, nodeID string, clusterIDs []string) error
 	DeregisterRunner(ctx context.Context, nodeID string) error
 }
+

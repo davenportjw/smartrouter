@@ -22,6 +22,8 @@ type EngineStats struct {
 	Status         string `json:"status"` // "idle", "busy", "offline"
 	ProcessedCount int64  `json:"processed_count"`
 	ErrorCount     int64  `json:"error_count"`
+	MaxModelSizeGB int    `json:"max_model_size_gb"`
+	MaxConcurrent  int    `json:"max_concurrent"`
 }
 
 type CoreRunnerEngine struct {
@@ -33,6 +35,9 @@ type CoreRunnerEngine struct {
 	SupportedModels   []string
 	MemoryAllocatedGB int
 	ComputeGPUCores   int
+	MaxModelSizeGB    int
+	MaxConcurrent     int
+	inFlight          int
 	Active            bool
 	Stats             EngineStats
 	httpClient        *http.Client
@@ -43,7 +48,7 @@ func NewCoreRunnerEngine(routerURL string, supportedModels []string) *CoreRunner
 	return &CoreRunnerEngine{
 		NodeID:          fmt.Sprintf("runner-%d", time.Now().UnixNano()),
 		RouterURL:       routerURL,
-		ClusterID:       "local-cluster-1", // Default fallback
+		ClusterID:       "local-cluster-1",       // Default fallback
 		LlamaServerURL:  "http://localhost:8080", // Default llama-server endpoint
 		SupportedModels: supportedModels,
 		httpClient: &http.Client{
@@ -76,7 +81,18 @@ func (e *CoreRunnerEngine) StartLoop() {
 			return
 		case <-ticker.C:
 			e.sendHeartbeat()
-			e.pollAndProcess()
+			e.mu.RLock()
+			maxConc := e.MaxConcurrent
+			inFlight := e.inFlight
+			e.mu.RUnlock()
+			if maxConc > 1 {
+				slots := maxConc - inFlight
+				for i := 0; i < slots; i++ {
+					go e.pollAndProcess()
+				}
+			} else {
+				e.pollAndProcess()
+			}
 		}
 	}
 }
@@ -94,7 +110,10 @@ func (e *CoreRunnerEngine) Stop() {
 func (e *CoreRunnerEngine) GetStats() EngineStats {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	return e.Stats
+	stats := e.Stats
+	stats.MaxModelSizeGB = e.MaxModelSizeGB
+	stats.MaxConcurrent = e.MaxConcurrent
+	return stats
 }
 
 func (e *CoreRunnerEngine) fetchOIDCToken(ctx context.Context) (string, error) {
@@ -125,6 +144,15 @@ func (e *CoreRunnerEngine) fetchOIDCToken(ctx context.Context) (string, error) {
 	return strings.TrimSpace(string(body)), nil
 }
 
+func (e *CoreRunnerEngine) attachAuthHeaders(ctx context.Context, req *http.Request) {
+	if secret := os.Getenv("BACKEND_SHARED_SECRET"); secret != "" {
+		req.Header.Set("X-Shared-Secret", secret)
+	}
+	if token, tokenErr := e.fetchOIDCToken(ctx); tokenErr == nil && token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+}
+
 func (e *CoreRunnerEngine) sendHeartbeat() {
 	e.mu.RLock()
 	payload := map[string]string{
@@ -143,11 +171,7 @@ func (e *CoreRunnerEngine) sendHeartbeat() {
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
-
-	// Resolve and attach IAM credentials dynamically
-	if token, tokenErr := e.fetchOIDCToken(ctx); tokenErr == nil && token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
+	e.attachAuthHeaders(ctx, req)
 
 	resp, err := e.httpClient.Do(req)
 	if err != nil {
@@ -159,6 +183,32 @@ func (e *CoreRunnerEngine) sendHeartbeat() {
 	if resp.StatusCode >= 400 {
 		bodyErr, _ := io.ReadAll(resp.Body)
 		log.Printf("[Runner Warning] Heartbeat returned status %s: %s", resp.Status, string(bodyErr))
+		return
+	}
+
+	var hbResp struct {
+		MaxModelSizeGB   int      `json:"max_model_size_gb"`
+		MaxConcurrent    int      `json:"max_concurrent"`
+		SupportedModels  []string `json:"supported_models"`
+		AssignedClusters []string `json:"assigned_clusters"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&hbResp); err == nil {
+		e.mu.Lock()
+		if hbResp.MaxModelSizeGB > 0 {
+			e.MaxModelSizeGB = hbResp.MaxModelSizeGB
+			e.Stats.MaxModelSizeGB = hbResp.MaxModelSizeGB
+		}
+		if hbResp.MaxConcurrent > 0 {
+			e.MaxConcurrent = hbResp.MaxConcurrent
+			e.Stats.MaxConcurrent = hbResp.MaxConcurrent
+		}
+		if len(hbResp.SupportedModels) > 0 {
+			e.SupportedModels = hbResp.SupportedModels
+		}
+		if len(hbResp.AssignedClusters) > 0 && hbResp.AssignedClusters[0] != "" {
+			e.ClusterID = hbResp.AssignedClusters[0]
+		}
+		e.mu.Unlock()
 	}
 }
 
@@ -171,6 +221,8 @@ func (e *CoreRunnerEngine) registerNode() {
 		MemoryAllocatedGB: e.MemoryAllocatedGB,
 		ComputeGPUCores:   e.ComputeGPUCores,
 		SupportedModels:   e.SupportedModels,
+		MaxModelSizeGB:    e.MaxModelSizeGB,
+		MaxConcurrent:     e.MaxConcurrent,
 	}
 	e.mu.RUnlock()
 
@@ -184,10 +236,7 @@ func (e *CoreRunnerEngine) registerNode() {
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
-
-	if token, tokenErr := e.fetchOIDCToken(ctx); tokenErr == nil && token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
+	e.attachAuthHeaders(ctx, req)
 
 	resp, err := e.httpClient.Do(req)
 	if err != nil {
@@ -212,8 +261,13 @@ type pollJob struct {
 
 func (e *CoreRunnerEngine) pollAndProcess() {
 	e.mu.RLock()
+	if e.MaxConcurrent > 0 && e.inFlight >= e.MaxConcurrent {
+		e.mu.RUnlock()
+		return
+	}
 	payload := map[string]interface{}{
 		"node_id":          e.NodeID,
+		"cluster_id":       e.ClusterID,
 		"supported_models": e.SupportedModels,
 	}
 	e.mu.RUnlock()
@@ -227,10 +281,7 @@ func (e *CoreRunnerEngine) pollAndProcess() {
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
-
-	if token, tokenErr := e.fetchOIDCToken(ctx); tokenErr == nil && token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
+	e.attachAuthHeaders(ctx, req)
 
 	resp, err := e.httpClient.Do(req)
 	if err != nil {
@@ -257,16 +308,13 @@ func (e *CoreRunnerEngine) pollAndProcess() {
 		return
 	}
 
-	if job.Model == "llama3:70b" {
-		log.Printf("[Runner Warning] Refusing execution of model %s due to device capacity limit overrides", job.Model)
-		e.resolveJob(job.ID, nil, http.StatusBadRequest, "device capacity exceeded: local maximum size limit is restricted")
-		return
-	}
-
 	log.Printf("[Runner Engine] Pulled job %s targeting model %s. Executing...", job.ID, job.Model)
 
 	e.mu.Lock()
-	e.Stats.Status = "busy"
+	e.inFlight++
+	if e.Active {
+		e.Stats.Status = "busy"
+	}
 	e.mu.Unlock()
 
 	// Forward to local llama.cpp instance with dual schema mapping support
@@ -287,7 +335,12 @@ func (e *CoreRunnerEngine) pollAndProcess() {
 	e.resolveJob(job.ID, resPayload, status, errMsg)
 
 	e.mu.Lock()
-	e.Stats.Status = "idle"
+	if e.inFlight > 0 {
+		e.inFlight--
+	}
+	if e.Active && e.inFlight == 0 {
+		e.Stats.Status = "idle"
+	}
 	e.mu.Unlock()
 }
 
@@ -365,146 +418,7 @@ func (e *CoreRunnerEngine) forwardToLlamaCpp(model string, payload []byte) ([]by
 
 	resp, err := e.httpClient.Do(req)
 	if err != nil {
-		log.Printf("[Runner Warning] Local llama.cpp host at %s unavailable. Forwarding query to Vertex AI API for live fallback...", e.LlamaServerURL)
-		
-		// Try to execute a completely real, live Vertex AI call!
-		projectID := os.Getenv("GCP_PROJECT")
-		if projectID == "" {
-			projectID = os.Getenv("PROJECT_ID")
-		}
-		if projectID == "" {
-			// Query metadata server for real project ID if available
-			metaReq, _ := http.NewRequest("GET", "http://metadata.google.internal/computeMetadata/v1/project/project-id", nil)
-			metaReq.Header.Set("Metadata-Flavor", "Google")
-			metaResp, metaErr := e.httpClient.Do(metaReq)
-			if metaErr == nil {
-				bodyBytes, _ := io.ReadAll(metaResp.Body)
-				metaResp.Body.Close()
-				if len(bodyBytes) > 0 {
-					projectID = strings.TrimSpace(string(bodyBytes))
-				}
-			}
-		}
-
-		vertexURL := fmt.Sprintf("https://us-central1-aiplatform.googleapis.com/v1/projects/%s/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent", projectID)
-		
-		var geminiPayload []byte
-		if isGemini {
-			geminiPayload = payload
-		} else {
-			var oaiReq struct {
-				Messages []struct {
-					Role    string `json:"role"`
-					Content string `json:"content"`
-				} `json:"messages"`
-			}
-			_ = json.Unmarshal(payload, &oaiReq)
-			var parts []map[string]string
-			for _, msg := range oaiReq.Messages {
-				parts = append(parts, map[string]string{"text": msg.Content})
-			}
-			geminiReq := map[string]interface{}{
-				"contents": []interface{}{
-					map[string]interface{}{
-						"role":  "user",
-						"parts": parts,
-					},
-				},
-			}
-			geminiPayload, _ = json.Marshal(geminiReq)
-		}
-
-		token := ""
-		// Directly query OAuth2 Access Token for Google APIs like Vertex AI
-		tokReq, _ := http.NewRequest("GET", "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token", nil)
-		tokReq.Header.Set("Metadata-Flavor", "Google")
-		tokResp, tokErr := e.httpClient.Do(tokReq)
-		if tokErr == nil && tokResp.StatusCode == http.StatusOK {
-			var tokRes struct {
-				AccessToken string `json:"access_token"`
-			}
-			_ = json.NewDecoder(tokResp.Body).Decode(&tokRes)
-			tokResp.Body.Close()
-			token = tokRes.AccessToken
-		}
-
-		vertexReq, vErr := http.NewRequest("POST", vertexURL, bytes.NewReader(geminiPayload))
-		if vErr == nil {
-			vertexReq.Header.Set("Content-Type", "application/json")
-			if token != "" {
-				vertexReq.Header.Set("Authorization", "Bearer "+token)
-			}
-			
-			vertexResp, vErr2 := e.httpClient.Do(vertexReq)
-			if vErr2 == nil && vertexResp.StatusCode == http.StatusOK {
-				defer vertexResp.Body.Close()
-				vertexBytes, _ := io.ReadAll(vertexResp.Body)
-				
-				if isGemini {
-					return vertexBytes, http.StatusOK, nil
-				} else {
-					var geminiRes struct {
-						Candidates []struct {
-							Content struct {
-								Parts []struct {
-									Text string `json:"text"`
-								} `json:"parts"`
-							} `json:"content"`
-						} `json:"candidates"`
-					}
-					if json.Unmarshal(vertexBytes, &geminiRes) == nil && len(geminiRes.Candidates) > 0 && len(geminiRes.Candidates[0].Content.Parts) > 0 {
-						mockResp := map[string]interface{}{
-							"choices": []interface{}{
-								map[string]interface{}{
-									"message": map[string]interface{}{
-										"role":    "assistant",
-										"content": geminiRes.Candidates[0].Content.Parts[0].Text,
-									},
-								},
-							},
-						}
-						mockBytes, _ := json.Marshal(mockResp)
-						return mockBytes, http.StatusOK, nil
-					}
-				}
-			} else if vErr2 == nil {
-				bodyErr, _ := io.ReadAll(vertexResp.Body)
-				vertexResp.Body.Close()
-				log.Printf("[Runner Warning] Live Vertex AI fallback returned status %s: %s", vertexResp.Status, string(bodyErr))
-			}
-		}
-
-		log.Printf("[Runner Warning] Live Vertex AI fallback failed. Resolving with static fallback response...")
-		if isGemini {
-			mockResp := map[string]interface{}{
-				"candidates": []interface{}{
-					map[string]interface{}{
-						"content": map[string]interface{}{
-							"parts": []interface{}{
-								map[string]interface{}{
-									"text": "Greetings! This is a local cluster serving response. (Llama server offline; Vertex fallback failed)",
-								},
-							},
-						},
-					},
-				},
-			}
-			mockBytes, _ := json.Marshal(mockResp)
-			return mockBytes, http.StatusOK, nil
-		} else {
-			mockResp := map[string]interface{}{
-				"choices": []interface{}{
-					map[string]interface{}{
-						"message": map[string]interface{}{
-							"role":    "assistant",
-							"content": "Greetings! This is a local cluster serving response. (Llama server offline; Vertex fallback failed)",
-						},
-					},
-				},
-			}
-			mockBytes, _ := json.Marshal(mockResp)
-			return mockBytes, http.StatusOK, nil
-		}
+		return nil, http.StatusBadGateway, fmt.Errorf("local llama.cpp host at %s unavailable: %w", e.LlamaServerURL, err)
 	}
 	defer resp.Body.Close()
 
@@ -555,7 +469,17 @@ func (e *CoreRunnerEngine) resolveJob(jobID string, payload []byte, statusCode i
 	}
 
 	bodyBytes, _ := json.Marshal(resBody)
-	resp, err := e.httpClient.Post(e.RouterURL+"/api/v1/cluster/queue/resolve", "application/json", bytes.NewReader(bodyBytes))
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "POST", e.RouterURL+"/api/v1/cluster/queue/resolve", bytes.NewReader(bodyBytes))
+	if err != nil {
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	e.attachAuthHeaders(ctx, req)
+
+	resp, err := e.httpClient.Do(req)
 	if err == nil {
 		resp.Body.Close()
 	}
