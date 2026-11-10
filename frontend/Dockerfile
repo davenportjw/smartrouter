@@ -2,12 +2,12 @@
 FROM golang:1.26.10-alpine AS builder
 WORKDIR /app
 
-# Install Templ binary
-RUN go install github.com/a-h/templ/cmd/templ@latest
-
 # Copy dependency configuration files from workspace root
 COPY go.mod go.sum ./
 RUN go mod download
+
+# Install Templ CLI pinned to the go.mod runtime version (avoids generator/runtime drift)
+RUN go install github.com/a-h/templ/cmd/templ
 
 # Copy shared package files and frontend code
 COPY pkg/ ./pkg
