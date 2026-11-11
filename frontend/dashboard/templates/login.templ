@@ -8,7 +8,6 @@ type FirebaseConfig struct {
 	StorageBucket     string `json:"storageBucket"`
 	MessagingSenderID string `json:"messagingSenderId"`
 	AppID             string `json:"appId"`
-	IsLocalDev        bool   `json:"isLocalDev"`
 }
 
 templ Login(config FirebaseConfig) {
@@ -92,25 +91,6 @@ templ Login(config FirebaseConfig) {
 							Sign In with Google
 						</button>
 
-						if config.IsLocalDev {
-							<div class="relative flex py-2 items-center">
-								<div class="flex-grow border-t border-gray-300"></div>
-								<span class="flex-shrink mx-4 text-gray-400 text-xs font-semibold uppercase">Or Development</span>
-								<div class="flex-grow border-t border-gray-300"></div>
-							</div>
-
-							<button
-								id="dev-login-btn"
-								onclick="signInAsDeveloper()"
-								class="w-full flex justify-center items-center gap-3 rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:from-blue-500 hover:to-indigo-500 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-							>
-								<svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
-								</svg>
-								Bypass Auth (Local Developer)
-							</button>
-						}
-
 						<div id="loading-spinner" class="hidden flex justify-center items-center gap-2 text-sm text-gray-500">
 							<svg class="animate-spin h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24">
 								<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -138,14 +118,13 @@ templ Login(config FirebaseConfig) {
 
 				function signInWithGoogle() {
 					document.getElementById("login-btn").classList.add("hidden");
-					if (document.getElementById("dev-login-btn")) {
-						document.getElementById("dev-login-btn").classList.add("hidden");
-					}
 					document.getElementById("loading-spinner").classList.remove("hidden");
 					document.getElementById("error-box").classList.add("hidden");
 
 					const provider = new firebase.auth.GoogleAuthProvider();
-					firebase.auth().signInWithPopup(provider)
+					// The server-side session cookie is the only session; keep no client-side auth state.
+					firebase.auth().setPersistence(firebase.auth.Auth.Persistence.NONE)
+						.then(() => firebase.auth().signInWithPopup(provider))
 						.then((result) => {
 							// Extract JWT ID token
 							return result.user.getIdToken();
@@ -175,49 +154,10 @@ templ Login(config FirebaseConfig) {
 						.catch((error) => {
 							console.error("Google Auth Error:", error);
 							document.getElementById("login-btn").classList.remove("hidden");
-							if (document.getElementById("dev-login-btn")) {
-								document.getElementById("dev-login-btn").classList.remove("hidden");
-							}
 							document.getElementById("loading-spinner").classList.add("hidden");
 							document.getElementById("error-box").classList.remove("hidden");
 							document.getElementById("error-message").innerText = error.message || "Failed to authenticate with Google Identity.";
 						});
-				}
-
-				function signInAsDeveloper() {
-					document.getElementById("login-btn").classList.add("hidden");
-					if (document.getElementById("dev-login-btn")) {
-						document.getElementById("dev-login-btn").classList.add("hidden");
-					}
-					document.getElementById("loading-spinner").classList.remove("hidden");
-					document.getElementById("error-box").classList.add("hidden");
-
-					fetch("/auth/session", {
-						method: "POST",
-						headers: {
-							"Content-Type": "application/x-www-form-urlencoded"
-						},
-						body: new URLSearchParams({ "idToken": "dev-admin-token" })
-					})
-					.then((response) => {
-						if (!response.ok) {
-							throw new Error("Developer authentication session generation failed.");
-						}
-						return response.json();
-					})
-					.then((data) => {
-						window.location.href = "/admin/keys";
-					})
-					.catch((error) => {
-						console.error("Dev Auth Error:", error);
-						document.getElementById("login-btn").classList.remove("hidden");
-						if (document.getElementById("dev-login-btn")) {
-							document.getElementById("dev-login-btn").classList.remove("hidden");
-						}
-						document.getElementById("loading-spinner").classList.add("hidden");
-						document.getElementById("error-box").classList.remove("hidden");
-						document.getElementById("error-message").innerText = error.message || "Failed to bypass auth.";
-					});
 				}
 			</script>
 		</body>

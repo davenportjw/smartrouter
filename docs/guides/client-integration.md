@@ -19,9 +19,9 @@ To integrate with the Smart Router, your credentials operate within a three-tier
 The proxy supports two authentication mechanisms across both **OpenAI-compatible (`/v1/*`)** and **Google Gemini Native (`/v1/models/*:generateContent`)** endpoints:
 
 1. **Static Router API Key**:
-   - **OpenAI Spec Header**: `Authorization: Bearer gr_key_your_custom_api_key`
-   - **Google Gemini Header**: `x-goog-api-key: gr_key_your_custom_api_key`
-   - **Query Parameter**: `?key=gr_key_your_custom_api_key`
+   - **OpenAI Spec Header**: `Authorization: Bearer <your-router-api-key>`
+   - **Google Gemini Header**: `x-goog-api-key: <your-router-api-key>`
+   - **Query Parameter**: `?key=<your-router-api-key>`
 2. **Zero-Key IAM Service Account OIDC**:
    - **Header**: `Authorization: Bearer <GCP_OIDC_IDENTITY_TOKEN>` (automatically verified against the application's bound `service_account` email).
 
@@ -45,8 +45,8 @@ The Smart Router provides native support for the **OpenAI Chat Completions & Mod
 from openai import OpenAI
 
 client = OpenAI(
-    api_key="gr_key_your_custom_api_key",
-    base_url="https://gemini-smart-router-txgsracloq-uc.a.run.app/v1",
+    api_key="<your-router-api-key>",
+    base_url="https://<your-router-service-url>/v1",
 )
 
 # 1. Dynamic Complexity Routing (Stage 0-3 Jev / Fastino / Contrastive-LM / LLM)
@@ -82,7 +82,7 @@ import OpenAI from "openai";
 
 const client = new OpenAI({
   apiKey: process.env.SMART_ROUTER_API_KEY,
-  baseURL: "https://gemini-smart-router-txgsracloq-uc.a.run.app/v1",
+  baseURL: "https://<your-router-service-url>/v1",
 });
 
 const completion = await client.chat.completions.create({
@@ -105,8 +105,8 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 llm = ChatOpenAI(
     model="gemini-dynamic",
-    api_key="gr_key_your_custom_api_key",
-    base_url="https://gemini-smart-router-txgsracloq-uc.a.run.app/v1",
+    api_key="<your-router-api-key>",
+    base_url="https://<your-router-service-url>/v1",
     temperature=0.2,
 )
 
@@ -124,8 +124,8 @@ import litellm
 
 response = litellm.completion(
     model="openai/gemini-dynamic",
-    api_base="https://gemini-smart-router-txgsracloq-uc.a.run.app/v1",
-    api_key="gr_key_your_custom_api_key",
+    api_base="https://<your-router-service-url>/v1",
+    api_key="<your-router-api-key>",
     messages=[{"role": "user", "content": "Hello from LiteLLM!"}],
 )
 print(response.choices[0].message.content)
@@ -135,8 +135,8 @@ print(response.choices[0].message.content)
 
 ```bash
 # Chat Completions with Bearer API Key
-curl -X POST "https://gemini-smart-router-txgsracloq-uc.a.run.app/v1/chat/completions" \
-  -H "Authorization: Bearer gr_key_your_custom_api_key" \
+curl -X POST "https://<your-router-service-url>/v1/chat/completions" \
+  -H "Authorization: Bearer <your-router-api-key>" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gemini-dynamic",
@@ -147,8 +147,8 @@ curl -X POST "https://gemini-smart-router-txgsracloq-uc.a.run.app/v1/chat/comple
   }'
 
 # List Available Models
-curl -X GET "https://gemini-smart-router-txgsracloq-uc.a.run.app/v1/models" \
-  -H "Authorization: Bearer gr_key_your_custom_api_key"
+curl -X GET "https://<your-router-service-url>/v1/models" \
+  -H "Authorization: Bearer <your-router-api-key>"
 ```
 
 ---
@@ -162,9 +162,9 @@ from google import genai
 from google.genai import types
 
 client = genai.Client(
-    api_key="gr_key_your_custom_api_key",
+    api_key="<your-router-api-key>",
     http_options={
-        "api_endpoint": "https://gemini-smart-router-txgsracloq-uc.a.run.app"
+        "api_endpoint": "https://<your-router-service-url>"
     },
 )
 
@@ -181,8 +181,8 @@ print(response.text)
 ### Gemini Native cURL (`:generateContent`)
 
 ```bash
-curl -X POST "https://gemini-smart-router-txgsracloq-uc.a.run.app/v1beta/models/gemini-3.8-flash:generateContent" \
-  -H "x-goog-api-key: gr_key_your_custom_api_key" \
+curl -X POST "https://<your-router-service-url>/v1beta/models/gemini-3.8-flash:generateContent" \
+  -H "x-goog-api-key: <your-router-api-key>" \
   -H "Content-Type: application/json" \
   -d '{
     "contents": [{
@@ -200,10 +200,10 @@ OIDC tokens eliminate the need to distribute, rotate, or store static API secret
 ```bash
 # 1. Retrieve OIDC Identity Token from local GCP Metadata Server
 OIDC_TOKEN=$(curl -H "Metadata-Flavor: Google" \
-  "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=https://gemini-smart-router-txgsracloq-uc.a.run.app")
+  "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=https://<your-router-service-url>")
 
 # 2. Call either the OpenAI endpoint or Gemini Native endpoint with the OIDC token
-curl -X POST "https://gemini-smart-router-txgsracloq-uc.a.run.app/v1/chat/completions" \
+curl -X POST "https://<your-router-service-url>/v1/chat/completions" \
   -H "Authorization: Bearer $OIDC_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -16,8 +17,6 @@ import (
 	"geminirouter/backend/proxy"
 	"geminirouter/pkg/config"
 	"geminirouter/pkg/decision"
-
-	"google.golang.org/api/idtoken"
 )
 
 // APIController handles the administrative REST APIs on the backend.
@@ -54,14 +53,20 @@ func NewAPIController(store *store.ConfigStore, scheduler *proxy.RequestSchedule
 }
 
 // AuthMiddleware validates incoming API requests using X-Shared-Secret, Bearer shared secret, or Google OIDC ID token.
+//
+// OIDC tokens are accepted only when they were minted for one of API_OIDC_AUDIENCES and the
+// verified email claim belongs to API_ALLOWED_CALLERS. If either variable is empty, OIDC is
+// rejected (fail closed) and only the shared-secret path can authenticate.
 func (ac *APIController) AuthMiddleware(next http.Handler) http.Handler {
+	oidc := loadOIDCPolicy()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Wrap state-changing requests in MaxBytesReader (1MB limit) to prevent memory exhaustion attacks
 		if r.Body != nil && r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions {
 			r.Body = http.MaxBytesReader(w, r.Body, 1024*1024)
 		}
 
-		isLocalDev := os.Getenv("LOCAL_DEV") == "true"
+		// Local-dev relaxations never apply on Cloud Run (K_SERVICE is always set there).
+		isLocalDev := os.Getenv("LOCAL_DEV") == "true" && os.Getenv("K_SERVICE") == ""
 
 		secret := r.Header.Get("X-Shared-Secret")
 		bearerToken := ""
@@ -71,12 +76,12 @@ func (ac *APIController) AuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		authenticated := false
-		if ac.SharedSecret != "" && (secret == ac.SharedSecret || bearerToken == ac.SharedSecret) {
+		if ac.SharedSecret != "" && (secretEquals(secret, ac.SharedSecret) || secretEquals(bearerToken, ac.SharedSecret)) {
 			authenticated = true
 		}
 
 		if !authenticated && !isLocalDev && bearerToken != "" {
-			if _, err := idtoken.Validate(r.Context(), bearerToken, ""); err == nil {
+			if err := oidc.authorize(r.Context(), bearerToken); err == nil {
 				authenticated = true
 			}
 		}
@@ -93,6 +98,11 @@ func (ac *APIController) AuthMiddleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// secretEquals compares secrets in constant time.
+func secretEquals(got, want string) bool {
+	return got != "" && subtle.ConstantTimeCompare([]byte(got), []byte(want)) == 1
 }
 
 // RegisterRoutes registers all administrative REST API routes under /api/*.

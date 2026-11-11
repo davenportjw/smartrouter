@@ -61,10 +61,10 @@ Before deploying to Cloud Run, you can easily run and validate the API Key clien
    pip install -r requirements.txt
    ```
 3. **Configure environment variables**:
-   Specify the local router port and your generated API Key (or the pre-seeded `gr_key_enterprise_123456789` key):
+   Specify the local router port and an API key generated from the Admin Portal:
    ```bash
    export ROUTER_URL="http://localhost:8080"
-   export ROUTER_API_KEY="gr_key_enterprise_123456789"
+   export ROUTER_API_KEY="<your-router-api-key>"
    # If your router has mandatory custom headers (e.g. X-Client-App-ID), specify it:
    export CLIENT_APP_ID="prod-app-main"
    ```

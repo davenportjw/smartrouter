@@ -84,7 +84,6 @@ func NewDashboardController(store config.AdminStore, projectID, location string)
 			StorageBucket:     storageBucket,
 			MessagingSenderID: strings.TrimSpace(os.Getenv("FIREBASE_MESSAGING_SENDER_ID")),
 			AppID:             strings.TrimSpace(os.Getenv("FIREBASE_APP_ID")),
-			IsLocalDev:        os.Getenv("LOCAL_DEV") == "true",
 		},
 	}
 }
@@ -112,7 +111,7 @@ func (dc *DashboardController) renderFormError(w http.ResponseWriter, r *http.Re
 func (dc *DashboardController) ServeLogin(w http.ResponseWriter, r *http.Request) {
 	// If session cookie already exists and is valid, bypass login
 	if cookie, err := r.Cookie("session"); err == nil && cookie.Value != "" {
-		if dc.SessionVerifier == nil || dc.SessionVerifier(r) {
+		if dc.SessionVerifier != nil && dc.SessionVerifier(r) {
 			http.Redirect(w, r, "/admin/apps", http.StatusFound)
 			return
 		}
@@ -122,6 +121,8 @@ func (dc *DashboardController) ServeLogin(w http.ResponseWriter, r *http.Request
 			Path:     "/",
 			MaxAge:   -1,
 			HttpOnly: true,
+			Secure:   os.Getenv("K_SERVICE") != "" || os.Getenv("LOCAL_DEV") != "true",
+			SameSite: http.SameSiteLaxMode,
 		})
 	}
 

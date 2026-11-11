@@ -13,6 +13,7 @@ dist/
 # Terraform artifacts
 .terraform/
 *.tfstate
+*.tfstate.*
 *.tfstate.backup
 *.tfstate.lock.info
 *.tfvars

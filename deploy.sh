@@ -262,7 +262,6 @@ if [ -z "$BACKEND_SHARED_SECRET" ]; then
     update_env_var "BACKEND_SHARED_SECRET" "$RAND_SECRET"
 fi
 
-ADMIN_API_SECRET="${ADMIN_API_SECRET:-$BACKEND_SHARED_SECRET}"
 FIREBASE_WEB_API_KEY="${FIREBASE_WEB_API_KEY:-$FIREBASE_API_KEY}"
 ALLOWED_EMAIL_DOMAINS="${ALLOWED_EMAIL_DOMAINS:-${ALLOWED_AUTH_DOMAINS:-$ALLOWED_DOMAINS}}"
 ALLOWED_AUTH_DOMAINS="${ALLOWED_AUTH_DOMAINS:-$ALLOWED_EMAIL_DOMAINS}"
@@ -281,12 +280,20 @@ cd terraform
 
 terraform init
 
+# One-time migration: the project-wide Identity Platform config is shared across apps in the GCP project.
+# This repo now only adds/removes its own sign-in hosts (terraform_data.authorized_domains), so
+# detach the old full-list resource from local state (state-only, no API call) if still present.
+if terraform state list 2>/dev/null | grep -qx 'google_identity_platform_config.auth_config'; then
+    log_info "Detaching shared project-wide Identity Platform config from local Terraform state..."
+    terraform state rm google_identity_platform_config.auth_config
+fi
+
 if [ -z "$ALLOWED_EMAIL_DOMAINS" ]; then
     log_error "ALLOWED_EMAIL_DOMAINS is missing or empty in .env. You must configure at least one authorized domain or specific email address for administrative dashboard sign-in."
     exit 1
 fi
 
-log_info "Applying Terraform configuration with authorized domains: $ALLOWED_EMAIL_DOMAINS"
+log_info "Applying Terraform configuration (admin sign-in allowlist: $ALLOWED_EMAIL_DOMAINS)"
 terraform apply -auto-approve \
   -var="project_id=$GOOGLE_CLOUD_PROJECT" \
   -var="region=$CLOUD_RUN_REGION" \
@@ -295,7 +302,8 @@ terraform apply -auto-approve \
   -var="firebase_storage_bucket=$FIREBASE_STORAGE_BUCKET" \
   -var="firebase_messaging_sender_id=$FIREBASE_MESSAGING_SENDER_ID" \
   -var="firebase_app_id=$FIREBASE_APP_ID" \
-  -var="allowed_email_domains=$ALLOWED_EMAIL_DOMAINS"
+  -var="allowed_email_domains=$ALLOWED_EMAIL_DOMAINS" \
+  -var="api_oidc_extra_audiences=$(gcloud run services describe gemini-smart-router --region "$CLOUD_RUN_REGION" --format="value(status.url)" --project="$GOOGLE_CLOUD_PROJECT" 2>/dev/null || true)"
 
 cd ..
 
@@ -311,10 +319,14 @@ sync_secret_to_gsm() {
         gcloud secrets create "$secret_name" --replication-policy="automatic" --project="$GOOGLE_CLOUD_PROJECT" --quiet
     fi
     printf "%s" "$secret_val" | gcloud secrets versions add "$secret_name" --data-file=- --project="$GOOGLE_CLOUD_PROJECT" --quiet >/dev/null
-    gcloud secrets add-iam-policy-binding "$secret_name" \
-        --member="serviceAccount:gemini-router-runner@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
-        --role="roles/secretmanager.secretAccessor" \
-        --project="$GOOGLE_CLOUD_PROJECT" --quiet >/dev/null
+    # Per-secret access only for the services that mount it (backend always; extra SAs via $3).
+    local sa
+    for sa in smart-router-api-sa ${3:-}; do
+        gcloud secrets add-iam-policy-binding "$secret_name" \
+            --member="serviceAccount:${sa}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
+            --role="roles/secretmanager.secretAccessor" \
+            --project="$GOOGLE_CLOUD_PROJECT" --quiet >/dev/null
+    done
 }
 
 JEV_RESOLVED="${JEV_API_KEY:-${TYPESAFE_API_KEY:-}}"
@@ -322,17 +334,34 @@ FASTINO_RESOLVED="${FASTINO_API_KEY:-${PIONEER_API_KEY:-}}"
 CLM_RESOLVED="${CLM_API_KEY:-${CONTRASTIVE_LM_API_KEY:-}}"
 
 log_info "Synchronizing populated .env secrets with Google Cloud Secret Manager..."
-sync_secret_to_gsm "BACKEND_SHARED_SECRET" "$BACKEND_SHARED_SECRET"
+sync_secret_to_gsm "BACKEND_SHARED_SECRET" "$BACKEND_SHARED_SECRET" "smart-router-ui-sa"
 sync_secret_to_gsm "JEV_API_KEY" "$JEV_RESOLVED"
 sync_secret_to_gsm "FASTINO_API_KEY" "$FASTINO_RESOLVED"
 sync_secret_to_gsm "CLM_API_KEY" "$CLM_RESOLVED"
 
-SECRET_MOUNTS="BACKEND_SHARED_SECRET=BACKEND_SHARED_SECRET:latest,ADMIN_API_SECRET=BACKEND_SHARED_SECRET:latest"
+SECRET_MOUNTS="BACKEND_SHARED_SECRET=BACKEND_SHARED_SECRET:latest"
 for opt_secret in JEV_API_KEY FASTINO_API_KEY CLM_API_KEY; do
     if gcloud secrets versions access latest --secret="$opt_secret" --project="$GOOGLE_CLOUD_PROJECT" >/dev/null 2>&1; then
         SECRET_MOUNTS="${SECRET_MOUNTS},${opt_secret}=${opt_secret}:latest"
     fi
 done
+# The UI only needs the shared secret (decision-engine keys are backend-only).
+UI_SECRET_MOUNTS="BACKEND_SHARED_SECRET=BACKEND_SHARED_SECRET:latest"
+
+# Dedicated per-service service accounts (terraform/service-accounts.tf).
+SA_SUFFIX="${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com"
+API_SA="smart-router-api-sa@${SA_SUFFIX}"
+UI_SA="smart-router-ui-sa@${SA_SUFFIX}"
+TRAFFIC_SA="smart-router-traffic-sa@${SA_SUFFIX}"
+
+# Admin API OIDC pinning: tokens must target the backend's own URL(s) and come from these callers.
+API_ALLOWED_CALLERS="${UI_SA},gemini-router-runner@${SA_SUFFIX}"
+PROJECT_NUMBER=$(gcloud projects describe "$GOOGLE_CLOUD_PROJECT" --format="value(projectNumber)")
+API_OIDC_AUDIENCES="https://gemini-smart-router-${PROJECT_NUMBER}.${CLOUD_RUN_REGION}.run.app"
+EXISTING_BACKEND_URL=$(gcloud run services describe gemini-smart-router --region "$CLOUD_RUN_REGION" --format="value(status.url)" --project="$GOOGLE_CLOUD_PROJECT" 2>/dev/null || true)
+if [ -n "$EXISTING_BACKEND_URL" ] && [ "$EXISTING_BACKEND_URL" != "$API_OIDC_AUDIENCES" ]; then
+    API_OIDC_AUDIENCES="${EXISTING_BACKEND_URL},${API_OIDC_AUDIENCES}"
+fi
 
 # 4. Generate Templ Templates
 log_info "Compiling Go HTML Templ components..."
@@ -346,13 +375,27 @@ log_info "Deploying Smart Router Backend to Cloud Run with Secret Manager mounts
 gcloud run deploy gemini-smart-router \
   --image "gcr.io/$GOOGLE_CLOUD_PROJECT/smart-router-backend" \
   --region "$CLOUD_RUN_REGION" \
-  --service-account "gemini-router-runner@$GOOGLE_CLOUD_PROJECT.iam.gserviceaccount.com" \
+  --service-account "$API_SA" \
   --project "$GOOGLE_CLOUD_PROJECT" \
-  --update-env-vars="^@^GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}@GEMINI_LOCATION=${DEPLOY_REGION}@LOCATION=${DEPLOY_REGION}" \
+  --update-env-vars="^;^GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT};GEMINI_LOCATION=${DEPLOY_REGION};LOCATION=${DEPLOY_REGION};API_OIDC_AUDIENCES=${API_OIDC_AUDIENCES};API_ALLOWED_CALLERS=${API_ALLOWED_CALLERS}" \
   --set-secrets="${SECRET_MOUNTS}" \
   --quiet
 
 BACKEND_URL=$(gcloud run services describe gemini-smart-router --region "$CLOUD_RUN_REGION" --format="value(status.url)" --project="$GOOGLE_CLOUD_PROJECT" 2>/dev/null || true)
+# First deploy: the hashed service URL only exists after creation, so add it to the audiences.
+case ",${API_OIDC_AUDIENCES}," in
+    *",${BACKEND_URL},"*) ;;
+    *)
+        API_OIDC_AUDIENCES="${BACKEND_URL},${API_OIDC_AUDIENCES}"
+        gcloud run services update gemini-smart-router --region "$CLOUD_RUN_REGION" --project "$GOOGLE_CLOUD_PROJECT" \
+          --update-env-vars="^;^API_OIDC_AUDIENCES=${API_OIDC_AUDIENCES}" --quiet
+        ;;
+esac
+# Callers that mint OIDC tokens for the backend.
+for invoker in "$UI_SA" "$TRAFFIC_SA" "gemini-router-runner@${SA_SUFFIX}"; do
+    gcloud run services add-iam-policy-binding gemini-smart-router --region "$CLOUD_RUN_REGION" --project "$GOOGLE_CLOUD_PROJECT" \
+      --member="serviceAccount:${invoker}" --role="roles/run.invoker" --quiet >/dev/null
+done
 PROXY_PUBLIC_URL="${PROXY_PUBLIC_URL:-$BACKEND_URL}"
 BACKEND_API_URL="${BACKEND_API_URL:-$BACKEND_URL}"
 
@@ -363,50 +406,21 @@ log_info "Deploying Smart Router Frontend UI to Cloud Run with Secret Manager mo
 gcloud run deploy gemini-smart-router-ui \
   --image "gcr.io/$GOOGLE_CLOUD_PROJECT/smart-router-frontend" \
   --region "$CLOUD_RUN_REGION" \
-  --service-account "gemini-router-runner@$GOOGLE_CLOUD_PROJECT.iam.gserviceaccount.com" \
+  --service-account "$UI_SA" \
   --project "$GOOGLE_CLOUD_PROJECT" \
   --update-env-vars="^@^GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}@GEMINI_LOCATION=${DEPLOY_REGION}@LOCATION=${DEPLOY_REGION}@BACKEND_SERVICE_NAME=gemini-smart-router@BACKEND_API_URL=${BACKEND_API_URL}@PROXY_PUBLIC_URL=${PROXY_PUBLIC_URL}@FIREBASE_API_KEY=${FIREBASE_API_KEY}@FIREBASE_WEB_API_KEY=${FIREBASE_WEB_API_KEY}@FIREBASE_AUTH_DOMAIN=${FIREBASE_AUTH_DOMAIN}@FIREBASE_PROJECT_ID=${GOOGLE_CLOUD_PROJECT}@FIREBASE_STORAGE_BUCKET=${FIREBASE_STORAGE_BUCKET}@FIREBASE_MESSAGING_SENDER_ID=${FIREBASE_MESSAGING_SENDER_ID}@FIREBASE_APP_ID=${FIREBASE_APP_ID}@ALLOWED_EMAIL_DOMAINS=${ALLOWED_EMAIL_DOMAINS}@ALLOWED_AUTH_DOMAINS=${ALLOWED_AUTH_DOMAINS}@ALLOWED_DOMAINS=${ALLOWED_DOMAINS}@ALLOWED_EMAILS=${ALLOWED_EMAILS}" \
-  --set-secrets="${SECRET_MOUNTS}" \
+  --set-secrets="${UI_SECRET_MOUNTS}" \
   --quiet
 
-# Synchronize Firebase Identity Platform authorizedDomains non-destructively
-FRONTEND_URL=$(gcloud run services describe gemini-smart-router-ui --region "$CLOUD_RUN_REGION" --format="value(status.url)" --project="$GOOGLE_CLOUD_PROJECT" 2>/dev/null || true)
-AUTH_TOKEN=$(gcloud auth application-default print-access-token 2>/dev/null || gcloud auth print-access-token 2>/dev/null || true)
-if [ -n "$AUTH_TOKEN" ]; then
-    log_info "Synchronizing Firebase Identity Platform authorizedDomains..."
-    FRONTEND_HOST="${FRONTEND_URL#https://}"; FRONTEND_HOST="${FRONTEND_HOST%/}"
-    BACKEND_HOST="${BACKEND_URL#https://}"; BACKEND_HOST="${BACKEND_HOST%/}"
-    PROJECT_NUM=$(gcloud projects describe "$GOOGLE_CLOUD_PROJECT" --format="value(projectNumber)" 2>/dev/null || true)
-    CURRENT_IDP=$(curl -s -H "Authorization: Bearer $AUTH_TOKEN" -H "x-goog-user-project: ${GOOGLE_CLOUD_PROJECT}" \
-        "https://identitytoolkit.googleapis.com/admin/v2/projects/${GOOGLE_CLOUD_PROJECT}/config" || echo "{}")
-    MERGED_DOMAINS=$(echo "$CURRENT_IDP" | jq -c \
-        --arg proj "$GOOGLE_CLOUD_PROJECT" \
-        --arg pnum "$PROJECT_NUM" \
-        --arg reg "$CLOUD_RUN_REGION" \
-        --arg fh "$FRONTEND_HOST" \
-        --arg bh "$BACKEND_HOST" \
-        --arg allowed "$ALLOWED_EMAIL_DOMAINS" '
-        ((.authorizedDomains // []) +
-         ["localhost", ($proj + ".firebaseapp.com"), ($proj + ".web.app"), $fh, $bh] +
-         (if $pnum != "" then [("gemini-smart-router-ui-" + $pnum + "." + $reg + ".run.app"), ("gemini-smart-router-" + $pnum + "." + $reg + ".run.app")] else [] end) +
-         ($allowed | split(",") | map(gsub("^\\s+|\\s+$"; "") | ltrimstr("@")) | map(select(length > 0 and (contains("@") | not))))
-        ) | map(select(length > 0)) | unique
-    ')
-    if [ -n "$MERGED_DOMAINS" ] && [ "$MERGED_DOMAINS" != "null" ]; then
-        curl -s -o /dev/null -X PATCH \
-            -H "Authorization: Bearer $AUTH_TOKEN" \
-            -H "x-goog-user-project: ${GOOGLE_CLOUD_PROJECT}" \
-            -H "Content-Type: application/json" \
-            -d "{\"authorizedDomains\": ${MERGED_DOMAINS}}" \
-            "https://identitytoolkit.googleapis.com/admin/v2/projects/${GOOGLE_CLOUD_PROJECT}/config?updateMask=authorizedDomains" || true
-    fi
-fi
+# Sign-in authorizedDomains: this app's Cloud Run hosts are added by Terraform
+# (terraform_data.authorized_domains -> terraform/scripts/authorized-domains.sh, locked add/remove).
+# Email allowlist domains are NOT sign-in hosts and must never be added to authorizedDomains.
 
 log_info "Triggering Google Cloud Build and Deploying active Go traffic generator to Cloud Run..."
 gcloud run deploy gemini-traffic-generator \
   --source ./generator \
   --region "$CLOUD_RUN_REGION" \
-  --service-account "gemini-router-runner@$GOOGLE_CLOUD_PROJECT.iam.gserviceaccount.com" \
+  --service-account "$TRAFFIC_SA" \
   --project "$GOOGLE_CLOUD_PROJECT" \
   --update-env-vars="ROUTER_URL=${BACKEND_URL},GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}" \
   --quiet

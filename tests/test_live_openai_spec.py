@@ -1,19 +1,16 @@
 import hashlib
 import os
-import subprocess
+import secrets
 import time
 import pytest
 from openai import OpenAI
 from google.cloud import firestore
 
-PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "davenport-boutique")
-SERVICE_URL = os.environ.get(
-    "SERVICE_URL", "https://gemini-smart-router-txgsracloq-uc.a.run.app"
-).rstrip("/")
+PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "").strip()
+SERVICE_URL = os.environ.get("SERVICE_URL", "").strip().rstrip("/")
 
 TEST_CLIENT_ID = "pytest-openai-spec-client"
 TEST_APP_ID = "pytest-openai-spec-app"
-TEST_API_KEY = "gr_pytest_live_openai_spec_key_99"
 
 
 def _hash_key(key: str) -> str:
@@ -23,8 +20,11 @@ def _hash_key(key: str) -> str:
 @pytest.fixture(scope="module")
 def live_openai_client():
     """Seeds temporary client/app/key in Firestore, yields an OpenAI SDK client, and cleans up after."""
+    if not PROJECT_ID or not SERVICE_URL:
+        pytest.skip("GOOGLE_CLOUD_PROJECT and SERVICE_URL must be set for live OpenAI spec tests")
+    test_api_key = f"gr_pytest_{secrets.token_hex(16)}"
     db = firestore.Client(project=PROJECT_ID)
-    key_hash = _hash_key(TEST_API_KEY)
+    key_hash = _hash_key(test_api_key)
 
     try:
         db.collection("clients").document(TEST_CLIENT_ID).set(
@@ -69,10 +69,10 @@ def live_openai_client():
         time.sleep(4)
 
         client = OpenAI(
-            api_key=TEST_API_KEY,
+            api_key=test_api_key,
             base_url=f"{SERVICE_URL}/v1",
             default_headers={
-                "x-goog-api-key": TEST_API_KEY,
+                "x-goog-api-key": test_api_key,
                 "X-Client-App-ID": TEST_APP_ID,
             },
         )

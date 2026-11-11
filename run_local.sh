@@ -50,7 +50,8 @@ go run github.com/a-h/templ/cmd/templ generate
 
 # 3. Re-orchestration Parameters
 export LOCAL_DEV="true"
-export BACKEND_SHARED_SECRET="local-dev-bypass-token-12345"
+# Throwaway per-run secret shared by the local backend and frontend (never a fixed literal).
+export BACKEND_SHARED_SECRET="${BACKEND_SHARED_SECRET:-$(openssl rand -hex 32)}"
 
 # 4. Graceful exit traps
 cleanup() {
@@ -93,7 +94,7 @@ echo -e "👉 Backend URL   : ${GREEN}http://localhost:8080${NC}"
 echo -e "👉 Admin Portal  : ${GREEN}http://localhost:8081/login${NC}"
 echo -e "👉 Traffic Gen   : ${GREEN}http://localhost:8082${NC}"
 echo -e "👉 Mode          : ${YELLOW}Decoupled Services (Backend + Frontend + Traffic Gen)${NC}"
-echo -e "👉 Shared Secret : ${BLUE}local-dev-bypass-token-12345${NC}"
+echo -e "👉 Shared Secret : ${BLUE}${BACKEND_SHARED_SECRET:0:8}… (per-run, from \$BACKEND_SHARED_SECRET)${NC}"
 echo -e "----------------------------------------------------------------------\n"
 
 # Wait on background tasks to keep process alive

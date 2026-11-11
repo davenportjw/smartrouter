@@ -21,7 +21,10 @@ except ImportError:
 
 # Configuration
 ROUTER_URL = os.getenv("ROUTER_URL", "http://localhost:8080").rstrip("/")
-API_KEY = os.getenv("ROUTER_API_KEY", "gr_key_enterprise_123456789")
+API_KEY = os.getenv("ROUTER_API_KEY", "").strip()
+if not API_KEY:
+    print("❌ Error: ROUTER_API_KEY environment variable is required.")
+    sys.exit(1)
 
 def run_sdk_example():
     print("======================================================================")

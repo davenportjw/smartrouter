@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -23,8 +24,15 @@ const (
 	testClientID = "test-verify-client"
 	testAppID    = "app-verify-client"
 	testRuleID   = "rule-verify-high-priority"
-	testAPIKey   = "gr_verify_post_deploy_key"
 )
+
+func generateEphemeralVerifyKey() (string, error) {
+	buf := make([]byte, 16)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return "gr_verify_" + hex.EncodeToString(buf), nil
+}
 
 func hashKey(key string) string {
 	h := sha256.Sum256([]byte(key))
@@ -145,6 +153,11 @@ func main() {
 		log.Fatalf("[FAIL] Failed to create Firestore client: %v", err)
 	}
 	defer client.Close()
+
+	testAPIKey, err := generateEphemeralVerifyKey()
+	if err != nil {
+		log.Fatalf("[FAIL] Failed to generate ephemeral verification API key: %v", err)
+	}
 
 	// Pre-calculate key hash
 	keyHash := hashKey(testAPIKey)

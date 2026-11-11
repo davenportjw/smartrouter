@@ -75,9 +75,32 @@ chmod +x deploy.sh
 
 ---
 
+## 🔐 Service Accounts & Admin API OIDC Pinning
+
+Each Cloud Run service runs as its own least-privilege service account (defined in `terraform/service-accounts.tf`):
+
+| Service | Service account | Roles (scope) |
+| --- | --- | --- |
+| `gemini-smart-router` (backend) | `smart-router-api-sa` | `roles/aiplatform.user`, `roles/datastore.user` (project); `roles/secretmanager.secretAccessor` on `BACKEND_SHARED_SECRET` |
+| `gemini-smart-router-ui` | `smart-router-ui-sa` | `roles/firebaseauth.admin`, `roles/aiplatform.user`, `roles/logging.viewer` (project); `roles/secretmanager.secretAccessor` on `BACKEND_SHARED_SECRET`; `roles/run.invoker` on the backend |
+| `gemini-traffic-generator` | `smart-router-traffic-sa` | `roles/run.invoker` on the backend only |
+
+`gemini-router-runner` no longer runs any Cloud Run service. It is kept as the identity operators impersonate to mint OIDC tokens for `cmd/verify` (and for an existing GKE Workload Identity binding), and it keeps `roles/run.invoker` on the backend.
+
+The backend admin API (`/api/*`) accepts either the shared secret (`X-Shared-Secret`) or a Google OIDC ID token. OIDC tokens are accepted only when **both** of these backend env vars are set (otherwise OIDC is rejected, fail closed):
+
+| Env var | Value |
+| --- | --- |
+| `API_OIDC_AUDIENCES` | Comma-separated backend URLs the token `aud` must match, e.g. `https://gemini-smart-router-<hash>-uc.a.run.app,https://gemini-smart-router-<project-number>.us-central1.run.app` |
+| `API_ALLOWED_CALLERS` | Comma-separated service-account emails allowed to call the admin API, e.g. `smart-router-ui-sa@<project>.iam.gserviceaccount.com,gemini-router-runner@<project>.iam.gserviceaccount.com` |
+
+The token's `email` claim must be in `API_ALLOWED_CALLERS` and `email_verified` must be `true`. A token minted for any other audience returns `401`.
+
+---
+
 ## 🛡️ Post-Deployment Secure Verification & Token Impersonation
 
-To maintain maximum security, the Smart Router backend on Cloud Run is deployed without public (`allUsers`) invoker permissions. Standard requests require OIDC identity token authentication matching the targeted audience (the backend service URL).
+The Smart Router backend on Cloud Run is publicly invokable (`allUsers` has `roles/run.invoker`, see `google_cloud_run_v2_service_iam_member.public_access`) because it is a hybrid API gateway: client traffic is authenticated inside the app by API keys, and the admin REST API (`/api/*`) is authenticated by the shared secret or by an OIDC identity token whose audience is the backend service URL and whose caller is in `API_ALLOWED_CALLERS` (see above). The caller service accounts also hold `roles/run.invoker` on the backend directly, so they keep working if the `allUsers` binding is ever removed.
 
 Since standard user accounts (e.g., `@mycompany.com` or `@gmail.com` accounts logged in via `gcloud`) cannot generate custom-audience OIDC tokens directly, the post-deployment verify utility (`cmd/verify/main.go`) implements a robust **ADC-Driven Service Account Impersonation** pattern.
 

@@ -36,7 +36,7 @@ spec:
         image: gcr.io/my-project/smart-router-k8s-agent:latest
         env:
         - name: ROUTER_URL
-          value: "https://gemini-smart-router-backend-txgsracloq-uc.a.run.app"
+          value: "https://<your-router-service-url>"
         - name: CLUSTER_ID
           value: "gke-gpu-spot-pool"
         resources:

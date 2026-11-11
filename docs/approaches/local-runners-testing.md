@@ -89,7 +89,7 @@ Submit a generated content request targeting `gemma-4-4b` via the router:
 ```bash
 curl -s -X POST "https://<YOUR_ROUTER_URL>/v1/models/gemma-4-4b:generateContent" \
     -H "Content-Type: application/json" \
-    -H "x-goog-api-key: gr_local_cluster_verify_key" \
+    -H "x-goog-api-key: <your-router-api-key>" \
     -H "X-Client-App-ID: app-local-verify" \
     -d '{"contents": [{"role": "user", "parts": [{"text": "What is 2 + 2? Answer in exactly one word."}]}]}'
 ```
@@ -125,7 +125,7 @@ Submit a content generation prompt via the Cloud Run router proxy:
 ```bash
 curl -s -X POST "https://<YOUR_ROUTER_URL>/v1/models/gemma-4-4b:generateContent" \
     -H "Content-Type: application/json" \
-    -H "x-goog-api-key: gr_local_cluster_verify_key" \
+    -H "x-goog-api-key: <your-router-api-key>" \
     -H "X-Client-App-ID: app-local-verify" \
     -d '{"contents": [{"role": "user", "parts": [{"text": "What is the chemical symbol for water? Answer in exactly one word."}]}]}'
 ```

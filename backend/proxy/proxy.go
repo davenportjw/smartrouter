@@ -1200,7 +1200,8 @@ func isJWT(token string) bool {
 
 // parseGoogleIdentity decodes and validates a Google-issued ID Token to extract the email.
 func parseGoogleIdentity(ctx context.Context, tokenStr string, host string) (string, error) {
-	isLocalDev := os.Getenv("LOCAL_DEV") == "true"
+	// Unverified parsing is a local-dev convenience only; never on Cloud Run (K_SERVICE set).
+	isLocalDev := os.Getenv("LOCAL_DEV") == "true" && os.Getenv("K_SERVICE") == ""
 	if isLocalDev {
 		// In local dev, parse unverified payload directly to extract email claim
 		parser := &jwt.Parser{}

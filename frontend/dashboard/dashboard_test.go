@@ -1470,9 +1470,9 @@ func TestDashboardRemediationsAndUIArchitecture(t *testing.T) {
 		t.Setenv("FIREBASE_AUTH_DOMAIN", "")
 		t.Setenv("FIREBASE_PROJECT_ID", "")
 		t.Setenv("FIREBASE_STORAGE_BUCKET", "")
-		t.Setenv("FIREBASE_APP_ID", "1:834476222725:web:testappid")
+		t.Setenv("FIREBASE_APP_ID", "1:123456789012:web:testappid")
 
-		loginDash := NewDashboardController(dbStore, "davenport-boutique", "us-central1")
+		loginDash := NewDashboardController(dbStore, "example-gcp-project", "us-central1")
 		reqLogin := httptest.NewRequest("GET", "/login", nil)
 		rrLogin := httptest.NewRecorder()
 
@@ -1485,11 +1485,11 @@ func TestDashboardRemediationsAndUIArchitecture(t *testing.T) {
 		if !strings.Contains(body, `data-api-key="AIzaSyTestFallbackWebKey123"`) {
 			t.Errorf("expected login HTML to contain fallback FIREBASE_WEB_API_KEY, got: %s", body)
 		}
-		if !strings.Contains(body, `data-auth-domain="davenport-boutique.firebaseapp.com"`) {
-			t.Errorf("expected login HTML to contain default auth domain davenport-boutique.firebaseapp.com")
+		if !strings.Contains(body, `data-auth-domain="example-gcp-project.firebaseapp.com"`) {
+			t.Errorf("expected login HTML to contain default auth domain example-gcp-project.firebaseapp.com")
 		}
-		if !strings.Contains(body, `data-project-id="davenport-boutique"`) {
-			t.Errorf("expected login HTML to contain default project id davenport-boutique")
+		if !strings.Contains(body, `data-project-id="example-gcp-project"`) {
+			t.Errorf("expected login HTML to contain default project id example-gcp-project")
 		}
 	})
 }

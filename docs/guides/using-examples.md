@@ -14,11 +14,11 @@ Demonstrates how client applications connect to the Smart Router using an API ke
    cd examples/cloudrun-apikey
    ```
 2. Ensure the local Smart Router is running on `localhost:8080`.
-3. Seed an API key (e.g., `gr_key_dev_chat`) in the dashboard.
+3. Generate an API key in the dashboard.
 4. Set the environment variables:
    ```ini
    ROUTER_URL="http://localhost:8080"
-   ROUTER_API_KEY="gr_key_dev_chat"
+   ROUTER_API_KEY="<your-router-api-key>"
    ```
 5. Run the client:
    ```bash

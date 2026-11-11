@@ -24,12 +24,6 @@ locals {
     if trimspace(entry) != ""
   ]
 
-  parsed_auth_domains = [
-    for entry in split(",", var.allowed_email_domains) :
-    trimprefix(trimspace(entry), "@")
-    if trimspace(entry) != "" && length(split("@", trimprefix(trimspace(entry), "@"))) == 1
-  ]
-
   # Managed Secret Manager container IDs (secret versions are populated out-of-band via
   # `gcloud secrets versions add` / `./deploy.sh` so raw secret values never enter terraform.tfstate).
   managed_secret_ids = toset([
@@ -59,56 +53,26 @@ resource "google_project_service" "apis" {
 
 # Firestore Database Native Instance
 resource "google_firestore_database" "database" {
-  depends_on  = [google_project_service.apis]
-  name        = "(default)"
-  location_id = var.region
-  type        = "FIRESTORE_NATIVE"
+  depends_on                        = [google_project_service.apis]
+  name                              = "(default)"
+  location_id                       = var.region
+  type                              = "FIRESTORE_NATIVE"
+  point_in_time_recovery_enablement = "POINT_IN_TIME_RECOVERY_ENABLED"
 
   # Prevent accidental deletion of Firestore database in production
   deletion_policy = "DELETE"
 }
 
-# Service Account for Cloud Run Services
+# Service Account for CLI/Developer OIDC Impersonation against Admin API
 resource "google_service_account" "router_sa" {
   depends_on   = [google_project_service.apis]
   account_id   = "gemini-router-runner"
   display_name = "Gemini Smart Router Cloud Run Service Account"
 }
 
-# IAM: Vertex AI User Access to invoke Gemini API models
-resource "google_project_iam_member" "vertex_ai_access" {
-  project = var.project_id
-  role    = "roles/aiplatform.user"
-  member  = "serviceAccount:${google_service_account.router_sa.email}"
-}
-
-# IAM: Firestore Access
-resource "google_project_iam_member" "firestore_access" {
-  project = var.project_id
-  role    = "roles/datastore.user"
-  member  = "serviceAccount:${google_service_account.router_sa.email}"
-}
-
-# IAM: Cloud Monitoring Viewer
-resource "google_project_iam_member" "monitoring_access" {
-  project = var.project_id
-  role    = "roles/monitoring.viewer"
-  member  = "serviceAccount:${google_service_account.router_sa.email}"
-}
-
-# IAM: Cloud Logging Viewer
-resource "google_project_iam_member" "logging_access" {
-  project = var.project_id
-  role    = "roles/logging.viewer"
-  member  = "serviceAccount:${google_service_account.router_sa.email}"
-}
-
-# IAM: Firebase Auth Admin Access for backend session validation
-resource "google_project_iam_member" "firebase_auth_access" {
-  project = var.project_id
-  role    = "roles/firebaseauth.admin"
-  member  = "serviceAccount:${google_service_account.router_sa.email}"
-}
+# IAM: Vertex AI, Firestore, and Secret Manager bindings were removed from router_sa:
+# no Cloud Run service runs as it any more (see service-accounts.tf). It is retained
+# strictly as a zero-privilege OIDC caller identity for authorized CLI operators.
 
 # Google Cloud Secret Manager: Managed Secret Containers for Decision Engines & Shared Auth
 # Note: Secret versions are populated out-of-band via `gcloud secrets versions add` (see deploy.sh)
@@ -130,21 +94,13 @@ resource "google_secret_manager_secret" "app_secrets" {
   depends_on = [google_project_service.apis]
 }
 
-resource "google_secret_manager_secret_iam_member" "router_sa_secret_accessor" {
-  for_each  = google_secret_manager_secret.app_secrets
-  project   = var.project_id
-  secret_id = each.value.secret_id
-  role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${google_service_account.router_sa.email}"
-}
-
 # 1. BACKEND SERVICE (Gemini Router API and Administrative Configuration APIs)
 resource "google_cloud_run_v2_service" "router_service" {
   depends_on = [
     google_project_service.apis,
-    google_service_account.router_sa,
+    google_service_account.api_sa,
     google_secret_manager_secret.app_secrets,
-    google_secret_manager_secret_iam_member.router_sa_secret_accessor
+    google_secret_manager_secret_iam_member.api_sa_secret_accessor
   ]
 
   name     = var.service_name
@@ -152,7 +108,7 @@ resource "google_cloud_run_v2_service" "router_service" {
   ingress  = "INGRESS_TRAFFIC_ALL"
 
   template {
-    service_account = google_service_account.router_sa.email
+    service_account = google_service_account.api_sa.email
 
     containers {
       image = "gcr.io/cloudrun/placeholder" # Updated dynamically in build/deploy script
@@ -169,6 +125,17 @@ resource "google_cloud_run_v2_service" "router_service" {
       env {
         name  = "GEMINI_LOCATION"
         value = var.region
+      }
+
+      # Admin API OIDC pinning (fail closed if either is empty); see service-accounts.tf.
+      env {
+        name  = "API_OIDC_AUDIENCES"
+        value = local.api_oidc_audiences
+      }
+
+      env {
+        name  = "API_ALLOWED_CALLERS"
+        value = local.api_allowed_callers
       }
 
       dynamic "env" {
@@ -198,6 +165,7 @@ resource "google_cloud_run_v2_service" "router_service" {
       client,
       client_version,
       template[0].containers[0].image,
+      template[0].containers[0].env,
     ]
   }
 }
@@ -214,9 +182,9 @@ resource "google_cloud_run_v2_service_iam_member" "public_access" {
 resource "google_cloud_run_v2_service" "frontend_service" {
   depends_on = [
     google_project_service.apis,
-    google_service_account.router_sa,
+    google_service_account.ui_sa,
     google_secret_manager_secret.app_secrets,
-    google_secret_manager_secret_iam_member.router_sa_secret_accessor
+    google_secret_manager_secret_iam_member.ui_sa_secret_accessor
   ]
 
   name     = "${var.service_name}-ui"
@@ -224,7 +192,7 @@ resource "google_cloud_run_v2_service" "frontend_service" {
   ingress  = "INGRESS_TRAFFIC_ALL"
 
   template {
-    service_account = google_service_account.router_sa.email
+    service_account = google_service_account.ui_sa.email
 
     containers {
       image = "gcr.io/cloudrun/placeholder" # Updated dynamically in build/deploy script
@@ -258,8 +226,9 @@ resource "google_cloud_run_v2_service" "frontend_service" {
         value = var.region
       }
 
+      # The UI only needs the shared secret (decision-engine keys are backend-only).
       dynamic "env" {
-        for_each = local.mounted_secret_ids
+        for_each = setintersection(local.mounted_secret_ids, local.ui_sa_secrets)
         content {
           name = env.value
           value_source {
@@ -323,6 +292,7 @@ resource "google_cloud_run_v2_service" "frontend_service" {
       client,
       client_version,
       template[0].containers[0].image,
+      template[0].containers[0].env,
     ]
   }
 }
@@ -335,42 +305,45 @@ resource "google_cloud_run_v2_service_iam_member" "frontend_public_access" {
   member   = "allUsers"
 }
 
-# Manage Authorized Domains for Google Identity Platform / Firebase Auth
-resource "google_identity_platform_config" "auth_config" {
-  project = var.project_id
+# Sign-in redirect hosts for Google Identity Platform / Firebase Auth.
+# The project's authorized-domains list is shared by every app in the GCP project, so this repo
+# no longer manages the whole project-wide list (google_identity_platform_config).
+# It adds only its own Cloud Run hosts on create and removes only those on destroy, one resource per
+# service (scripts/authorized-domains.sh). Email domains from allowed_email_domains are NOT redirect
+# hosts and are only used for the IAM/app allowlist above.
+locals {
+  sign_in_hosts = {
+    frontend = [for u in google_cloud_run_v2_service.frontend_service.urls : trimsuffix(trimprefix(u, "https://"), "/")]
+    router   = [for u in google_cloud_run_v2_service.router_service.urls : trimsuffix(trimprefix(u, "https://"), "/")]
+  }
+}
 
-  authorized_domains = distinct(concat([
-    "localhost",
-    "${var.project_id}.firebaseapp.com",
-    "${var.project_id}.web.app",
-    replace(replace(google_cloud_run_v2_service.frontend_service.uri, "https://", ""), "/", ""),
-    replace(replace(google_cloud_run_v2_service.router_service.uri, "https://", ""), "/", "")
-  ], local.parsed_auth_domains))
+resource "terraform_data" "authorized_domains" {
+  for_each = local.sign_in_hosts
 
-  lifecycle {
-    ignore_changes = [
-      autodelete_anonymous_users,
-      blocking_functions,
-      client,
-      mfa,
-      monitoring,
-      multi_tenant,
-      quota,
-      sign_in,
-      sms_region_config
-    ]
+  triggers_replace = {
+    project = var.project_id
+    hosts   = join(" ", sort(each.value))
   }
 
-  depends_on = [
-    google_project_service.apis
-  ]
+  provisioner "local-exec" {
+    command = "${path.module}/scripts/authorized-domains.sh add ${self.triggers_replace.project} ${self.triggers_replace.hosts}"
+  }
+
+  provisioner "local-exec" {
+    when       = destroy
+    on_failure = continue
+    command    = "[ -x ${path.module}/scripts/authorized-domains.sh ] && ${path.module}/scripts/authorized-domains.sh remove ${self.triggers_replace.project} ${self.triggers_replace.hosts}"
+  }
+
+  depends_on = [google_project_service.apis]
 }
 
 # 3. TRAFFIC GENERATOR SERVICE (Targets the Backend Service endpoint for load simulation)
 resource "google_cloud_run_v2_service" "generator_service" {
   depends_on = [
     google_project_service.apis,
-    google_service_account.router_sa
+    google_service_account.traffic_sa
   ]
 
   name     = "gemini-traffic-generator"
@@ -378,7 +351,7 @@ resource "google_cloud_run_v2_service" "generator_service" {
   ingress  = "INGRESS_TRAFFIC_ALL"
 
   template {
-    service_account = google_service_account.router_sa.email
+    service_account = google_service_account.traffic_sa.email
 
     annotations = {
       "run.googleapis.com/cpu-throttling" = "false"
@@ -415,6 +388,9 @@ resource "google_cloud_run_v2_service" "generator_service" {
       client,
       client_version,
       template[0].containers[0].image,
+      template[0].containers[0].env,
+      # Set by `gcloud run deploy --source` (deploy.sh); not managed here.
+      build_config,
     ]
   }
 }

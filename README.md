@@ -23,6 +23,8 @@ flowchart TD
     B2 -->|Google Sign-In| G[Firebase Authentication]
 ```
 
+> **Admin API OIDC:** the backend only accepts OIDC tokens minted for its own URL (`API_OIDC_AUDIENCES`) from allowlisted service accounts (`API_ALLOWED_CALLERS`); if either is unset, OIDC is rejected and only the shared secret works. Each Cloud Run service runs as its own least-privilege service account. See [Cloud Deployment → Service Accounts & Admin API OIDC Pinning](docs/guides/cloud-deployment.md#-service-accounts--admin-api-oidc-pinning).
+
 ---
 
 ## ⚙️ Prerequisites

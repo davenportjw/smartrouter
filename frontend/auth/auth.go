@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -15,148 +16,247 @@ import (
 
 type contextKey string
 
-const uidContextKey contextKey = "uid"
+const (
+	uidContextKey   contextKey = "uid"
+	emailContextKey contextKey = "email"
+
+	// SessionCookieName is the HttpOnly cookie that carries the Firebase session cookie.
+	SessionCookieName = "session"
+	// SessionDuration is the validity of a Firebase session cookie (5 days).
+	SessionDuration = 5 * 24 * time.Hour
+	// maxSignInAge bounds how old the Google sign-in behind an ID token may be when minting a session.
+	maxSignInAge = 10 * time.Minute
+	// googleSignInProvider is the only accepted Firebase sign-in provider.
+	googleSignInProvider = "google.com"
+)
+
+// FirebaseAuthClient is the subset of the Firebase Admin SDK auth client used here.
+// *auth.Client satisfies it; tests may inject a client built against throwaway keys.
+type FirebaseAuthClient interface {
+	VerifyIDToken(ctx context.Context, idToken string) (*auth.Token, error)
+	SessionCookie(ctx context.Context, idToken string, expiresIn time.Duration) (string, error)
+	VerifySessionCookie(ctx context.Context, sessionCookie string) (*auth.Token, error)
+	VerifySessionCookieAndCheckRevoked(ctx context.Context, sessionCookie string) (*auth.Token, error)
+	RevokeRefreshTokens(ctx context.Context, uid string) error
+}
 
 // AuthStore handles connection to Firebase Auth service.
 type AuthStore struct {
-	Client *auth.Client
+	Client FirebaseAuthClient
+	// now is overridable in tests; defaults to time.Now.
+	now func() time.Time
 }
 
-// NewAuthStore initializes a connection to the Firebase Auth service or sets up mock for local dev.
-func NewAuthStore(ctx context.Context) (*AuthStore, error) {
-	isLocalDev := os.Getenv("LOCAL_DEV") == "true"
-	if isLocalDev {
-		return &AuthStore{Client: nil}, nil
-	}
+// Session is the verified identity behind a Firebase session cookie.
+type Session struct {
+	UID   string
+	Email string
+}
 
-	// Uses Google Application Default Credentials (ADC) automatically
-	app, err := firebase.NewApp(ctx, nil)
+// onCloudRun reports whether the process is running on Cloud Run.
+func onCloudRun() bool {
+	return os.Getenv("K_SERVICE") != ""
+}
+
+// localDevEnabled reports whether local-development relaxations apply. They can never
+// apply on Cloud Run, even if LOCAL_DEV is set there by mistake.
+func localDevEnabled() bool {
+	return os.Getenv("LOCAL_DEV") == "true" && !onCloudRun()
+}
+
+// NewAuthStore initializes the Firebase Admin SDK auth client with Application Default Credentials.
+// Outside Cloud Run with LOCAL_DEV=true, an initialization failure is logged and every sign-in
+// fails closed instead of aborting startup. There is no authentication bypass.
+func NewAuthStore(ctx context.Context) (*AuthStore, error) {
+	client, err := newFirebaseAuthClient(ctx)
+	if err != nil {
+		if localDevEnabled() {
+			log.Printf("[Auth] Firebase auth unavailable in local dev (%v); sign-in will fail until ADC is configured", err)
+			return &AuthStore{}, nil
+		}
+		return nil, err
+	}
+	return &AuthStore{Client: client}, nil
+}
+
+func newFirebaseAuthClient(ctx context.Context) (FirebaseAuthClient, error) {
+	var conf *firebase.Config
+	if projectID := firebaseProjectID(); projectID != "" {
+		conf = &firebase.Config{ProjectID: projectID}
+	}
+	// Uses Google Application Default Credentials (ADC) automatically.
+	app, err := firebase.NewApp(ctx, conf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize firebase app: %w", err)
 	}
-
 	client, err := app.Auth(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize firebase auth client: %w", err)
 	}
-
-	return &AuthStore{Client: client}, nil
+	return client, nil
 }
 
-// CreateSession verifies a client-side ID token and issues a secure HTTP-only session cookie.
+func firebaseProjectID() string {
+	if v := strings.TrimSpace(os.Getenv("FIREBASE_PROJECT_ID")); v != "" && v != "your-gcp-project-id" {
+		return v
+	}
+	return strings.TrimSpace(os.Getenv("GOOGLE_CLOUD_PROJECT"))
+}
+
+func (as *AuthStore) clock() time.Time {
+	if as.now != nil {
+		return as.now()
+	}
+	return time.Now()
+}
+
+func secureCookies() bool {
+	return !localDevEnabled()
+}
+
+func clearSessionCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     SessionCookieName,
+		Value:    "",
+		MaxAge:   -1,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   secureCookies(),
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+// checkIdentityClaims enforces a verified email, Google as the sign-in provider, and the
+// configured allowlist. It applies to both ID tokens and session cookies.
+func checkIdentityClaims(token *auth.Token) (string, error) {
+	if token == nil || strings.TrimSpace(token.UID) == "" {
+		return "", errors.New("token is missing uid")
+	}
+	email, _ := token.Claims["email"].(string)
+	email = strings.ToLower(strings.TrimSpace(email))
+	if email == "" {
+		return "", errors.New("token is missing email claim")
+	}
+	if verified, _ := token.Claims["email_verified"].(bool); !verified {
+		return "", errors.New("email is not verified")
+	}
+	if token.Firebase.SignInProvider != googleSignInProvider {
+		return "", fmt.Errorf("sign-in provider %q is not allowed", token.Firebase.SignInProvider)
+	}
+	allowed := ResolveAllowedDomainsFromEnv()
+	if len(allowed) == 0 {
+		return "", errAllowlistMissing
+	}
+	if !isEmailAuthorized(email, allowed) {
+		return "", fmt.Errorf("email %s is not authorized", email)
+	}
+	return email, nil
+}
+
+var errAllowlistMissing = errors.New("no authorized domains are configured in ALLOWED_EMAIL_DOMAINS / ALLOWED_AUTH_DOMAINS")
+
+// VerifySession verifies the request's Firebase session cookie (signature, issuer, audience,
+// expiry, revocation and disabled state via the Admin SDK) and re-checks the verified email,
+// Google provider and allowlist. It fails closed; identity headers are never consulted.
+func (as *AuthStore) VerifySession(r *http.Request) (*Session, error) {
+	if as == nil || as.Client == nil {
+		return nil, errors.New("firebase auth client not initialized")
+	}
+	cookie, err := r.Cookie(SessionCookieName)
+	if err != nil || cookie.Value == "" {
+		return nil, errors.New("missing session cookie")
+	}
+	token, err := as.Client.VerifySessionCookieAndCheckRevoked(r.Context(), cookie.Value)
+	if err != nil {
+		return nil, err
+	}
+	email, err := checkIdentityClaims(token)
+	if err != nil {
+		return nil, err
+	}
+	return &Session{UID: token.UID, Email: email}, nil
+}
+
+// CreateSession verifies a client-side Google ID token and issues a secure HTTP-only
+// Firebase session cookie.
 func (as *AuthStore) CreateSession(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if !verifyOrigin(r) {
+		http.Error(w, "Forbidden: CSRF verification failed", http.StatusForbidden)
+		return
+	}
 
-	// Extract ID Token from body or header
-	idToken := r.FormValue("idToken")
+	idToken := strings.TrimSpace(r.FormValue("idToken"))
 	if idToken == "" {
 		http.Error(w, "Missing idToken parameter", http.StatusBadRequest)
 		return
 	}
 
-	// Set session duration (5 days)
-	expiresIn := time.Hour * 24 * 5
+	if as.Client == nil {
+		http.Error(w, "Sign-in is unavailable: authentication is not configured", http.StatusServiceUnavailable)
+		return
+	}
 
-	isLocalDev := os.Getenv("LOCAL_DEV") == "true"
-	var cookieString string
+	decodedToken, err := as.Client.VerifyIDToken(r.Context(), idToken)
+	if err != nil {
+		log.Printf("[Auth] Error verifying ID token: %v", err)
+		http.Error(w, "Invalid ID token", http.StatusUnauthorized)
+		return
+	}
 
-	if isLocalDev && idToken == "dev-admin-token" {
-		cookieString = "dev-admin-session-cookie"
-	} else {
-		if as.Client == nil {
-			http.Error(w, "Firebase auth client not initialized", http.StatusInternalServerError)
-			return
-		}
+	authTime := decodedToken.AuthTime
+	signInAge := as.clock().Sub(time.Unix(authTime, 0))
+	if authTime <= 0 || signInAge > maxSignInAge || signInAge < -time.Minute {
+		http.Error(w, "Recent sign-in required; please sign in again", http.StatusUnauthorized)
+		return
+	}
 
-		// First, verify the ID token to inspect its claims (specifically email)
-		decodedToken, err := as.Client.VerifyIDToken(r.Context(), idToken)
-		if err != nil {
-			log.Printf("[Auth] Error verifying ID token: %v", err)
-			http.Error(w, "Invalid ID token", http.StatusUnauthorized)
-			return
-		}
-
-		// Retrieve email claim
-		emailClaim, ok := decodedToken.Claims["email"]
-		if !ok {
-			log.Printf("[Auth] Missing email claim in ID token")
-			http.Error(w, "Missing email claim in ID token", http.StatusForbidden)
-			return
-		}
-		email, ok := emailClaim.(string)
-		if !ok {
-			log.Printf("[Auth] Invalid email claim format")
-			http.Error(w, "Invalid email claim format", http.StatusForbidden)
-			return
-		}
-
-		// Restrict authentication access to authorized domains or specific email addresses
-		allowedDomains := ResolveAllowedDomainsFromEnv()
-		if len(allowedDomains) == 0 {
-			log.Printf("[Auth] Access denied because no authorized domains are configured in ALLOWED_EMAIL_DOMAINS / ALLOWED_AUTH_DOMAINS")
+	email, err := checkIdentityClaims(decodedToken)
+	if err != nil {
+		if errors.Is(err, errAllowlistMissing) {
+			log.Printf("[Auth] Access denied: %v", err)
 			http.Error(w, "Authentication system is misconfigured: ALLOWED_EMAIL_DOMAINS must be explicitly set", http.StatusInternalServerError)
 			return
 		}
-
-		if !isEmailAuthorized(email, allowedDomains) {
-			log.Printf("[Auth] Access denied for unauthorized email: %s", email)
-			http.Error(w, "Access restricted to authorized domains or specific email addresses", http.StatusForbidden)
-			return
-		}
-
-		var errCookie error
-		cookieString, errCookie = as.Client.SessionCookie(r.Context(), idToken, expiresIn)
-		if errCookie != nil {
-			log.Printf("[Auth] Error creating session cookie: %v", errCookie)
-			http.Error(w, "Failed to create session", http.StatusUnauthorized)
-			return
-		}
+		log.Printf("[Auth] Access denied: %v", err)
+		http.Error(w, "Access restricted to verified Google accounts on authorized domains or specific email addresses", http.StatusForbidden)
+		return
 	}
 
-	// Write secure, HTTP-only session cookie
+	cookieString, err := as.Client.SessionCookie(r.Context(), idToken, SessionDuration)
+	if err != nil {
+		log.Printf("[Auth] Error creating session cookie for %s: %v", email, err)
+		http.Error(w, "Failed to create session", http.StatusUnauthorized)
+		return
+	}
+
 	http.SetCookie(w, &http.Cookie{
-		Name:     "session",
+		Name:     SessionCookieName,
 		Value:    cookieString,
-		MaxAge:   int(expiresIn.Seconds()),
+		MaxAge:   int(SessionDuration.Seconds()),
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   !isLocalDev, // Require secure HTTPS only when not in local dev
+		Secure:   secureCookies(),
 		SameSite: http.SameSiteLaxMode,
 	})
 
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status": "success"}`))
+	_, _ = w.Write([]byte(`{"status": "success"}`))
 }
 
-// Logout clears the secure session cookie and redirects.
+// Logout clears the secure session cookie, revokes the user's Firebase sessions, and redirects.
 func (as *AuthStore) Logout(w http.ResponseWriter, r *http.Request) {
-	cookie, err := r.Cookie("session")
-	isLocalDev := os.Getenv("LOCAL_DEV") == "true"
-
-	if err == nil && (!isLocalDev || cookie.Value != "dev-admin-session-cookie") {
-		if as.Client != nil {
-			// Revoke session on Firebase server side for security
-			decoded, err := as.Client.VerifySessionCookie(r.Context(), cookie.Value)
-			if err == nil {
-				_ = as.Client.RevokeRefreshTokens(r.Context(), decoded.UID)
-			}
+	if cookie, err := r.Cookie(SessionCookieName); err == nil && cookie.Value != "" && as.Client != nil {
+		// Revoke session on Firebase server side for security
+		if decoded, err := as.Client.VerifySessionCookie(r.Context(), cookie.Value); err == nil {
+			_ = as.Client.RevokeRefreshTokens(r.Context(), decoded.UID)
 		}
 	}
-
-	// Delete local session cookie
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session",
-		Value:    "",
-		MaxAge:   -1,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   !isLocalDev,
-		SameSite: http.SameSiteLaxMode,
-	})
-
+	clearSessionCookie(w)
 	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
@@ -172,68 +272,41 @@ func (as *AuthStore) Middleware(next http.Handler) http.Handler {
 			}
 		}
 
-		cookie, err := r.Cookie("session")
-		if err != nil {
+		if _, err := r.Cookie(SessionCookieName); err != nil {
 			// No session cookie, redirect to login
 			http.Redirect(w, r, "/login", http.StatusFound)
 			return
 		}
 
-		isLocalDev := os.Getenv("LOCAL_DEV") == "true"
-		var uid string
-
-		if isLocalDev && cookie.Value == "dev-admin-session-cookie" {
-			uid = "dev-admin-uid"
-		} else {
-			if as.Client == nil {
-				http.SetCookie(w, &http.Cookie{
-					Name:   "session",
-					Value:  "",
-					MaxAge: -1,
-					Path:   "/",
-				})
-				http.Redirect(w, r, "/login", http.StatusFound)
-				return
-			}
-			// Verify session cookie (checkRevoked=true is recommended)
-			decodedToken, err := as.Client.VerifySessionCookieAndCheckRevoked(r.Context(), cookie.Value)
-			if err != nil {
-				log.Printf("[Auth Middleware] Invalid or revoked session cookie: %v", err)
-				// Delete corrupt/revoked cookie and redirect
-				http.SetCookie(w, &http.Cookie{
-					Name:   "session",
-					Value:  "",
-					MaxAge: -1,
-					Path:   "/",
-				})
-				http.Redirect(w, r, "/login", http.StatusFound)
-				return
-			}
-			uid = decodedToken.UID
+		session, err := as.VerifySession(r)
+		if err != nil {
+			log.Printf("[Auth Middleware] Rejected session cookie: %v", err)
+			// Delete corrupt/revoked/unauthorized cookie and redirect
+			clearSessionCookie(w)
+			http.Redirect(w, r, "/login", http.StatusFound)
+			return
 		}
 
-		// Set UID in context so templates/handlers can retrieve user details
-		ctx := context.WithValue(r.Context(), uidContextKey, uid)
+		// Set verified identity in context so templates/handlers can retrieve user details
+		ctx := context.WithValue(r.Context(), uidContextKey, session.UID)
+		ctx = context.WithValue(ctx, emailContextKey, session.Email)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
+// SessionFromContext returns the verified identity set by Middleware.
+func SessionFromContext(ctx context.Context) (*Session, bool) {
+	uid, _ := ctx.Value(uidContextKey).(string)
+	email, _ := ctx.Value(emailContextKey).(string)
+	if uid == "" || email == "" {
+		return nil, false
+	}
+	return &Session{UID: uid, Email: email}, true
+}
+
 // HasValidSession checks whether the request carries a valid, verified session cookie.
 func (as *AuthStore) HasValidSession(r *http.Request) bool {
-	if as == nil {
-		return false
-	}
-	cookie, err := r.Cookie("session")
-	if err != nil || cookie.Value == "" {
-		return false
-	}
-	if os.Getenv("LOCAL_DEV") == "true" && cookie.Value == "dev-admin-session-cookie" {
-		return true
-	}
-	if as.Client == nil {
-		return false
-	}
-	_, err = as.Client.VerifySessionCookieAndCheckRevoked(r.Context(), cookie.Value)
+	_, err := as.VerifySession(r)
 	return err == nil
 }
 
@@ -276,6 +349,9 @@ func isEmailAuthorized(email string, allowedList []string) bool {
 		entry = strings.ToLower(strings.TrimSpace(entry))
 		// Trim leading '@' if user input includes it (e.g., @gmail.com)
 		cleanedEntry := strings.TrimPrefix(entry, "@")
+		if cleanedEntry == "" {
+			continue
+		}
 		if strings.Contains(cleanedEntry, "@") {
 			// Match specific email address exactly
 			if email == cleanedEntry {

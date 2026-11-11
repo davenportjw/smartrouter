@@ -96,7 +96,7 @@ spec:
         image: gcr.io/my-project/smart-router-k8s-runner:latest
         imagePullPolicy: Always
         args: [
-          "--router-url=https://gemini-smart-router-txgsracloq-uc.a.run.app",
+          "--router-url=https://<your-router-service-url>",
           "--cluster-id=gke-gpu-spot-pool",
           "--cpu-mode=false"
         ]
@@ -195,8 +195,8 @@ curl -s -X POST "$BACKEND_URL/api/apps" \
 
 #### C. Register an API Key (Hashed)
 ```bash
-# Hash the key hash using SHA-256
-KEY_HASH=$(echo -n "gr_local_cluster_verify_key" | shasum -a 256 | cut -d' ' -f1)
+# Hash your generated API key using SHA-256
+KEY_HASH=$(echo -n "<your-router-api-key>" | shasum -a 256 | cut -d' ' -f1)
 
 curl -s -X POST "$BACKEND_URL/api/keys" \
     -H "X-Shared-Secret: $SHARED_SECRET" \
@@ -217,9 +217,9 @@ curl -s -X POST "$BACKEND_URL/api/rules" \
     -d '{
         "id": "rule-route-to-gke-cpu",
         "app_id": "app-local-verify",
-        "model_pattern": "gemma2:2b",
+        "model_pattern": "gemma-4-4b",
         "client_tier": "premium",
-        "target_model": "gemma2:2b",
+        "target_model": "gemma-4-4b",
         "target_location": "local-cluster",
         "priority_weight": 100
     }'
@@ -228,8 +228,8 @@ curl -s -X POST "$BACKEND_URL/api/rules" \
 ### 3. Submit Inference Prompt Query
 To execute a query through the proxy that routes to your GKE runner:
 ```bash
-curl -i -X POST "$BACKEND_URL/v1/models/gemma2:2b:generateContent" \
-    -H "x-goog-api-key: gr_local_cluster_verify_key" \
+curl -i -X POST "$BACKEND_URL/v1/models/gemma-4-4b:generateContent" \
+    -H "x-goog-api-key: <your-router-api-key>" \
     -H "X-Client-App-ID: app-local-verify" \
     -H "Content-Type: application/json" \
     -d '\''{"contents": [{"parts": [{"text": "What is 2+2? Answer in one word."}]}], "generationConfig": {"maxOutputTokens": 10}}'\''

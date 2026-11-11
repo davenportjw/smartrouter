@@ -339,7 +339,7 @@ func TestAPIConfigStoreAndBackendAPIIntegration(t *testing.T) {
 		reqReg := httptest.NewRequest("POST", "/api/v1/cluster/runners/register", strings.NewReader(`{
 			"id": "runner-mac-1",
 			"cluster_id": "local-cluster-1",
-			"hostname": "Jasons-MacBook-Pro",
+			"hostname": "dev-workstation-01",
 			"platform": "darwin",
 			"status": "online",
 			"total_ram_bytes": 17179869184,

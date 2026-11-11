@@ -14,13 +14,23 @@ For safety and security, there are no default or hardcoded allowed domains or em
 ALLOWED_EMAIL_DOMAINS="mycompany.com,corp.example.org,operator@gmail.com"
 ```
 During deployment, `deploy.sh` and Terraform synchronize both:
-1. **Admin Session Email Allowlist**: Enforced server-side in `/auth/session` (`frontend/auth/auth.go`) against verified Firebase ID token email claims.
+1. **Admin Session Email Allowlist**: Enforced server-side in `/auth/session` and on every `/admin/*` request (`frontend/auth/auth.go`) against verified Firebase ID token / session cookie email claims.
 2. **Firebase Identity Platform Authorized Domains (`authorizedDomains`)**: Ensures `localhost`, `<project-id>.firebaseapp.com`, `<project-id>.web.app`, the deployed Cloud Run service hostnames (`gemini-smart-router-ui` and `gemini-smart-router`), and configured domain entries are registered on Google Identity Toolkit (`admin/v2/projects/<project-id>/config`).
 
 ### Logging In
 1. Open `/admin` in your browser.
 2. If unauthenticated (or if a stale session cookie fails verification), the session cookie is cleared and you are redirected to `/login`.
 3. Click **Sign In with Google** and authorize with your Google credentials.
+
+### Session Model (Firebase Session Cookies)
+The dashboard never mints its own sessions and holds no session signing secret.
+1. **Login (`POST /auth/session`)**: the browser signs in with Google via the Firebase JS SDK (no client-side persistence) and posts the ID token (same-origin only). The server verifies it with the Firebase Admin SDK (RS256, issuer/audience for the project, expiry), then requires `email_verified == true`, `firebase.sign_in_provider == "google.com"`, a sign-in (`auth_time`) within the last 10 minutes, and an email on the allowlist. It then calls `auth.Client.SessionCookie` (Identity Toolkit `createSessionCookie`) for a **5-day** Google-signed session cookie, set as `session` with `HttpOnly; Secure; SameSite=Lax; Path=/`.
+2. **Every `/admin/*` request**: `VerifySessionCookieAndCheckRevoked` validates the signature against Google's session-cookie certificates, the `https://session.firebase.google.com/<project-id>` issuer, audience, expiry, and that the account is not disabled or revoked (`accounts:lookup`). The verified-email, Google-provider and allowlist checks are re-applied, so removing an address from `ALLOWED_EMAIL_DOMAINS` takes effect immediately. Any failure clears the cookie and redirects to `/login` (fail closed).
+3. **Identity headers are never trusted**: the actor comes only from the verified cookie (`auth.SessionFromContext`); headers such as `X-User-Email` / `X-User-Id` are ignored.
+4. **Logout (`/logout`)** clears the cookie and revokes the user's Firebase refresh tokens, invalidating all of their sessions.
+5. **Local development** has no bypass. `LOCAL_DEV=true` only drops the cookie `Secure` flag on `http://localhost` and is ignored whenever `K_SERVICE` is set (Cloud Run).
+
+The frontend Cloud Run service account needs permission to create session cookies and look up accounts (for example `roles/firebaseauth.admin`).
 
 ### Firebase Web API Key Verification & Renewal
 During deployment, `deploy.sh` probes the configured `FIREBASE_API_KEY` against Google Identity Toolkit (`accounts:createAuthUri`). If the key in `.env` is missing, placeholder, or expired (`auth/api-key-expired`), `deploy.sh` queries the GCP Firebase Management API (`webApps/*/config` with `x-goog-user-project`) and API Keys API to synchronize the active Firebase Web API key into `.env` and Cloud Run environment variables (`FIREBASE_API_KEY` and `FIREBASE_WEB_API_KEY`).

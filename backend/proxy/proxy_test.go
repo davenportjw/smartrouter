@@ -3863,7 +3863,7 @@ func TestIndividualModelsByOfferedLocation(t *testing.T) {
 	t.Setenv("LOCAL_DEV", "true")
 	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
 	ctx := context.Background()
-	cfgStore, err := store.NewConfigStore(ctx, "davenport-boutique")
+	cfgStore, err := store.NewConfigStore(ctx, "test-project")
 	if err != nil {
 		t.Fatalf("failed to init config store: %v", err)
 	}
@@ -3939,7 +3939,7 @@ func TestIndividualModelsByOfferedLocation(t *testing.T) {
 			defer backend.Close()
 
 			backendURL, _ := url.Parse(backend.URL)
-			rp, err := NewRouterProxy(cfgStore, "davenport-boutique", "us-central1")
+			rp, err := NewRouterProxy(cfgStore, "test-project", "us-central1")
 			if err != nil {
 				t.Fatalf("failed to create proxy: %v", err)
 			}
@@ -3988,7 +3988,7 @@ func TestIndividualModelsByOfferedLocation(t *testing.T) {
 			}
 
 			// 2. Verify rewritten URL path
-			expectedPath := fmt.Sprintf("/v1/projects/davenport-boutique/locations/%s/publishers/google/models/%s:generateContent", tc.location, tc.model)
+			expectedPath := fmt.Sprintf("/v1/projects/test-project/locations/%s/publishers/google/models/%s:generateContent", tc.location, tc.model)
 			if capturedUpstreamPath != expectedPath {
 				t.Errorf("Upstream URL path mismatch:\nexpected: %s\ngot:      %s", expectedPath, capturedUpstreamPath)
 			}

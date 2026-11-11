@@ -48,8 +48,8 @@ fi
 log_info "Generating OIDC Token for Cloud Run gateway..."
 OIDC_TOKEN=$(gcloud auth print-identity-token --audiences="$BACKEND_URL" --project="$PROJECT_ID" 2>/dev/null || true)
 
-# Define verification parameters
-CLIENT_API_KEY="gr_local_cluster_verify_key"
+# Define verification parameters (generate ephemeral key per run)
+CLIENT_API_KEY="gr_verify_$(openssl rand -hex 16)"
 APP_ID="app-local-verify"
 CLIENT_ID="client-local-verify"
 RULE_ID="rule-route-to-gke-cpu"

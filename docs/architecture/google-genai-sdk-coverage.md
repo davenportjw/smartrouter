@@ -65,7 +65,7 @@ from openai import OpenAI
 
 client = OpenAI(
     api_key="YOUR_ROUTER_API_KEY",
-    base_url="https://gemini-smart-router-txgsracloq-uc.a.run.app/v1",
+    base_url="https://<your-router-service-url>/v1",
 )
 
 response = client.chat.completions.create(
@@ -89,7 +89,7 @@ from google.genai import types
 client = genai.Client(
     api_key="YOUR_ROUTER_API_KEY",
     http_options={
-        "api_endpoint": "https://gemini-smart-router-txgsracloq-uc.a.run.app"
+        "api_endpoint": "https://<your-router-service-url>"
     },
 )
 
@@ -114,14 +114,14 @@ import litellm
 llm = ChatOpenAI(
     model="gemini-dynamic",
     api_key="YOUR_ROUTER_API_KEY",
-    base_url="https://gemini-smart-router-txgsracloq-uc.a.run.app/v1",
+    base_url="https://<your-router-service-url>/v1",
 )
 print(llm.invoke("Write a haiku about distributed systems.").content)
 
 # LiteLLM
 res = litellm.completion(
     model="openai/gemini-dynamic",
-    api_base="https://gemini-smart-router-txgsracloq-uc.a.run.app/v1",
+    api_base="https://<your-router-service-url>/v1",
     api_key="YOUR_ROUTER_API_KEY",
     messages=[{"role": "user", "content": "Hello via LiteLLM!"}],
 )

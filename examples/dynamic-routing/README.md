@@ -29,13 +29,11 @@ uv pip install -r requirements.txt
 
 To authorize example requests, the Smart Router requires specific application and API Key configs:
 
-#### A. Local Development Environment (Offline)
-When running the router locally with `LOCAL_DEV=true` (initiated by `./run_local.sh`), all required examples are **pre-configured and pre-seeded** in `data/local_db.json`:
-- **Authorized Key**: `gr_key_enterprise_123456789` (maps to a premium client tier).
+#### A. Local Development Environment
+When running the router locally with `LOCAL_DEV=true` (initiated by `./run_local.sh`), create a client, application, and API key via the Admin Portal (`http://localhost:8081`):
 - **Authorized App ID**: `prod-app-main` (with complexity routing enabled).
 - **Mandatory Custom Header**: `X-Client-App-ID` (complying with the validation pattern `^[a-zA-Z0-9-.@+]+$`).
-
-Simply start the local smart router and run the scripts out of the box!
+- **API Key**: Export your generated key as `ROUTER_API_KEY="<your-router-api-key>"`.
 
 #### B. Production / Cloud Run Environment
 When running against a live production deployment of the Smart Router, you must register these entities inside the **Admin Portal** (or your GCP Firestore):
@@ -48,13 +46,13 @@ When running against a live production deployment of the Smart Router, you must 
    - Go to the **Access Control (Keys)** tab -> **Generate API Key**. Bind it to `prod-app-main`. Copy the generated key (prefixed with `gr_key_`).
 4. **Register Routing Rules**:
    - Go to the **Routing Rules** tab -> **New Rule**:
-     - **Rule 1 (Priority Upgrade)**: Model Pattern: `gemini-1.5-pro`, Client Tier: `premium`, Custom Header Filter: `X-Route-Priority = gold`, Target Model: `gemini-2.5-pro`, Priority Weight: `5`.
-     - **Rule 2 (Default Fallback)**: Model Pattern: `gemini-1.5-pro`, Client Tier: `all`, Target Model: `gemini-2.5-flash`, Priority Weight: `1`.
+     - **Rule 1 (Priority Upgrade)**: Model Pattern: `gemini-2.5-flash`, Client Tier: `premium`, Custom Header Filter: `X-Route-Priority = gold`, Target Model: `gemini-3.1-pro`, Priority Weight: `5`.
+     - **Rule 2 (Default Fallback)**: Model Pattern: `gemini-2.5-flash`, Client Tier: `all`, Target Model: `gemini-3.8-flash`, Priority Weight: `1`.
 5. **Export Environment Variables**:
    Before running the scripts, specify your live Cloud Run URL and your generated API Key:
    ```bash
-   export ROUTER_URL="https://your-smart-router-service-xxxx.a.run.app"
-   export ROUTER_API_KEY="gr_key_your_generated_key"
+   export ROUTER_URL="https://<your-router-service-url>"
+   export ROUTER_API_KEY="<your-router-api-key>"
    ```
 
 ---

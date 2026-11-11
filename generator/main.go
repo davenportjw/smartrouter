@@ -15,12 +15,8 @@ import (
 var (
 	routerURL    string
 	roundCounter uint64
-	clientKeys   = map[string]string{
-		"premium":  "gr_key_enterprise_123456789",
-		"standard": "gr_key_standard_987654321",
-		"free":     "gr_key_free_555555555",
-	}
-	prompts = []string{
+	clientKeys   = map[string]string{}
+	prompts      = []string{
 		"What is the average distance to the moon?",
 		"Give me a 3-step recipe for making chocolate chip cookies.",
 		"Explain the difference between synchronous and asynchronous execution.",
@@ -51,6 +47,23 @@ func main() {
 	routerURL = os.Getenv("ROUTER_URL")
 	if routerURL == "" {
 		routerURL = "http://localhost:8080"
+	}
+
+	sharedKey := os.Getenv("ROUTER_API_KEY")
+	for tier, envName := range map[string]string{
+		"premium":  "TRAFFIC_KEY_PREMIUM",
+		"standard": "TRAFFIC_KEY_STANDARD",
+		"free":     "TRAFFIC_KEY_FREE",
+	} {
+		val := os.Getenv(envName)
+		if val == "" {
+			val = sharedKey
+		}
+		if val != "" {
+			clientKeys[tier] = val
+		} else {
+			log.Printf("[Traffic Generator] %s (and ROUTER_API_KEY) not set; %s tier simulation will be skipped", envName, tier)
+		}
 	}
 
 	port := os.Getenv("PORT")
@@ -180,8 +193,11 @@ func executeSimulationRound() (string, error) {
 
 	if clientTier == "invalid" {
 		// Unauthorized call (Invalid API Key)
-		return sendRequest("gr_key_bad_invalid_key", model, prompt, "script-runner-1", false, customHeaders)
+		return sendRequest("invalid-unregistered-probe", model, prompt, "script-runner-1", false, customHeaders)
 	} else if clientTier == "free" {
+		if clientKeys["free"] == "" {
+			return "Skipped free tier round: TRAFFIC_KEY_FREE not configured", nil
+		}
 		// Test Free Tier client
 		// Every 3rd free tier round, trigger a rate limit (429) by sending 6 requests in a quick burst!
 		if step%3 == 0 {
@@ -208,6 +224,9 @@ func executeSimulationRound() (string, error) {
 	// - 1/10: Missing custom header (triggers required failure)
 	headerBucket := step % 10
 	key := clientKeys[clientTier]
+	if key == "" {
+		return fmt.Sprintf("Skipped %s tier round: traffic API key env var not configured", clientTier), nil
+	}
 	appID := "prod-app-main"
 	if clientTier == "standard" {
 		appID = "stage-web-ui"
