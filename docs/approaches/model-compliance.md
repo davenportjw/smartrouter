@@ -18,6 +18,12 @@ Legacy model versions (e.g., `gemini-1.0-*`, `gemini-1.5-*`, `gemini-2.0-*`, `ge
 
 Use only the verified and authorized models in database rules, integration tests, or complexity targets:
 
+### Gemini 4 Series & Gemini Decisions API
+* **`gemini-4-argon`**: Frontier reasoning model for architecture design, multi-system synthesis, and deep algorithmic problems.
+  * **Offered Locations**: `global`, `us`, `us-central1`
+* **`gemini-decision-1`**: Dedicated single-forward-pass calibrated probability engine (`POST https://generativelanguage.googleapis.com/v1beta/decisions`) returning calibrated choice/score distributions with zero output tokens (`\$0.10` / 1M input tokens, `\$0.00` output).
+  * **Offered Locations**: `global`
+
 ### Gemini 3.8 Series
 * **`gemini-3.8-flash`**: High-performance flagship model offering ultra-low latency, multimodal understanding, and reasoning.
   * **Offered Locations**: `global`, `us`, `us-central1`, `europe-west1`

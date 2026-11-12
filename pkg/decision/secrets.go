@@ -141,6 +141,8 @@ func isDotEnvLoaded(key, val string) bool {
 // NormalizeEngineName canonicalizes engine names for secret lookup and rule matching.
 func NormalizeEngineName(engine string) string {
 	switch strings.ToLower(strings.TrimSpace(engine)) {
+	case "gemini-decision", "gemini-decisions", "gemini-decision-1", "decisions":
+		return "gemini-decision"
 	case "clm", "contrastive-lm", "contrastive_lm":
 		return "contrastive-lm"
 	case "fastino":
@@ -168,6 +170,8 @@ func EngineMatches(ruleEngine, activeEngine string) bool {
 // DefaultSecretRefForEngine returns the canonical Secret Manager / env var name for an engine.
 func DefaultSecretRefForEngine(engine string) string {
 	switch NormalizeEngineName(engine) {
+	case "gemini-decision":
+		return "GEMINI_DECISIONS_API_KEY"
 	case "jev":
 		return "JEV_API_KEY"
 	case "fastino":
@@ -185,6 +189,8 @@ func candidateEnvVarsForEngine(engine, secretRef string) []string {
 		keys = append(keys, trimmed)
 	}
 	switch NormalizeEngineName(engine) {
+	case "gemini-decision":
+		keys = append(keys, "GEMINI_DECISIONS_API_KEY")
 	case "jev":
 		keys = append(keys, "JEV_API_KEY", "TYPESAFE_API_KEY")
 	case "fastino":
@@ -311,6 +317,8 @@ func resolveEnvSecretWithSource(engine, secretRef string) (string, string, bool)
 // DisplayNameForEngine returns the human-friendly provider label for a decision engine.
 func DisplayNameForEngine(engine string) string {
 	switch NormalizeEngineName(engine) {
+	case "gemini-decision":
+		return "Gemini Decisions API (gemini-decision-1 · Keyless ADC)"
 	case "jev":
 		return "Jev (Typesafe SystemOne)"
 	case "fastino":
@@ -426,6 +434,8 @@ func GetEngineClusterConfig(engine string) (endpoint, connectionMode, clusterID 
 	// Fallback to environment variable if configured
 	var envEp string
 	switch norm {
+	case "gemini-decision":
+		envEp = strings.TrimSpace(os.Getenv("GEMINI_DECISION_ENDPOINT"))
 	case "jev":
 		envEp = strings.TrimSpace(os.Getenv("JEV_ENDPOINT"))
 	case "fastino":
@@ -442,6 +452,10 @@ func GetEngineClusterConfig(engine string) (endpoint, connectionMode, clusterID 
 			mode = "cluster"
 		}
 		return envEp, mode, cur.ClusterID
+	}
+
+	if norm == "gemini-decision" {
+		return DefaultGeminiDecisionEndpoint, "adc", cur.ClusterID
 	}
 
 	return "", "local", cur.ClusterID
@@ -524,6 +538,28 @@ func GetEngineSecretStatus(engine, secretRef string) EngineSecretStatus {
 		}
 	}
 
+	if norm == "gemini-decision" {
+		if ep == "" {
+			resolvedEndpoint = DefaultGeminiDecisionEndpoint
+		}
+		if mode == "" || mode == "local" {
+			mode = "adc"
+		}
+		return EngineSecretStatus{
+			Engine:         norm,
+			DisplayName:    displayName,
+			SecretName:     "ADC (OAuth2)",
+			EnvVar:         "GOOGLE_CLOUD_PROJECT",
+			Configured:     true,
+			MaskedKey:      "ADC OAuth2",
+			MaskedPreview:  "ADC OAuth2 (Keyless)",
+			Source:         "adc",
+			Endpoint:       resolvedEndpoint,
+			ConnectionMode: mode,
+			ClusterID:      clusterID,
+		}
+	}
+
 	return EngineSecretStatus{
 		Engine:         norm,
 		DisplayName:    displayName,
@@ -539,9 +575,10 @@ func GetEngineSecretStatus(engine, secretRef string) EngineSecretStatus {
 	}
 }
 
-// GetAllEngineSecretStatuses returns masked secret statuses for jev, fastino, and contrastive-lm.
+// GetAllEngineSecretStatuses returns masked secret statuses for gemini-decision, jev, fastino, and contrastive-lm.
 func GetAllEngineSecretStatuses(customSecretRef string) []EngineSecretStatus {
 	return []EngineSecretStatus{
+		GetEngineSecretStatus("gemini-decision", customSecretRef),
 		GetEngineSecretStatus("jev", customSecretRef),
 		GetEngineSecretStatus("fastino", customSecretRef),
 		GetEngineSecretStatus("contrastive-lm", customSecretRef),

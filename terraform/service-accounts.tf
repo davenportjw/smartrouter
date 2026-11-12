@@ -15,14 +15,18 @@
 
 locals {
   api_sa_project_roles = toset([
-    "roles/aiplatform.user", # Vertex AI generateContent proxying
-    "roles/datastore.user",  # Firestore config store
+    "roles/aiplatform.user",                   # Vertex AI generateContent proxying
+    "roles/datastore.user",                    # Firestore config store
+    "roles/serviceusage.serviceUsageConsumer", # Quota check for Gemini Decisions API & API Keys v2
+    "roles/serviceusage.apiKeysViewer"         # ADC lookup of project Authorization Key restricted to generativelanguage.googleapis.com
   ])
 
   ui_sa_project_roles = toset([
-    "roles/firebaseauth.admin", # createSessionCookie / VerifySessionCookie
-    "roles/aiplatform.user",    # model/endpoint listing + model verification calls
-    "roles/logging.viewer",     # dashboard request logs (logging entries:list)
+    "roles/firebaseauth.admin",                # createSessionCookie / VerifySessionCookie
+    "roles/aiplatform.user",                   # model/endpoint listing + model verification calls
+    "roles/logging.viewer",                    # dashboard request logs (logging entries:list)
+    "roles/serviceusage.serviceUsageConsumer", # Quota check for live Decisions inspect
+    "roles/serviceusage.apiKeysViewer"         # ADC lookup of project Authorization Key restricted to generativelanguage.googleapis.com
   ])
 
   # Only secrets each service actually mounts (the backend may also mount decision-engine keys).

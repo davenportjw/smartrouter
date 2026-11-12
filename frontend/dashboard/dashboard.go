@@ -1948,6 +1948,8 @@ func GetModelPricing(modelID string) (inPer1M float64, outPer1M float64) {
 	}
 
 	orderedRules := []pricingRule{
+		{match: "gemini-decision-1", in1M: 0.10, out1M: 0.00},
+		{match: "gemini-decision", in1M: 0.10, out1M: 0.00},
 		{match: "gemini-4-argon", in1M: 2.00, out1M: 10.00},
 		{match: "gemini-4-pro", in1M: 2.00, out1M: 10.00},
 		{match: "gemini-4", in1M: 2.00, out1M: 10.00},
@@ -1984,6 +1986,9 @@ func estimateTokensAndCost(model string, bytesSent int64) (int, int, float64) {
 	inTokens := int(float64(outTokens) * 1.5)
 	if inTokens < 100 {
 		inTokens = 100
+	}
+	if strings.Contains(strings.ToLower(model), "gemini-decision") {
+		outTokens = 0
 	}
 
 	inPer1M, outPer1M := GetModelPricing(model)
@@ -3423,6 +3428,7 @@ func (dc *DashboardController) SaveComplexitySettings(w http.ResponseWriter, r *
 	enabled := r.FormValue("enabled") == "true"
 	alwaysOverride := r.FormValue("always_override") == "true"
 	engine := strings.TrimSpace(r.FormValue("engine"))
+	geminiDecisionEndpoint := strings.TrimSpace(r.FormValue("gemini_decision_endpoint"))
 	jevEndpoint := strings.TrimSpace(r.FormValue("jev_endpoint"))
 	fastinoEndpoint := strings.TrimSpace(r.FormValue("fastino_endpoint"))
 	clmEndpoint := strings.TrimSpace(r.FormValue("clm_endpoint"))
@@ -3534,6 +3540,7 @@ func (dc *DashboardController) SaveComplexitySettings(w http.ResponseWriter, r *
 		Enabled:                enabled,
 		AlwaysOverride:         alwaysOverride,
 		Engine:                 engine,
+		GeminiDecisionEndpoint: geminiDecisionEndpoint,
 		JevEndpoint:            jevEndpoint,
 		FastinoEndpoint:        fastinoEndpoint,
 		CLMEndpoint:            clmEndpoint,
@@ -3799,14 +3806,15 @@ func (dc *DashboardController) HandleComplexityInspect(w http.ResponseWriter, r 
 	}
 
 	complexityCfg := config.ComplexityRouting{
-		Enabled:         true,
-		Engine:          engine,
-		SimpleModel:     simpleModel,
-		MediumModel:     mediumModel,
-		ComplexModel:    complexModel,
-		CLMEndpoint:     decision.GetEngineEndpoint("contrastive-lm"),
-		JevEndpoint:     decision.GetEngineEndpoint("jev"),
-		FastinoEndpoint: decision.GetEngineEndpoint("fastino"),
+		Enabled:                true,
+		Engine:                 engine,
+		SimpleModel:            simpleModel,
+		MediumModel:            mediumModel,
+		ComplexModel:           complexModel,
+		GeminiDecisionEndpoint: decision.GetEngineEndpoint("gemini-decision"),
+		CLMEndpoint:            decision.GetEngineEndpoint("contrastive-lm"),
+		JevEndpoint:            decision.GetEngineEndpoint("jev"),
+		FastinoEndpoint:        decision.GetEngineEndpoint("fastino"),
 	}
 
 	var result decision.DecisionResult
@@ -3828,6 +3836,23 @@ func (dc *DashboardController) HandleComplexityInspect(w http.ResponseWriter, r 
 
 	if result.TargetModel == "" {
 		switch strings.ToLower(engine) {
+		case "gemini-decision", "gemini-decisions", "gemini-decision-1", "decisions":
+			gemEng := decision.NewGeminiDecisionEngine(dc.TokenSource, dc.ProjectID)
+			if dc.HTTPClient != nil {
+				gemEng.HTTPClient = dc.HTTPClient
+			}
+			res, err := gemEng.Classify(r.Context(), prompt, complexityCfg, false, false)
+			if err != nil {
+				if strings.Contains(r.Header.Get("Accept"), "application/json") || r.URL.Query().Get("format") == "json" {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusBadGateway)
+					_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+					return
+				}
+				http.Error(w, err.Error(), http.StatusBadGateway)
+				return
+			}
+			result = res
 		case "fastino":
 			fastino := decision.NewFastinoDecisionEngine()
 			result = fastino.Classify(r.Context(), prompt, complexityCfg, false, false)
@@ -4320,6 +4345,12 @@ func (dc *DashboardController) CreateProviderCluster(w http.ResponseWriter, r *h
 		engineStr := strings.TrimSpace(r.FormValue("engine"))
 		roleStr := strings.TrimSpace(r.FormValue("role"))
 		clusterIDStr := strings.TrimSpace(r.FormValue("cluster_id"))
+		fallbackModel := strings.TrimSpace(r.FormValue("fallback_model"))
+		fallbackLocation := strings.TrimSpace(r.FormValue("fallback_location"))
+		if fallbackModel != "" && !config.IsValidModelName(config.StripLocationSuffix(fallbackModel)) {
+			http.Error(w, "Invalid or legacy fallback_model: "+fallbackModel, http.StatusBadRequest)
+			return
+		}
 		activeStr := strings.ToLower(strings.TrimSpace(r.FormValue("active")))
 
 		activeVal := true
@@ -4328,14 +4359,16 @@ func (dc *DashboardController) CreateProviderCluster(w http.ResponseWriter, r *h
 		}
 
 		ep := config.DirectEndpoint{
-			ID:        id,
-			Name:      name,
-			ModelName: modelStr,
-			URL:       urlStr,
-			Engine:    engineStr,
-			Role:      roleStr,
-			ClusterID: clusterIDStr,
-			Active:    activeVal,
+			ID:               id,
+			Name:             name,
+			ModelName:        modelStr,
+			URL:              urlStr,
+			Engine:           engineStr,
+			Role:             roleStr,
+			ClusterID:        clusterIDStr,
+			FallbackModel:    fallbackModel,
+			FallbackLocation: fallbackLocation,
+			Active:           activeVal,
 		}
 		lowerModel := strings.ToLower(modelStr)
 		if lowerModel == "contrastive-lm" || lowerModel == "clm" || lowerModel == "jev" || lowerModel == "fastino" {
@@ -4370,6 +4403,12 @@ func (dc *DashboardController) CreateProviderCluster(w http.ResponseWriter, r *h
 				}
 				if !r.Form.Has("active") {
 					ep.Active = existing.Active
+				}
+				if !r.Form.Has("fallback_model") && ep.FallbackModel == "" {
+					ep.FallbackModel = existing.FallbackModel
+				}
+				if !r.Form.Has("fallback_location") && ep.FallbackLocation == "" {
+					ep.FallbackLocation = existing.FallbackLocation
 				}
 				localReg.LocalConfig.DirectEndpoints[i] = ep
 				updated = true

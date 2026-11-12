@@ -23,7 +23,7 @@ type Client struct {
 type ComplexityRouting struct {
 	Enabled                bool              `firestore:"enabled" json:"enabled"`
 	AlwaysOverride         bool              `firestore:"always_override" json:"always_override"`
-	Engine                 string            `firestore:"engine" json:"engine"` // "heuristics", "llm", "jev", "fastino", "clm", "contrastive-lm"
+	Engine                 string            `firestore:"engine" json:"engine"` // "gemini-decision", "heuristics", "llm", "jev", "fastino", "clm", "contrastive-lm"
 	SimpleModel            string            `firestore:"simple_model" json:"simple_model"`
 	MediumModel            string            `firestore:"medium_model" json:"medium_model"`
 	ComplexModel           string            `firestore:"complex_model" json:"complex_model"`
@@ -34,6 +34,7 @@ type ComplexityRouting struct {
 	UseLLMClassifier       bool              `firestore:"use_llm_classifier" json:"use_llm_classifier"`
 	ClassifierModel        string            `firestore:"classifier_model" json:"classifier_model"`
 	AdditionalInstructions string            `firestore:"additional_instructions" json:"additional_instructions"`
+	GeminiDecisionEndpoint string            `firestore:"gemini_decision_endpoint,omitempty" json:"gemini_decision_endpoint,omitempty"`
 	JevEndpoint            string            `firestore:"jev_endpoint" json:"jev_endpoint"`
 	FastinoEndpoint        string            `firestore:"fastino_endpoint" json:"fastino_endpoint"`
 	CLMEndpoint            string            `firestore:"clm_endpoint" json:"clm_endpoint"`
@@ -150,17 +151,19 @@ type LocalConfig struct {
 
 // DirectEndpoint describes a single static local endpoint bypassing the queue.
 type DirectEndpoint struct {
-	ID             string `firestore:"id" json:"id"`
-	Name           string `firestore:"name,omitempty" json:"name,omitempty"`
-	ModelName      string `firestore:"model_name" json:"model_name"` // e.g., "gemma-4-26b", "contrastive-lm"
-	URL            string `firestore:"url" json:"url"`               // e.g., "http://10.128.0.5:8080/rank"
-	BaseURL        string `firestore:"base_url,omitempty" json:"base_url,omitempty"`
-	Active         bool   `firestore:"active" json:"active"`
-	Role           string `firestore:"role,omitempty" json:"role,omitempty"`
-	Engine         string `firestore:"engine,omitempty" json:"engine,omitempty"`
-	SecretRef      string `firestore:"secret_ref,omitempty" json:"secret_ref,omitempty"`
-	ConnectionMode string `firestore:"connection_mode,omitempty" json:"connection_mode,omitempty"`
-	ClusterID      string `firestore:"cluster_id,omitempty" json:"cluster_id,omitempty"`
+	ID               string `firestore:"id" json:"id"`
+	Name             string `firestore:"name,omitempty" json:"name,omitempty"`
+	ModelName        string `firestore:"model_name" json:"model_name"` // e.g., "gemma-4-26b", "contrastive-lm"
+	URL              string `firestore:"url" json:"url"`               // e.g., "http://10.128.0.5:8080/rank"
+	BaseURL          string `firestore:"base_url,omitempty" json:"base_url,omitempty"`
+	Active           bool   `firestore:"active" json:"active"`
+	Role             string `firestore:"role,omitempty" json:"role,omitempty"`
+	Engine           string `firestore:"engine,omitempty" json:"engine,omitempty"`
+	SecretRef        string `firestore:"secret_ref,omitempty" json:"secret_ref,omitempty"`
+	ConnectionMode   string `firestore:"connection_mode,omitempty" json:"connection_mode,omitempty"`
+	ClusterID        string `firestore:"cluster_id,omitempty" json:"cluster_id,omitempty"`
+	FallbackModel    string `firestore:"fallback_model,omitempty" json:"fallback_model,omitempty"`
+	FallbackLocation string `firestore:"fallback_location,omitempty" json:"fallback_location,omitempty"`
 }
 
 // LocalCluster manages dynamic pool queuing for on-prem machines.
@@ -383,6 +386,9 @@ func GetDefaultLocationForModel(modelName string, currentLoc string) string {
 		return sufLoc
 	}
 	baseID := StripLocationSuffix(modelName)
+	if baseID == "gemini-decision-1" {
+		return "global"
+	}
 	if strings.HasPrefix(baseID, "gemini-3.") || strings.HasPrefix(baseID, "gemini-4") {
 		if currentLoc == "us" || currentLoc == "eu" || currentLoc == "global" {
 			return currentLoc

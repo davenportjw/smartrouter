@@ -363,13 +363,20 @@ func (e *CoreRunnerEngine) forwardToLlamaCpp(model string, payload []byte) ([]by
 		requestBody = payload
 	} else {
 		// Gemini request mapping:
-		// Parse the Gemini contents payload and translate to an OpenAI chat structure for llama.cpp
+		// Parse the Gemini contents + optional systemInstruction payload and translate to OpenAI chat structure for llama.cpp
+		type geminiTextPart struct {
+			Text string `json:"text"`
+		}
 		var geminiReq struct {
+			SystemInstruction *struct {
+				Parts []geminiTextPart `json:"parts"`
+			} `json:"systemInstruction"`
+			SystemInstructionSnake *struct {
+				Parts []geminiTextPart `json:"parts"`
+			} `json:"system_instruction"`
 			Contents []struct {
-				Role  string `json:"role"`
-				Parts []struct {
-					Text string `json:"text"`
-				} `json:"parts"`
+				Role  string           `json:"role"`
+				Parts []geminiTextPart `json:"parts"`
 			} `json:"contents"`
 		}
 		if err := json.Unmarshal(payload, &geminiReq); err != nil {
@@ -381,6 +388,24 @@ func (e *CoreRunnerEngine) forwardToLlamaCpp(model string, payload []byte) ([]by
 			Content string `json:"content"`
 		}
 		var messages []oaiMessage
+		sysInst := geminiReq.SystemInstruction
+		if sysInst == nil {
+			sysInst = geminiReq.SystemInstructionSnake
+		}
+		if sysInst != nil && len(sysInst.Parts) > 0 {
+			var sysParts []string
+			for _, p := range sysInst.Parts {
+				if strings.TrimSpace(p.Text) != "" {
+					sysParts = append(sysParts, p.Text)
+				}
+			}
+			if len(sysParts) > 0 {
+				messages = append(messages, oaiMessage{
+					Role:    "system",
+					Content: strings.Join(sysParts, "\n"),
+				})
+			}
+		}
 		for _, content := range geminiReq.Contents {
 			role := content.Role
 			if role == "" || role == "user" {
@@ -428,15 +453,25 @@ func (e *CoreRunnerEngine) forwardToLlamaCpp(model string, payload []byte) ([]by
 	}
 
 	if isGemini && resp.StatusCode == http.StatusOK {
-		// Translate OpenAI completions output back to Gemini format
+		// Translate OpenAI completions output back to Gemini format while preserving token usageMetadata
 		var oaiRes struct {
 			Choices []struct {
 				Message struct {
 					Content string `json:"content"`
 				} `json:"message"`
+				FinishReason string `json:"finish_reason"`
 			} `json:"choices"`
+			Usage struct {
+				PromptTokens     int `json:"prompt_tokens"`
+				CompletionTokens int `json:"completion_tokens"`
+				TotalTokens      int `json:"total_tokens"`
+			} `json:"usage"`
 		}
 		if err := json.Unmarshal(resBytes, &oaiRes); err == nil && len(oaiRes.Choices) > 0 {
+			finishReason := "STOP"
+			if strings.EqualFold(oaiRes.Choices[0].FinishReason, "length") {
+				finishReason = "MAX_TOKENS"
+			}
 			geminiResp := map[string]interface{}{
 				"candidates": []interface{}{
 					map[string]interface{}{
@@ -447,8 +482,20 @@ func (e *CoreRunnerEngine) forwardToLlamaCpp(model string, payload []byte) ([]by
 								},
 							},
 						},
+						"finishReason": finishReason,
 					},
 				},
+			}
+			totalTokens := oaiRes.Usage.TotalTokens
+			if totalTokens == 0 && (oaiRes.Usage.PromptTokens > 0 || oaiRes.Usage.CompletionTokens > 0) {
+				totalTokens = oaiRes.Usage.PromptTokens + oaiRes.Usage.CompletionTokens
+			}
+			if totalTokens > 0 || oaiRes.Usage.PromptTokens > 0 || oaiRes.Usage.CompletionTokens > 0 {
+				geminiResp["usageMetadata"] = map[string]interface{}{
+					"promptTokenCount":     oaiRes.Usage.PromptTokens,
+					"candidatesTokenCount": oaiRes.Usage.CompletionTokens,
+					"totalTokenCount":      totalTokens,
+				}
 			}
 			geminiBytes, _ := json.Marshal(geminiResp)
 			return geminiBytes, http.StatusOK, nil

@@ -17,6 +17,9 @@ import (
 	store "geminirouter/backend/config"
 	"geminirouter/backend/proxy"
 	"geminirouter/pkg/config"
+	"geminirouter/pkg/decision"
+
+	"golang.org/x/oauth2"
 )
 
 func TestDashboardUIAndRESTBackendIntegration(t *testing.T) {
@@ -3270,6 +3273,131 @@ func TestTDD_MetricsCalculationAndOutlierResilience(t *testing.T) {
 		}
 	})
 }
+
+func TestTDD_DashboardGeminiDecisionPricingInspectAndDirectEndpointFailover(t *testing.T) {
+	t.Setenv("LOCAL_DEV", "true")
+	t.Setenv("LOCAL_DATA_DIR", t.TempDir())
+
+	inPrice, outPrice := GetModelPricing("gemini-decision-1")
+	if inPrice != 0.10 || outPrice != 0.00 {
+		t.Fatalf("expected gemini-decision-1 pricing ($0.10 in / $0.00 out), got in=%.3f out=%.3f", inPrice, outPrice)
+	}
+
+	ctx := context.Background()
+	cfgStore, err := store.NewConfigStore(ctx, "test-project")
+	if err != nil {
+		t.Fatalf("failed to init store: %v", err)
+	}
+	_ = cfgStore.SaveClient(ctx, config.Client{ID: "cl-dash", Tier: "premium"})
+	_ = cfgStore.SaveApp(ctx, config.App{ID: "app-dash", ClientID: "cl-dash", Name: "Dash App", RPM: 60, TPM: 100000})
+
+	decisionsSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"answers": {
+				"complexity": {"type":"choice","choice":"simple","probabilities":{"simple":0.95,"medium":0.04,"complex":0.01},"confidence":0.95},
+				"task_kind": {"type":"choice","choice":"fast_query","probabilities":{"fast_query":0.94,"general":0.06},"confidence":0.94},
+				"local_eligible": {"type":"noul","noul":0.98,"confidence":0.98}
+			},
+			"usage": {"total_input_tokens": 52, "total_output_tokens": 0, "total_tokens": 52}
+		}`))
+	}))
+	defer decisionsSrv.Close()
+
+	dash := NewDashboardController(cfgStore, "test-project", "us-central1")
+	dash.TokenSource = &staticDashTokenSource{tok: "dash-adc-test-token"}
+
+	// 1. SaveComplexitySettings persists engine="gemini-decision" and gemini_decision_endpoint
+	saveForm := url.Values{
+		"app_id":                   {"app-dash"},
+		"enabled":                  {"true"},
+		"engine":                   {"gemini-decision"},
+		"gemini_decision_endpoint": {decisionsSrv.URL + "/v1beta/decisions"},
+		"simple_model":             {"gemma-4-4b"},
+		"medium_model":             {"gemini-3.8-flash"},
+		"complex_model":            {"gemini-4-argon"},
+	}
+	reqSave := httptest.NewRequest("POST", "/admin/complexity/save", strings.NewReader(saveForm.Encode()))
+	reqSave.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	reqSave.Header.Set("HX-Request", "true")
+	rrSave := httptest.NewRecorder()
+	dash.SaveComplexitySettings(rrSave, reqSave)
+	if rrSave.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK saving complexity settings, got %d: %s", rrSave.Code, rrSave.Body.String())
+	}
+	savedApp, _ := cfgStore.LookupApp("app-dash")
+	if savedApp.Complexity.Engine != "gemini-decision" || savedApp.Complexity.GeminiDecisionEndpoint != decisionsSrv.URL+"/v1beta/decisions" {
+		t.Fatalf("expected saved Engine='gemini-decision' and GeminiDecisionEndpoint, got %+v", savedApp.Complexity)
+	}
+
+	// 2. HandleComplexityInspect executes GeminiDecisionEngine and renders Local Eligibility + Tier Scores
+	decision.SetEngineEndpoint("gemini-decision", decisionsSrv.URL+"/v1beta/decisions")
+	defer decision.SetEngineEndpoint("gemini-decision", "")
+
+	inspectForm := url.Values{
+		"prompt":        {"Convert 100C to Fahrenheit"},
+		"engine":        {"gemini-decision"},
+		"simple_model":  {"gemma-4-4b"},
+		"medium_model":  {"gemini-3.8-flash"},
+		"complex_model": {"gemini-4-argon"},
+	}
+	reqInspect := httptest.NewRequest("POST", "/admin/complexity/inspect", strings.NewReader(inspectForm.Encode()))
+	reqInspect.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rrInspect := httptest.NewRecorder()
+	dash.HandleComplexityInspect(rrInspect, reqInspect)
+	if rrInspect.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK from HandleComplexityInspect, got %d: %s", rrInspect.Code, rrInspect.Body.String())
+	}
+	if !strings.Contains(rrInspect.Body.String(), "gemma-4-4b") || !strings.Contains(rrInspect.Body.String(), "gemini-decision") {
+		t.Errorf("expected gemma-4-4b and gemini-decision in inspect HTML, got: %s", rrInspect.Body.String())
+	}
+
+	// 3. CreateProviderCluster with type=endpoint persists FallbackModel and FallbackLocation on DirectEndpoint
+	epForm := url.Values{
+		"type":              {"endpoint"},
+		"id":                {"ep-mlx-local"},
+		"name":              {"MLX Gemma 4 Node"},
+		"model":             {"gemma-4-4b"},
+		"url":               {"http://10.0.1.9:8080/v1"},
+		"engine":            {"mlx"},
+		"fallback_model":    {"gemini-3.8-flash"},
+		"fallback_location": {"global"},
+	}
+	reqEP := httptest.NewRequest("POST", "/admin/clusters/providers/create", strings.NewReader(epForm.Encode()))
+	reqEP.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rrEP := httptest.NewRecorder()
+	dash.CreateProviderCluster(rrEP, reqEP)
+	if rrEP.Code != http.StatusSeeOther && rrEP.Code != http.StatusOK {
+		t.Fatalf("expected CreateProviderCluster success, got %d: %s", rrEP.Code, rrEP.Body.String())
+	}
+	provs, _ := cfgStore.GetAllProviders(ctx)
+	var foundEP *config.DirectEndpoint
+	for _, p := range provs {
+		if p.ID == config.ProviderLocal {
+			for _, reg := range p.Regions {
+				if reg.LocalConfig != nil {
+					for i := range reg.LocalConfig.DirectEndpoints {
+						if reg.LocalConfig.DirectEndpoints[i].ID == "ep-mlx-local" {
+							foundEP = &reg.LocalConfig.DirectEndpoints[i]
+						}
+					}
+				}
+			}
+		}
+	}
+	if foundEP == nil || foundEP.FallbackModel != "gemini-3.8-flash" || foundEP.FallbackLocation != "global" {
+		t.Fatalf("expected DirectEndpoint FallbackModel='gemini-3.8-flash' and FallbackLocation='global', got %+v", foundEP)
+	}
+}
+
+type staticDashTokenSource struct {
+	tok string
+}
+
+func (s *staticDashTokenSource) Token() (*oauth2.Token, error) {
+	return &oauth2.Token{AccessToken: s.tok, Expiry: time.Now().Add(time.Hour)}, nil
+}
+
 
 
 

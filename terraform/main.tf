@@ -14,7 +14,9 @@ locals {
     "iam.googleapis.com",
     "monitoring.googleapis.com",
     "identitytoolkit.googleapis.com",
-    "aiplatform.googleapis.com"
+    "aiplatform.googleapis.com",
+    "generativelanguage.googleapis.com",
+    "apikeys.googleapis.com",
   ]
 
   # Parse ALLOWED_EMAIL_DOMAINS to convert domains and specific emails to IAM members
@@ -139,7 +141,7 @@ resource "google_cloud_run_v2_service" "router_service" {
       }
 
       dynamic "env" {
-        for_each = local.mounted_secret_ids
+        for_each = local.api_sa_secrets
         content {
           name = env.value
           value_source {
@@ -228,7 +230,7 @@ resource "google_cloud_run_v2_service" "frontend_service" {
 
       # The UI only needs the shared secret (decision-engine keys are backend-only).
       dynamic "env" {
-        for_each = setintersection(local.mounted_secret_ids, local.ui_sa_secrets)
+        for_each = local.ui_sa_secrets
         content {
           name = env.value
           value_source {

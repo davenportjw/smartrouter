@@ -100,8 +100,8 @@ curl -s -X POST "$BACKEND_URL/api/keys" \
         \"status\": \"active\"
     }"
 
-# Seed High-Priority Local Routing Rule (Targeting local GKE CPU Pool)
-log_info "Seeding rule to route model 'gemma2:2b' to GKE CPU Spot Pool..."
+# Seed High-Priority Local Routing Rule (Targeting local GKE CPU Pool with Cloud Failover)
+log_info "Seeding rule to route model 'gemma-4-4b' to GKE CPU Spot Pool..."
 curl -s -X POST "$BACKEND_URL/api/rules" \
     -H "Authorization: Bearer $OIDC_TOKEN" \
     -H "X-Shared-Secret: $SHARED_SECRET" \
@@ -109,10 +109,11 @@ curl -s -X POST "$BACKEND_URL/api/rules" \
     -d "{
         \"id\": \"$RULE_ID\",
         \"app_id\": \"$APP_ID\",
-        \"model_pattern\": \"gemma2:2b\",
+        \"model_pattern\": \"gemma-4-4b\",
         \"client_tier\": \"premium\",
-        \"target_model\": \"gemma2:2b\",
+        \"target_model\": \"gemma-4-4b\",
         \"target_location\": \"local-cluster\",
+        \"fallback_model\": \"gemini-3.5-flash-lite\",
         \"priority_weight\": 100
     }"
 
@@ -122,8 +123,8 @@ echo -e "✨ READY TO INITIATE LOCAL ROUTING CYCLE"
 echo -e "------------------------------------------------------------"
 log_step "Step 1: Run your GKE CPU runner using:"
 echo -e "        ./examples/local-cluster/deploy-runner.sh 2"
-log_step "Step 2: Submit your routed query targeting 'gemma2:2b' using:"
-echo -e "        curl -X POST \"$BACKEND_URL/v1/models/gemma2:2b:generateContent\" \\"
+log_step "Step 2: Submit your routed query targeting 'gemma-4-4b' using:"
+echo -e "        curl -X POST \"$BACKEND_URL/v1/models/gemma-4-4b:generateContent\" \\"
 echo -e "            -H \"x-goog-api-key: $CLIENT_API_KEY\" \\"
 echo -e "            -H \"X-Client-App-ID: $APP_ID\" \\"
 echo -e "            -d '{\"contents\": [{\"parts\": [{\"text\": \"Hello local Gemma!\"}]}]}'"

@@ -366,38 +366,74 @@ func TestMinConfidenceFallbackAndSecretVault(t *testing.T) {
 		t.Errorf("expected masked preview, got %q", status.MaskedPreview)
 	}
 
-	// 2. Test MinConfidence fallback to medium tier when confidence < MinConfidence
-	srvLowConf := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// 2. Test MinConfidence upward safety escalation (never downgrades complex; escalates simple->medium and upward-leaning medium->complex)
+	srvLowConfSimple := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{
 			"answers": {
 				"complexity": {
-					"choice": "complex",
+					"choice": "simple",
 					"confidence": 0.52,
-					"probabilities": {"simple": 0.20, "medium": 0.28, "complex": 0.52}
+					"probabilities": {"simple": 0.52, "medium": 0.42, "complex": 0.06}
 				}
 			}
 		}`))
 	}))
-	defer srvLowConf.Close()
+	defer srvLowConfSimple.Close()
 
 	jev := NewJevDecisionEngine()
 	cfg := config.ComplexityRouting{
 		Enabled:       true,
 		Engine:        "jev",
-		JevEndpoint:   srvLowConf.URL,
+		JevEndpoint:   srvLowConfSimple.URL,
 		MinConfidence: 0.80,
 		SimpleModel:   "gemini-3.5-flash-lite",
 		MediumModel:   "gemini-3.8-flash",
-		ComplexModel:  "gemini-3.1-pro",
+		ComplexModel:  "gemini-4-argon",
 	}
 
-	res := jev.Classify(ctx, "Ambiguous request", cfg, false, false)
-	if res.Tier != "medium" || res.TargetModel != "gemini-3.8-flash" {
-		t.Errorf("expected fallback to medium tier (gemini-3.8-flash) when confidence 0.52 < MinConfidence 0.80, got tier=%s model=%s", res.Tier, res.TargetModel)
+	resSimple := jev.Classify(ctx, "Ambiguous simple request", cfg, false, false)
+	if resSimple.Tier != "medium" || resSimple.TargetModel != "gemini-3.8-flash" {
+		t.Errorf("expected upward escalation simple -> medium (gemini-3.8-flash) when confidence 0.52 < MinConfidence 0.80, got tier=%s model=%s", resSimple.Tier, resSimple.TargetModel)
 	}
-	if !strings.Contains(res.Rationale, "min_confidence_fallback") {
-		t.Errorf("expected min_confidence_fallback in rationale, got %s", res.Rationale)
+	if !strings.Contains(resSimple.Rationale, "min_confidence_fallback") {
+		t.Errorf("expected min_confidence_fallback in rationale, got %s", resSimple.Rationale)
+	}
+
+	// 3. Low-confidence complex MUST NEVER be downgraded to medium
+	resComplex := applyMinConfidenceFallback(DecisionResult{
+		Tier:        "complex",
+		TargetModel: "gemini-4-argon",
+		Confidence:  0.52,
+		Scores:      map[string]float64{"simple": 0.12, "medium": 0.36, "complex": 0.52},
+		Rationale:   "gemini-decision-1: tier=complex (conf=0.52)",
+	}, cfg)
+	if resComplex.Tier != "complex" || resComplex.TargetModel != "gemini-4-argon" {
+		t.Errorf("expected low-confidence complex to remain complex (never downgrade), got tier=%s model=%s", resComplex.Tier, resComplex.TargetModel)
+	}
+
+	// 4. Low-confidence medium with upward complex tail (p_complex > p_simple) escalates to complex
+	resUpwardMedium := applyMinConfidenceFallback(DecisionResult{
+		Tier:        "medium",
+		TargetModel: "gemini-3.8-flash",
+		Confidence:  0.47,
+		Scores:      map[string]float64{"simple": 0.23, "medium": 0.47, "complex": 0.30},
+		Rationale:   "gemini-decision-1: tier=medium (conf=0.47)",
+	}, cfg)
+	if resUpwardMedium.Tier != "complex" || resUpwardMedium.TargetModel != "gemini-4-argon" {
+		t.Errorf("expected upward-leaning uncertain medium to escalate to complex (gemini-4-argon), got tier=%s model=%s", resUpwardMedium.Tier, resUpwardMedium.TargetModel)
+	}
+
+	// 5. Low-confidence medium where cumulative (simple+medium >= MinConfidence) and p_simple >= p_complex stays medium
+	resDownwardMedium := applyMinConfidenceFallback(DecisionResult{
+		Tier:        "medium",
+		TargetModel: "gemini-3.8-flash",
+		Confidence:  0.50,
+		Scores:      map[string]float64{"simple": 0.47, "medium": 0.50, "complex": 0.03},
+		Rationale:   "gemini-decision-1: tier=medium (conf=0.50)",
+	}, cfg)
+	if resDownwardMedium.Tier != "medium" || resDownwardMedium.TargetModel != "gemini-3.8-flash" {
+		t.Errorf("expected downward-leaning medium (p_simple+p_medium=0.97 >= 0.80) to stay medium, got tier=%s model=%s", resDownwardMedium.Tier, resDownwardMedium.TargetModel)
 	}
 }
 

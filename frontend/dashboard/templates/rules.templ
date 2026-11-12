@@ -309,6 +309,7 @@ templ RuleModal(apps []config.App, activeModels []config.ModelConfig, rule *conf
 							<label for="decision_engine" class="block text-[10px] font-medium text-gray-600">Decision Engine Filter</label>
 							<select name="decision_engine" id="decision_engine" class="mt-1 block w-full rounded-md bg-white border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono">
 								<option value="" if rule == nil || rule.DecisionEngine == "" || rule.DecisionEngine == "all" { selected }>Any Engine</option>
+								<option value="gemini-decision" if rule != nil && (rule.DecisionEngine == "gemini-decision" || rule.DecisionEngine == "gemini-decisions" || rule.DecisionEngine == "gemini-decision-1") { selected }>Gemini Decisions API (gemini-decision-1)</option>
 								<option value="jev" if rule != nil && rule.DecisionEngine == "jev" { selected }>Jev (SystemOne)</option>
 								<option value="fastino" if rule != nil && rule.DecisionEngine == "fastino" { selected }>Fastino (Pioneer)</option>
 								<option value="contrastive-lm" if rule != nil && (rule.DecisionEngine == "clm" || rule.DecisionEngine == "contrastive-lm") { selected }>Contrastive-LM (CLM)</option>

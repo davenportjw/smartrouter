@@ -1,6 +1,6 @@
 # 🧠 Routing Configuration & Auditing
 
-The Smart Router provides **Fast Decision Model Routing (Jev, Fastino & Contrastive-LM)**, **Session Affinity**, **Agent Task Switching**, **Per-Prompt Overrides**, and **Conditional Rules-Based Routing** to manage Gemini API requests.
+The Smart Router provides **Fast Decision Model Routing (`gemini-decision`, Jev, Fastino & Contrastive-LM)**, **Hybrid Local-vs-Cloud Sourcing**, **Session Affinity**, **Agent Task Switching**, **Per-Prompt Overrides**, and **Conditional Rules-Based Routing** to manage Gemini and Gemma API requests.
 
 ---
 
@@ -9,11 +9,12 @@ The Smart Router provides **Fast Decision Model Routing (Jev, Fastino & Contrast
 Clients can target the virtual model **`gemini-dynamic`** instead of hardcoding model names:
 
 ```http
-POST http://localhost:8080/v1/models/gemini-dynamic:generateContent?key=gr_key_abc
+POST http://localhost:8080/v1/models/gemini-dynamic:generateContent?key=<your-router-api-key>
 ```
 
 ### Decision Engines
-The router supports five decision engines to classify prompt complexity into `simple`, `medium`, or `complex` tiers:
+The router supports six decision engines to classify prompt complexity into `simple`, `medium`, or `complex` tiers:
+* **`gemini-decision` (Google Gemini Decisions API — `gemini-decision-1`)**: Single-forward-pass calibrated probability scoring (`POST https://generativelanguage.googleapis.com/v1beta/decisions`) returning calibrated probabilities for `complexity` (`simple`, `medium`, `complex`), `task_kind`, and `local_eligible` (`yes` / `no`) in 50–100 ms compute time with **zero output tokens** (`\$0.10` / 1M input tokens, `\$0.00` output). Uses Google Cloud Application Default Credentials (ADC) to dynamically resolve and cache the project's `generativelanguage.googleapis.com`-restricted authorization key via `apikeys.googleapis.com/v2` (`roles/serviceusage.apiKeysViewer`), requiring zero `GEMINI_API_KEY` environment variables. Also exposed directly as a native pass-through endpoint on `POST /v1beta/decisions` and `POST /v1/decisions`.
 * **`jev` (Jev Structured Decision Model)**: Microsecond rule-based logit scoring over extracted syntactic and structural features (code blocks, math/O-notation, multi-step reasoning, and word count), with optional remote `/v1/systemone` or flat JSON endpoint evaluation (`JevEndpoint` / `JEV_ENDPOINT`).
 * **`fastino` (Fastino GLiClass / Pioneer Classifier)**: Sub-millisecond zero-shot sequence classification via a remote Fastino endpoint (`FastinoEndpoint` / `FASTINO_ENDPOINT`) or local zero-shot structural density fallback.
 * **`contrastive-lm` / `clm` (Contrastive-LM Embedding Classifier)**: 5D Euclidean contrastive distance classifier comparing prompt feature vectors against Simple, Medium, and Complex anchor profiles, with support for a self-hosted Contrastive-LM cluster runner (`CLMEndpoint` / `CLM_ENDPOINT` on `/rank` or `/classify`) or local Euclidean fallback.
@@ -29,7 +30,7 @@ Unlike external managed APIs (`jev`, `fastino`), **Contrastive-LM (`contrastive-
 ### Custom Tier Criteria & Confidence Thresholds
 Per application, administrators can configure:
 * **Custom Tier Criteria (`SimpleCriteria`, `MediumCriteria`, `ComplexCriteria`)**: Comma-separated keywords or domain phrases that boost logit/similarity scores for their respective tier across `jev`, `fastino`, and `contrastive-lm`.
-* **Minimum Confidence Threshold (`MinConfidence`)**: If the decision engine's confidence falls below `MinConfidence` (e.g., `0.75`), the router automatically escalates `simple` -> `medium` and `medium` -> `complex` (`[min_confidence_fallback: ...]`) to prevent under-provisioning on ambiguous prompts.
+* **Minimum Confidence Threshold (`MinConfidence`)**: Enforces upward-only safety escalation when classifier confidence falls below `MinConfidence` (e.g., `0.75`): `simple` escalates to `medium`, upward-leaning `medium` (`p_simple + p_medium < MinConfidence` or `p_complex > p_simple`) escalates to `complex`, and `complex` predictions are never downgraded (`[min_confidence_fallback: ...]`).
 
 ### Secret Key Management (`.env` → `deploy.sh` → Google Cloud Secret Manager)
 Remote decision engine endpoints (`jev`, `fastino`, `contrastive-lm`) and internal administrative calls (`BACKEND_SHARED_SECRET`) use a unified zero-leak secret pipeline:
@@ -51,7 +52,7 @@ Remote decision engine endpoints (`jev`, `fastino`, `contrastive-lm`) and intern
 Clients can override dynamic routing per prompt using HTTP request headers:
 * **`X-Router-Model`**: Immediately pin the target model for this single prompt (e.g., `X-Router-Model: gemini-3.1-pro`).
 * **`X-Router-Complexity`**: Force a specific complexity tier (`simple`, `medium`, or `complex`) mapped to the app's configured models.
-* **`X-Router-Engine`**: Select the decision engine (`jev`, `fastino`, `contrastive-lm`, `clm`, `llm`, or `heuristics`) for this prompt.
+* **`X-Router-Engine`**: Select the decision engine (`gemini-decision`, `jev`, `fastino`, `contrastive-lm`, `clm`, `llm`, or `heuristics`) for this prompt.
 
 ### Sticky Multi-Turn Session Continuation (Stage 1)
 To preserve reasoning continuity across multi-turn conversations, pass a session identifier:
@@ -72,7 +73,8 @@ Autonomous agents can dynamically change the model tier mid-session or per reque
 * `POST /api/v1/sessions/reset` — Reset or clear a locked session.
 * `POST /api/v1/complexity/inspect` — Inspect prompt features, tier logits, target model, and human-readable decision rationales across `jev`, `fastino`, `contrastive-lm`, or `heuristics` without invoking upstream inference.
 * `GET|POST|DELETE /api/v1/complexity/keys` — Inspect masked key & provider status (`providers` + `keys`), store/rotate runtime decision engine API keys, endpoints, and Contrastive-LM cluster bindings, or clear keys from the runtime vault.
-* `GET /api/decision/providers` & `POST /api/decision/providers/probe` — Inspect decision engine provider status or run a live classification probe against `jev`, `fastino`, or `contrastive-lm`.
+* `GET /api/decision/providers` & `POST /api/decision/providers/probe` — Inspect decision engine provider status or run a live classification probe against `gemini-decision`, `jev`, `fastino`, or `contrastive-lm`.
+* `go run ./cmd/eval` — Run the 20-case adversarial routing evaluation harness and 7 live proxy stress scenarios (`docs/approaches/routing-eval-harness.md`).
 
 ---
 
@@ -157,8 +159,10 @@ The Smart Router adds custom audit headers on all proxied HTTP responses:
 | **`X-Requested-Model`** | Model requested by the client | `gemini-dynamic` |
 | **`X-Routed-Model`** | Upstream model targeted | `gemini-3.1-pro` |
 | **`X-Routed-Model-Location`** | Resolved serving location | `us` |
-| **`X-Router-Engine-Used`** | Decision engine or stage that resolved the model | `jev`, `clm`, `session_lock`, `task_mapping`, `prompt_override` |
+| **`X-Router-Engine-Used`** | Decision engine or stage that resolved the model | `gemini-decision`, `jev`, `clm`, `session_lock`, `task_mapping`, `prompt_override` |
 | **`X-Router-Complexity-Tier`** | Assigned complexity tier | `simple`, `medium`, `complex` |
+| **`X-Router-Confidence`** | Calibrated probability score for the winning tier | `0.9400` |
+| **`X-Router-Local-Eligible`** | Probability that an open-weights local runner (`gemma-4-*`) can satisfy the prompt | `0.9200` |
 | **`X-Session-ID`** | Active multi-turn session ID (if present) | `sess-chat-42` |
 | **`X-Session-Turn`** | Current conversation turn index in the session | `2` |
 | **`X-Agent-Task`** | Active agent task context (if present) | `debugging` |

@@ -43,7 +43,7 @@ If live Vertex AI credentials are authenticated, verify a real endpoint resoluti
    ```
 2. Send a test query through the local smart router targeting standard models:
    ```bash
-   curl -X POST "http://localhost:8080/v1/models/gemini-1.5-flash:generateContent?key=gr_dev_key_123456" \
+   curl -X POST "http://localhost:8080/v1/models/gemini-3.8-flash:generateContent?key=<your-router-api-key>" \
      -H "Content-Type: application/json" \
      -d '{"contents":[{"parts":[{"text":"Hello"}]}]}'
    ```

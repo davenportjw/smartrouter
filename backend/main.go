@@ -98,6 +98,8 @@ func main() {
 	apiController.JevEngine = geminiProxy.JevEngine
 	apiController.FastinoEngine = geminiProxy.FastinoEngine
 	apiController.CLMEngine = geminiProxy.CLMEngine
+	apiController.GeminiDecisionEngine = geminiProxy.GeminiDecisionEngine
+	apiController.LLMClassifier = geminiProxy.InspectLLMClassifier
 
 	mux := http.NewServeMux()
 
@@ -106,6 +108,10 @@ func main() {
 	mux.Handle("/v1beta/models", geminiProxy)
 	mux.Handle("/v1/models/", geminiProxy)
 	mux.Handle("/v1/models", geminiProxy)
+	mux.Handle("/v1beta/decisions", geminiProxy)
+	mux.Handle("/v1beta/decisions/", geminiProxy)
+	mux.Handle("/v1/decisions", geminiProxy)
+	mux.Handle("/v1/decisions/", geminiProxy)
 	mux.Handle("/v1/chat/completions", geminiProxy)
 	mux.Handle("/v1/chat/completions/", geminiProxy)
 	mux.Handle("/v1beta/openai/chat/completions", geminiProxy)

@@ -112,7 +112,7 @@ spec:
       - name: llama-engine
         image: ghcr.io/ggerganov/llama.cpp:server
         args: [
-          "--model", "/models/gemma-2-9b-it.gguf",
+          "--model", "/models/gemma-4-26b-it.gguf",
           "--port", "8080"
         ]
         ports:

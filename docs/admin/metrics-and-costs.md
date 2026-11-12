@@ -40,6 +40,7 @@ Navigate to `/admin/costs` (or inspect per-model unit rates and accumulated spen
 | **`gemini-2.5-flash-lite`** | \$0.0375 | \$0.15 |
 | **`gemma-4-*` (`@local` / Local Cluster)** | \$0.00 (Local) | \$0.00 (Local) |
 | **`gemma-4-*` (Cloud / MaaS)** | \$0.15 | \$0.60 |
+| **`gemini-decision-1` (Gemini Decisions API)** | \$0.10 | \$0.00 (Zero output tokens) |
 | **`text-embedding-*` / `multimodal-embedding-*`** | \$0.025 | \$0.00 |
 
 ### Analytics Views

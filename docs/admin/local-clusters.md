@@ -17,7 +17,10 @@ On-premises cluster pools coordinate asynchronous pull-queue routing without req
    - **Max Queue Age / Timeout (`MaxQueueAge`)**: Per-cluster queue expiration window in seconds (defaults to `90s`). Queued requests waiting longer than `MaxQueueAge` expire automatically.
    - **Cloud Failover Model (`FallbackModel`) & Location (`FallbackLocation`)**: Optional user-specified cloud failover target (e.g., `gemini-3.8-flash` in `us-central1`).
      - **Blank (Default — Strict Error Mode)**: No silent cloud failover occurs (including on auto-discovered clusters). When local models are served by attached nodes, Table 1 displays `No failover (504 on timeout)`. If the cluster queue times out (`504 Gateway Timeout`) or a runner returns an upstream inference error (`502 Bad Gateway`), Smart Router surfaces the true error directly to the caller.
-     - **Configured (User-Specified Cloud Failover)**: When a local cluster queue times out or returns a `>= 500` runner error, Smart Router forwards the original request to the configured `FallbackModel` and `FallbackLocation` and sets `X-Cluster-Fallback: true` on the HTTP response. In Table 1, the `Failover → <model>` badge is only shown alongside the cluster's `Served Models` once at least one attached node reports a primary served model.
+     - **Configured (User-Specified Cloud Failover & Instant `<1ms` Spillover)**:
+       - **Zero-Runner Instant Cloud Spillover**: If a `LocalCluster` has `FallbackModel` configured and `0` online capable runners (`LastSeen <= 30s` supporting the requested model), Smart Router skips queue waiting completely (`<1ms`) and forwards immediately to the configured cloud `FallbackModel` and `FallbackLocation`, setting `X-Cluster-Fallback: true` and `X-Cluster-Fallback-Reason: no_online_runners`.
+       - **Queue Timeout / Runner Error Failover**: When an online runner queue times out or returns a `>= 500` runner error, Smart Router forwards the original request to `FallbackModel` and `FallbackLocation` and sets `X-Cluster-Fallback: true` on the HTTP response.
+   - **Auto-Resolution of Bare Local Model Names**: When a caller or Stage-3 `ComplexityRouting` tier targets a bare open-weights model name (such as `gemma-4-4b`, `gemma-4-26b`, or `gemma-4-31b`) without an `@cluster-id` suffix or explicit Stage-4 routing rule, `ConfigStore.ResolveLocalModelLocation` automatically binds the request to a matching `DirectEndpoint`, an online `LocalCluster` runner, or a `FallbackModel`-enabled `LocalCluster` for instant cloud spillover.
    - **Attach Existing Cluster Nodes (`node_ids`)**: Select or deselect existing registered runner nodes directly within the **Add / Edit Cluster Pool** modal. Saving the cluster pool automatically updates both `LocalCluster.Nodes` and each runner's `AssignedClusters` list, and populates the pool's **Served Models** column in Table 1.
 
 ---
@@ -36,7 +39,8 @@ Managed runners poll `/api/v1/cluster/queue/poll` over HTTPS and execute local i
    - **Supported Models (`supported_models`)**: Comma-separated list of authorized models (e.g., `gemma-4-4b, gemma-4-26b`).
    - **Assigned Cluster Pools (`cluster_ids`)**: Checkboxes mapping the runner to one or more `LocalCluster` pools (`LocalCluster.Nodes` is automatically synchronized with `RegisteredRunner.AssignedClusters`).
 3. **Detaching a Runner**: Unchecking all cluster pools detaches the runner (`AssignedClusters = []`). Detached runners are preserved across subsequent heartbeats and re-registrations and receive `204 No Content` on `/api/v1/cluster/queue/poll` until re-attached by an administrator.
-4. **Heartbeat Staleness Detection**: Runners send heartbeats every 2–5 seconds to `/api/v1/cluster/runners/heartbeat`. Any runner whose `LastSeen` timestamp is older than **30 seconds** is automatically marked `offline` in `/api/v1/admin/runners` and `/admin/clusters`, while retaining its `LastSeen` timestamp for operator diagnostics.
+4. **Heartbeat Staleness Detection**: Runners send heartbeats every 2–5 seconds to `/api/v1/cluster/runners/heartbeat`. Any runner whose `LastSeen` timestamp is older than **30 seconds** is automatically marked `offline` in `/api/v1/admin/runners`, `/admin/clusters`, and `IsRunnerNodeOnline`, while retaining its `LastSeen` timestamp for operator diagnostics.
+5. **System Instructions & Token Telemetry Preservation**: `CoreRunnerEngine` translates Gemini `systemInstruction` (`system_instruction`) payloads into OpenAI `"system"` messages before calling `llama-server`, and maps OpenAI `usage` counters back into Gemini `usageMetadata` (`promptTokenCount`, `candidatesTokenCount`, `totalTokenCount`) so TPM rate limiters and `/admin/costs` track exact local token consumption.
 
 ---
 
@@ -46,13 +50,14 @@ For self-hosted inference servers reachable directly by Smart Router over VPC or
 
 1. Click **+ Add Direct Endpoint** on `/admin/clusters`.
 2. Configure:
-   - **Endpoint ID & Name**: Unique identifier (e.g., `vllm-gemma-26b`) and display name.
+   - **Endpoint ID & Name**: Unique identifier (e.g., `vllm-gemma-4-26b`) and display name.
    - **Engine**: `ollama`, `vllm`, `sglang`, `mlx`, `llamacpp`, or `contrastive-lm`.
    - **Target URL**: Base URL of the inference server (e.g., `http://10.0.0.15:8000`).
    - **Served Model (`ModelName`)**: Target model name (e.g., `gemma-4-26b`).
    - **Routing Role**: `inference` (for generation workloads) or `decision_engine` (for complexity classification).
-3. **Automatic Protocol Translation**:
-   - Requests sent to `/v1/models/{model}:generateContent` (Gemini native format) or `/v1/chat/completions` (OpenAI format) are automatically translated into OpenAI `/v1/chat/completions` payloads for `ollama`, `vllm`, `sglang`, `mlx`, and `llamacpp` direct endpoints, and converted back to match the caller's requested response format (`X-Direct-Endpoint: <id>`).
+   - **Cloud Failover (`FallbackModel` & `FallbackLocation`)**: Optional Vertex AI cloud model (e.g., `gemini-3.8-flash` in `us-central1`). If the direct endpoint is unreachable or returns `>= 500`, Smart Router fails over directly to Vertex AI and sets `X-Direct-Fallback: true`. Leave blank to preserve strict error surfacing (`502 Bad Gateway`).
+3. **Automatic Protocol Translation & Real-Time SSE Streaming**:
+   - Both synchronous (`:generateContent`, `/v1/chat/completions`) and streaming (`:streamGenerateContent?alt=sse`, OpenAI `stream: true`) requests are translated on the fly into OpenAI `/v1/chat/completions` payloads and streamed chunk-by-chunk back to the caller in either Gemini SSE or OpenAI `chat.completion.chunk` SSE format (`X-Direct-Endpoint: <id>`).
 
 ---
 

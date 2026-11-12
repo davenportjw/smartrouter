@@ -115,16 +115,16 @@ log_info "🧪 TEST CYCLE 1/2: Deploying Compute Runner in CPU Cost-Saver Mode..
 log_info "======================================================================"
 ./examples/local-cluster/deploy-runner.sh "2"
 
-# Seed rule routing a mock CPU model 'gemma2:2b' to local cluster
+# Seed rule routing CPU model 'gemma-4-4b' to local cluster
 log_info "Seeding CPU test routing rule..."
 curl -s -X POST "$BACKEND_URL/api/rules" \
     -H "X-Shared-Secret: $SHARED_SECRET" \
     -H "Content-Type: application/json" \
     -d "{
         \"id\": \"rule-test-cpu-runner\",
-        \"model_pattern\": \"gemma2:2b\",
+        \"model_pattern\": \"gemma-4-4b\",
         \"client_tier\": \"all\",
-        \"target_model\": \"gemma2:2b\",
+        \"target_model\": \"gemma-4-4b\",
         \"target_location\": \"local-cluster\",
         \"priority_weight\": 10
     }"
@@ -153,16 +153,16 @@ log_info "🧪 TEST CYCLE 2/2: Deploying Compute Runner in GPU Accelerated Mode.
 log_info "======================================================================"
 ./examples/local-cluster/deploy-runner.sh "1"
 
-# Seed rule routing a mock GPU model 'llama3:8b' to local cluster
+# Seed rule routing GPU model 'gemma-4-26b' to local cluster
 log_info "Seeding GPU test routing rule..."
 curl -s -X POST "$BACKEND_URL/api/rules" \
     -H "X-Shared-Secret: $SHARED_SECRET" \
     -H "Content-Type: application/json" \
     -d "{
         \"id\": \"rule-test-gpu-runner\",
-        \"model_pattern\": \"llama3:8b\",
+        \"model_pattern\": \"gemma-4-26b\",
         \"client_tier\": \"all\",
-        \"target_model\": \"llama3:8b\",
+        \"target_model\": \"gemma-4-26b\",
         \"target_location\": \"local-cluster\",
         \"priority_weight\": 10
     }"

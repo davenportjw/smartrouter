@@ -87,19 +87,18 @@ def main():
     print(f"Targeting Router URL: {ROUTER_URL}")
     print(f"Using API Key       : {API_KEY[:10]}...")
     
-    # 1. Requesting gemini-1.5-pro with no headers
-    # Standard routing rules should rewrite '*' to default 'gemini-2.5-flash'
+    # 1. Requesting gemini-2.5-flash with no headers
+    # Standard routing rules rewrite to default 'gemini-3.8-flash'
     send_rules_request(
-        "gemini-1.5-pro", 
+        "gemini-2.5-flash", 
         {}, 
         "Standard Request (No custom routing headers)"
     )
 
-    # 2. Requesting gemini-1.5-pro WITH 'X-Route-Priority: gold' header
-    # In local_db.json, we have seeded a rule that maps X-Route-Priority: gold
-    # requesting gemini-1.5-pro to gemini-2.5-pro!
+    # 2. Requesting gemini-2.5-flash WITH 'X-Route-Priority: gold' header
+    # Priority rule upgrades X-Route-Priority: gold requests to 'gemini-4-argon'!
     send_rules_request(
-        "gemini-1.5-pro", 
+        "gemini-2.5-flash", 
         {"X-Route-Priority": "gold"}, 
         "Rules-Based Request (Targeting rule: X-Route-Priority = gold)"
     )

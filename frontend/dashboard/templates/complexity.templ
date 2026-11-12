@@ -207,7 +207,9 @@ templ ComplexityTab(items []ComplexityViewModel) {
 										}
 									</div>
 									<div class="flex items-center gap-1.5 shrink-0">
-										if st.Source == "secret_manager" {
+										if st.Source == "adc" {
+											<span class="text-[11px] text-slate-500">Application Default Credentials</span>
+										} else if st.Source == "secret_manager" {
 											<span class="text-[11px] text-slate-500">Secret Manager</span>
 										} else if st.Source == "dotenv" {
 											<span class="text-[11px] text-slate-500">Local .env</span>
@@ -267,6 +269,7 @@ templ ComplexityTab(items []ComplexityViewModel) {
 							<div>
 								<label for="secret-engine" class="block text-xs font-semibold text-gray-700 mb-1">Target Engine</label>
 								<select id="secret-engine" name="engine" onchange="selectDecisionProvider(this.value)" class="block w-full rounded-md border-gray-300 bg-white shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono">
+									<option value="gemini-decision">gemini-decision (Keyless ADC)</option>
 									<option value="jev">jev (JEV_API_KEY)</option>
 									<option value="fastino">fastino (FASTINO_API_KEY)</option>
 									<option value="contrastive-lm">contrastive-lm (CLM_API_KEY)</option>
@@ -428,6 +431,7 @@ templ ComplexityTab(items []ComplexityViewModel) {
 					<div>
 						<label for="inspect-engine" class="block text-xs font-semibold text-gray-700 mb-1">Decision Engine</label>
 						<select id="inspect-engine" name="engine" class="block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs">
+							<option value="gemini-decision">Gemini Decisions API (gemini-decision-1)</option>
 							<option value="jev" selected>Jev Decision Engine (Rule Logits)</option>
 							<option value="fastino">Fastino Decision Engine (Sub-ms Feature Scoring)</option>
 							<option value="contrastive-lm">Contrastive-LM (5D Euclidean Anchor Profiles)</option>
@@ -562,6 +566,7 @@ templ ComplexityModal(app config.App, activeModels []config.ModelConfig) {
 										<div>
 											<label for="engine" class="block text-xs font-medium text-gray-700 mb-1">Routing Engine</label>
 											<select name="engine" id="engine" class="block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono">
+												<option value="gemini-decision" if app.Complexity.Engine == "gemini-decision" || app.Complexity.Engine == "gemini-decisions" || app.Complexity.Engine == "gemini-decision-1" { selected }>Gemini Decisions API (gemini-decision-1 · Calibrated Zero-Output Routing)</option>
 												<option value="jev" if app.Complexity.Engine == "jev" || (app.Complexity.Engine == "" && !app.Complexity.UseLLMClassifier) { selected }>Jev Structured Decision Model (Microsecond rule-based logit scoring)</option>
 												<option value="fastino" if app.Complexity.Engine == "fastino" { selected }>Fastino Decision Engine (Sub-millisecond structural &amp; lexical scoring)</option>
 												<option value="contrastive-lm" if app.Complexity.Engine == "contrastive-lm" { selected }>Contrastive-LM (5D Euclidean distance to anchor profiles)</option>
@@ -571,7 +576,18 @@ templ ComplexityModal(app config.App, activeModels []config.ModelConfig) {
 											</select>
 										</div>
 
-										<div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+										<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+											<div>
+												<label for="gemini_decision_endpoint" class="block text-xs font-medium text-gray-700">Gemini Decisions Endpoint (Optional)</label>
+												<input
+													type="text"
+													name="gemini_decision_endpoint"
+													id="gemini_decision_endpoint"
+													value={ app.Complexity.GeminiDecisionEndpoint }
+													placeholder="https://generativelanguage.googleapis.com/v1beta/decisions"
+													class="mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono"
+												/>
+											</div>
 											<div>
 												<label for="jev_endpoint" class="block text-xs font-medium text-gray-700">Jev Endpoint (Optional)</label>
 												<input
@@ -821,6 +837,11 @@ templ ComplexityInspectResult(res decision.DecisionResult) {
 				<span class="text-xs font-mono text-slate-600">
 					Conf: { fmt.Sprintf("%.1f%%", res.Confidence * 100) }
 				</span>
+				if res.LocalEligibleProb > 0 {
+					<span class="text-xs font-mono text-emerald-700">
+						Local Eligible: { fmt.Sprintf("%.1f%%", res.LocalEligibleProb * 100) }
+					</span>
+				}
 			</div>
 		</div>
 

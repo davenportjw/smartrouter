@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -48,10 +49,11 @@ type RouterProxy struct {
 	transportMu      sync.Mutex
 	ClassifierClient *http.Client
 	classifierCache  sync.Map // cache for classifier prompt hashes
-	Sessions         *config.SessionRegistry
-	JevEngine        *decision.JevDecisionEngine
-	FastinoEngine    *decision.FastinoDecisionEngine
-	CLMEngine        *decision.CLMContrastiveEngine
+	Sessions             *config.SessionRegistry
+	GeminiDecisionEngine *decision.GeminiDecisionEngine
+	JevEngine            *decision.JevDecisionEngine
+	FastinoEngine        *decision.FastinoDecisionEngine
+	CLMEngine            *decision.CLMContrastiveEngine
 }
 
 // responseWriterWrapper intercepts writes to capture status code and response body size.
@@ -148,6 +150,16 @@ func (rp *RouterProxy) lazyInit() {
 	if rp.Sessions == nil {
 		rp.Sessions = config.NewSessionRegistry(30 * time.Minute)
 	}
+	if rp.GeminiDecisionEngine == nil {
+		rp.GeminiDecisionEngine = decision.NewGeminiDecisionEngine(rp.TokenSource, rp.ProjectID)
+	} else {
+		if rp.TokenSource != nil {
+			rp.GeminiDecisionEngine.TokenSource = rp.TokenSource
+		}
+		if rp.ProjectID != "" && rp.GeminiDecisionEngine.ProjectID == "" {
+			rp.GeminiDecisionEngine.ProjectID = rp.ProjectID
+		}
+	}
 	if rp.JevEngine == nil {
 		rp.JevEngine = decision.NewJevDecisionEngine()
 	}
@@ -193,12 +205,13 @@ func NewRouterProxy(store *store.ConfigStore, projectID, location string) (*Rout
 		Scheduler:     NewRequestScheduler(maxQueueSize, activeLimit),
 		Queue:         NewClusterQueue(maxQueueSize, 60*time.Second),
 		TokenSource:   ts,
-		ProjectID:     projectID,
-		Location:      location,
-		Sessions:      config.NewSessionRegistry(30 * time.Minute),
-		JevEngine:     decision.NewJevDecisionEngine(),
-		FastinoEngine: decision.NewFastinoDecisionEngine(),
-		CLMEngine:     decision.NewCLMContrastiveEngine(),
+		ProjectID:            projectID,
+		Location:             location,
+		Sessions:             config.NewSessionRegistry(30 * time.Minute),
+		GeminiDecisionEngine: decision.NewGeminiDecisionEngine(ts, projectID),
+		JevEngine:            decision.NewJevDecisionEngine(),
+		FastinoEngine:        decision.NewFastinoDecisionEngine(),
+		CLMEngine:            decision.NewCLMContrastiveEngine(),
 		ClassifierClient: &http.Client{
 			Transport: &http.Transport{
 				MaxIdleConns:        100,
@@ -546,7 +559,18 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				targetModel := requestedModel
 				if app.OptOutDynamicRouting {
 					modelLoc := rp.Location
-					if activeModel, exists := rp.Store.LookupActiveModel(targetModel, rp.Location); exists {
+					if config.ExtractLocationSuffix(targetModel) == "" {
+						if localLoc, okLocal := rp.Store.ResolveLocalModelLocation(targetModel); okLocal {
+							modelLoc = localLoc
+							targetModel = config.StripLocationSuffix(targetModel)
+						} else if activeModel, exists := rp.Store.LookupActiveModel(targetModel, rp.Location); exists {
+							modelLoc = activeModel.Location
+							targetModel = config.StripLocationSuffix(activeModel.ID)
+						} else {
+							modelLoc = config.GetDefaultLocationForModel(targetModel, rp.Location)
+							targetModel = config.StripLocationSuffix(targetModel)
+						}
+					} else if activeModel, exists := rp.Store.LookupActiveModel(targetModel, rp.Location); exists {
 						modelLoc = activeModel.Location
 						targetModel = config.StripLocationSuffix(activeModel.ID)
 					} else {
@@ -612,21 +636,15 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						if sess != nil {
 							sess.SetModel(targetModel, engineUsed)
 						}
-					} else if sess != nil && sess.Turn > 0 && sess.Policy == "lock" && sess.LockedModel != "" {
-						// Stage 1: Sticky Session Lock (Multi-Turn Continuation)
-						targetModel = sess.LockedModel
-						engineUsed = "session_lock"
-						complexityTier = "locked"
-						evaluatedConfidence = 1.0
 					} else if sess != nil && sessionModel != "" {
-						// Explicit Session Model Initialization
+						// Explicit Session Model Initialization or Mid-Session Re-Pin
 						targetModel = sessionModel
 						engineUsed = "session_lock"
 						complexityTier = "session_init"
 						evaluatedConfidence = 1.0
 						sess.SetModel(targetModel, engineUsed)
 					} else if agentTask != "" {
-						// Stage 2: Agent Task Switching
+						// Stage 2: Agent Task Switching (also upgrades sticky session lock when X-Agent-Task is provided)
 						if tm, tier, ok := decision.ResolveTaskModel(agentTask, app.Complexity); ok {
 							targetModel = tm
 							complexityTier = tier
@@ -639,6 +657,12 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						if sess != nil {
 							sess.SetModel(targetModel, engineUsed)
 						}
+					} else if sess != nil && sess.Turn > 0 && sess.Policy == "lock" && sess.LockedModel != "" {
+						// Stage 1: Sticky Session Lock (Multi-Turn Continuation when no explicit task/model switch is requested)
+						targetModel = sess.LockedModel
+						engineUsed = "session_lock"
+						complexityTier = "locked"
+						evaluatedConfidence = 1.0
 					} else if isDynamic {
 						// Stage 3: Dynamic Decision Engines (Jev / Fastino / CLM / Contrastive-LM / LLM / Heuristics)
 						engine := promptOverrideEngine
@@ -671,6 +695,31 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						} else {
 							effectiveComplexity := rp.resolveComplexityWithClusterProviders(app.Complexity)
 							switch engine {
+							case "gemini-decision", "gemini-decisions", "gemini-decision-1", "decisions":
+								blocks, bTools, bMulti := decision.BuildDecisionInputBlocksFromGeminiBody(bodyBytes)
+								if len(blocks) == 0 && snippet != "" {
+									blocks = []decision.DecisionInputBlock{{Type: "text", Text: snippet}}
+								}
+								res, err := rp.GeminiDecisionEngine.ClassifyWithInput(r.Context(), blocks, effectiveComplexity, hasTools || bTools, hasMultimodal || bMulti)
+								if err != nil {
+									log.Printf("[Proxy Decision] Gemini Decisions API error: %v; falling back to heuristics", err)
+									w.Header().Set("X-Router-Decision-Error", err.Error())
+									complexityTier = rp.classifyHeuristics(charCount, hasTools, hasMultimodal, app.Complexity)
+									targetModel = decision.ResolveModelByTier(complexityTier, app.Complexity)
+									engineUsed = "heuristics"
+									evaluatedConfidence = 0.80
+								} else {
+									complexityTier = res.Tier
+									targetModel = res.TargetModel
+									engineUsed = "gemini-decision"
+									evaluatedConfidence = res.Confidence
+									if extractedTask == "" {
+										extractedTask = res.Features.ExtractedTask
+									}
+									if res.LocalEligibleProb > 0 {
+										r.Header.Set("X-Router-Local-Eligible", fmt.Sprintf("%.2f", res.LocalEligibleProb))
+									}
+								}
 							case "jev":
 								res := rp.JevEngine.Classify(r.Context(), snippet, effectiveComplexity, hasTools, hasMultimodal)
 								complexityTier = res.Tier
@@ -781,6 +830,37 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 								candEng := strings.ToLower(strings.TrimSpace(candEngines[0]))
 								effectiveComplexity := rp.resolveComplexityWithClusterProviders(app.Complexity)
 								switch candEng {
+								case "gemini-decision", "gemini-decisions", "gemini-decision-1", "decisions":
+									blocks, bTools, bMulti := decision.BuildDecisionInputBlocksFromGeminiBody(bodyBytes)
+									if len(blocks) == 0 && snippet != "" {
+										blocks = []decision.DecisionInputBlock{{Type: "text", Text: snippet}}
+									}
+									res, err := rp.GeminiDecisionEngine.ClassifyWithInput(r.Context(), blocks, effectiveComplexity, hasTools || bTools, hasMultimodal || bMulti)
+									if err == nil {
+										complexityTier = res.Tier
+										engineUsed = "gemini-decision"
+										evaluatedConfidence = res.Confidence
+										if extractedTask == "" {
+											extractedTask = res.Features.ExtractedTask
+										}
+										if res.LocalEligibleProb > 0 {
+											r.Header.Set("X-Router-Local-Eligible", fmt.Sprintf("%.2f", res.LocalEligibleProb))
+										}
+									} else {
+										log.Printf("[Proxy Decision] Stage-4 Gemini Decisions API error: %v", err)
+										w.Header().Set("X-Router-Decision-Error", err.Error())
+									}
+								case "llm":
+									classifierModel := app.Complexity.ClassifierModel
+									if classifierModel == "" {
+										classifierModel = "gemini-3.5-flash-lite"
+									}
+									tier, err := rp.callLLMClassifier(r.Context(), classifierModel, snippet, app.Complexity.AdditionalInstructions)
+									if err == nil && (tier == "simple" || tier == "medium" || tier == "complex") {
+										complexityTier = tier
+										engineUsed = "llm"
+										evaluatedConfidence = 0.90
+									}
 								case "fastino":
 									res := rp.FastinoEngine.Classify(r.Context(), snippet, effectiveComplexity, hasTools, hasMultimodal)
 									complexityTier = res.Tier
@@ -857,14 +937,29 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					}
 
 					// Resolve and set the routed model's location if not specifically overridden by the matched rule location
-					if activeModel, exists := rp.Store.LookupActiveModel(targetModel, rp.Location); exists {
+					if !ruleSetLocation && config.ExtractLocationSuffix(targetModel) == "" {
+						if localLoc, okLocal := rp.Store.ResolveLocalModelLocation(targetModel); okLocal {
+							modelLoc = localLoc
+							targetModel = config.StripLocationSuffix(targetModel)
+						} else if activeModel, exists := rp.Store.LookupActiveModel(targetModel, rp.Location); exists {
+							modelLoc = activeModel.Location
+							targetModel = config.StripLocationSuffix(activeModel.ID)
+						} else {
+							modelLoc = config.GetDefaultLocationForModel(targetModel, rp.Location)
+							targetModel = config.StripLocationSuffix(targetModel)
+						}
+					} else if activeModel, exists := rp.Store.LookupActiveModel(targetModel, rp.Location); exists {
 						if !ruleSetLocation || config.ExtractLocationSuffix(targetModel) != "" {
 							modelLoc = activeModel.Location
 						}
 						targetModel = config.StripLocationSuffix(activeModel.ID)
 					} else {
 						if !ruleSetLocation || config.ExtractLocationSuffix(targetModel) != "" {
-							modelLoc = config.GetDefaultLocationForModel(targetModel, rp.Location)
+							if localLoc, okLocal := rp.Store.ResolveLocalModelLocation(targetModel); okLocal {
+								modelLoc = localLoc
+							} else {
+								modelLoc = config.GetDefaultLocationForModel(targetModel, rp.Location)
+							}
 						}
 						targetModel = config.StripLocationSuffix(targetModel)
 					}
@@ -946,7 +1041,11 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		routedModel = r.Header.Get("X-Requested-Model")
 	}
 	if routedModel == "" {
-		routedModel = "gemini-2.5-flash"
+		if isDecisionsPassthroughPath(r.URL.Path) {
+			routedModel = decision.GeminiDecisionModel
+		} else {
+			routedModel = "gemini-3.8-flash"
+		}
 	}
 
 	// Enqueue request in priority-based queue
@@ -965,150 +1064,174 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rp.Scheduler.Release(queueItem)
 
+	// Direct Gemini Decisions API pass-through (POST /v1beta/decisions or POST /v1/decisions)
+	if isDecisionsPassthroughPath(r.URL.Path) {
+		rp.handleDecisionsPassthrough(wrapped, r, bodyBytes, app, client, estimatedTokens)
+		return
+	}
+
 	// Check if routed to a dynamic local cluster queue ("local-cluster" or a named LocalCluster ID)
 	if clusterID, matchedCluster, isLocalCluster := rp.resolveLocalCluster(r.Header.Get("X-Routed-Model-Location")); isLocalCluster {
 		// If no pull-queue cluster with this ID is configured (e.g., generic "local-cluster") and an active DirectEndpoint matches, skip queue
 		if matchedCluster == nil {
 			if ep, ok := rp.resolveDirectEndpoint(routedModel, r.Header.Get("X-Routed-Model-Location")); ok {
-				rp.forwardToDirectEndpoint(wrapped, r, ep, bodyBytes, routedModel, client.Tier, app.ID, isOpenAIChat || strings.EqualFold(r.Header.Get("X-OpenAI-Format"), "true"), openAIStream)
-				return
-			}
-		}
-
-		applyClusterFallback := func(reason string) bool {
-			if matchedCluster == nil || strings.TrimSpace(matchedCluster.FallbackModel) == "" {
-				return false
-			}
-			fbModel, fbLocSuffix := config.SplitModelAndLocation(strings.TrimSpace(matchedCluster.FallbackModel))
-			fbLoc := strings.TrimSpace(matchedCluster.FallbackLocation)
-			if fbLoc == "" {
-				fbLoc = fbLocSuffix
-			}
-			if fbLoc == "" {
-				fbLoc = config.GetDefaultLocationForModel(fbModel, rp.Location)
-			}
-			log.Printf("[Proxy Cluster Fallback] Cluster %q failed (%s); falling back to model %q in location %q", clusterID, reason, fbModel, fbLoc)
-			routedModel = fbModel
-			r.Header.Set("X-Routed-Model", routedModel)
-			r.Header.Set("X-Routed-Model-Location", fbLoc)
-			w.Header().Set("X-Cluster-Fallback", "true")
-			return true
-		}
-
-		if rp.Queue == nil {
-			if !applyClusterFallback("local cluster queue disabled") {
-				writeJSONError(wrapped, http.StatusServiceUnavailable, "UNAVAILABLE", "Local cluster serving is not enabled on this router instance.")
-				return
-			}
-		} else {
-			var jobMaxAge time.Duration
-			if matchedCluster != nil && matchedCluster.MaxQueueAge > 0 {
-				if matchedCluster.MaxQueueAge < time.Millisecond {
-					jobMaxAge = matchedCluster.MaxQueueAge * time.Second
-				} else {
-					jobMaxAge = matchedCluster.MaxQueueAge
-				}
-			}
-
-			jobID := fmt.Sprintf("job-%d", time.Now().UnixNano())
-			job := &config.QueueJob{
-				ID:        jobID,
-				ClusterID: clusterID,
-				AppID:     app.ID,
-				Model:     routedModel,
-				Priority:  app.Priority,
-				Tier:      client.Tier,
-				MaxAge:    jobMaxAge,
-				Payload:   bodyBytes,
-				CreatedAt: time.Now(),
-			}
-
-			resChan, err := rp.Queue.Enqueue(job)
-			if err != nil {
-				if !applyClusterFallback(fmt.Sprintf("enqueue error: %v", err)) {
-					writeJSONError(wrapped, http.StatusTooManyRequests, "RESOURCE_EXHAUSTED", fmt.Sprintf("Local cluster queue full: %v", err))
+				if rp.forwardToDirectEndpoint(wrapped, r, ep, bodyBytes, routedModel, client.Tier, app.ID, isOpenAIChat || strings.EqualFold(r.Header.Get("X-OpenAI-Format"), "true"), openAIStream) {
 					return
 				}
+				routedModel = r.Header.Get("X-Routed-Model")
+			}
+		}
+
+		// Re-evaluate cluster match in case DirectEndpoint failover rewrote X-Routed-Model-Location to a cloud region
+		if clusterID2, matchedCluster2, stillLocal := rp.resolveLocalCluster(r.Header.Get("X-Routed-Model-Location")); stillLocal {
+			clusterID = clusterID2
+			matchedCluster = matchedCluster2
+
+			applyClusterFallback := func(reason string) bool {
+				if matchedCluster == nil || strings.TrimSpace(matchedCluster.FallbackModel) == "" {
+					return false
+				}
+				fbModel, fbLocSuffix := config.SplitModelAndLocation(strings.TrimSpace(matchedCluster.FallbackModel))
+				fbLoc := strings.TrimSpace(matchedCluster.FallbackLocation)
+				if fbLoc == "" {
+					fbLoc = fbLocSuffix
+				}
+				if fbLoc == "" {
+					fbLoc = config.GetDefaultLocationForModel(fbModel, rp.Location)
+				}
+				log.Printf("[Proxy Cluster Fallback] Cluster %q failed (%s); falling back to model %q in location %q", clusterID, reason, fbModel, fbLoc)
+				routedModel = fbModel
+				r.Header.Set("X-Routed-Model", routedModel)
+				r.Header.Set("X-Routed-Model-Location", fbLoc)
+				w.Header().Set("X-Cluster-Fallback", "true")
+				return true
+			}
+
+			if rp.Queue == nil {
+				if !applyClusterFallback("local cluster queue disabled") {
+					writeJSONError(wrapped, http.StatusServiceUnavailable, "UNAVAILABLE", "Local cluster serving is not enabled on this router instance.")
+					return
+				}
+			} else if matchedCluster != nil && strings.TrimSpace(matchedCluster.FallbackModel) != "" && !rp.hasOnlineCapableRunner(clusterID, matchedCluster, routedModel) {
+				// Instant cloud spillover (<1ms) when FallbackModel is configured and 0 capable runners are online
+				w.Header().Set("X-Cluster-Fallback-Reason", "no_online_runners")
+				applyClusterFallback("no online capable runners")
 			} else {
-				waitDuration := jobMaxAge
-				if waitDuration <= 0 && rp.Queue.maxAge > 0 {
-					waitDuration = rp.Queue.maxAge
+				var jobMaxAge time.Duration
+				if matchedCluster != nil && matchedCluster.MaxQueueAge > 0 {
+					if matchedCluster.MaxQueueAge < time.Millisecond {
+						jobMaxAge = matchedCluster.MaxQueueAge * time.Second
+					} else {
+						jobMaxAge = matchedCluster.MaxQueueAge
+					}
 				}
-				if waitDuration <= 0 {
-					waitDuration = 90 * time.Second
-				}
-				timer := time.NewTimer(waitDuration + 25*time.Millisecond)
-				defer timer.Stop()
 
-				select {
-				case <-r.Context().Done():
-					rp.Queue.CancelJob(job.ID)
-					writeJSONError(wrapped, http.StatusGatewayTimeout, "DEADLINE_EXCEEDED", "Client disconnected while waiting in cluster queue")
-					return
-				case <-timer.C:
-					rp.Queue.CancelJob(job.ID)
-					if !applyClusterFallback("queue wait timeout") {
-						writeJSONError(wrapped, http.StatusGatewayTimeout, "DEADLINE_EXCEEDED", "gateway timeout: request exceeded max queue age")
+				jobID := fmt.Sprintf("job-%d", time.Now().UnixNano())
+				job := &config.QueueJob{
+					ID:        jobID,
+					ClusterID: clusterID,
+					AppID:     app.ID,
+					Model:     routedModel,
+					Priority:  app.Priority,
+					Tier:      client.Tier,
+					MaxAge:    jobMaxAge,
+					Payload:   bodyBytes,
+					CreatedAt: time.Now(),
+				}
+
+				resChan, err := rp.Queue.Enqueue(job)
+				if err != nil {
+					if !applyClusterFallback(fmt.Sprintf("enqueue error: %v", err)) {
+						writeJSONError(wrapped, http.StatusTooManyRequests, "RESOURCE_EXHAUSTED", fmt.Sprintf("Local cluster queue full: %v", err))
 						return
 					}
-				case res := <-resChan:
-					if res.Error != nil || res.StatusCode >= http.StatusInternalServerError {
-						errMsg := "cluster runner error"
-						if res.Error != nil {
-							errMsg = res.Error.Error()
-						}
-						statusCode := res.StatusCode
-						if statusCode == 0 {
-							statusCode = http.StatusBadGateway
-						}
-						if !applyClusterFallback(errMsg) {
-							writeJSONError(wrapped, statusCode, "INTERNAL", errMsg)
+				} else {
+					waitDuration := jobMaxAge
+					if waitDuration <= 0 && rp.Queue.maxAge > 0 {
+						waitDuration = rp.Queue.maxAge
+					}
+					if waitDuration <= 0 {
+						waitDuration = 90 * time.Second
+					}
+					timer := time.NewTimer(waitDuration + 25*time.Millisecond)
+					defer timer.Stop()
+
+					select {
+					case <-r.Context().Done():
+						rp.Queue.CancelJob(job.ID)
+						writeJSONError(wrapped, http.StatusGatewayTimeout, "DEADLINE_EXCEEDED", "Client disconnected while waiting in cluster queue")
+						return
+					case <-timer.C:
+						rp.Queue.CancelJob(job.ID)
+						if !applyClusterFallback("queue wait timeout") {
+							writeJSONError(wrapped, http.StatusGatewayTimeout, "DEADLINE_EXCEEDED", "gateway timeout: request exceeded max queue age")
 							return
 						}
-					} else {
-						w.Header().Set("X-Routed-Model", routedModel)
-						w.Header().Set("X-Requested-Model", r.Header.Get("X-Requested-Model"))
-						w.Header().Set("X-Routed-Model-Location", clusterID)
-						w.Header().Set("X-Client-Tier", client.Tier)
-						w.Header().Set("X-App-ID", app.ID)
-						if v := r.Header.Get("X-Router-Engine-Used"); v != "" {
-							w.Header().Set("X-Router-Engine-Used", v)
-						}
-						if v := r.Header.Get("X-Router-Complexity-Tier"); v != "" {
-							w.Header().Set("X-Router-Complexity-Tier", v)
-						}
-						if v := r.Header.Get("X-Session-ID"); v != "" {
-							w.Header().Set("X-Session-ID", v)
-						}
-						if v := r.Header.Get("X-Session-Turn"); v != "" {
-							w.Header().Set("X-Session-Turn", v)
-						}
-						if v := r.Header.Get("X-Agent-Task"); v != "" {
-							w.Header().Set("X-Agent-Task", v)
-						}
-
-						wantOpenAI := isOpenAIChat || strings.EqualFold(r.Header.Get("X-OpenAI-Format"), "true")
-						if wantOpenAI {
-							if openAIStream {
-								ssePayload := translateGeminiStreamToOpenAISSE(res.Payload, routedModel, fmt.Sprintf("chatcmpl-%d", time.Now().UnixNano()), time.Now().Unix())
-								wrapped.Header().Set("Content-Type", "text/event-stream")
-								wrapped.WriteHeader(res.StatusCode)
-								_, _ = wrapped.Write(ssePayload)
+					case res := <-resChan:
+						if res.Error != nil || res.StatusCode >= http.StatusInternalServerError {
+							errMsg := "cluster runner error"
+							if res.Error != nil {
+								errMsg = res.Error.Error()
+							}
+							statusCode := res.StatusCode
+							if statusCode == 0 {
+								statusCode = http.StatusBadGateway
+							}
+							if !applyClusterFallback(errMsg) {
+								writeJSONError(wrapped, statusCode, "INTERNAL", errMsg)
 								return
 							}
-							oaiPayload, err := translateGeminiToOpenAIResponse(res.Payload, routedModel)
-							if err == nil {
-								wrapped.Header().Set("Content-Type", "application/json")
-								wrapped.WriteHeader(res.StatusCode)
-								_, _ = wrapped.Write(oaiPayload)
-								return
+						} else {
+							w.Header().Set("X-Routed-Model", routedModel)
+							w.Header().Set("X-Requested-Model", r.Header.Get("X-Requested-Model"))
+							w.Header().Set("X-Routed-Model-Location", clusterID)
+							w.Header().Set("X-Client-Tier", client.Tier)
+							w.Header().Set("X-App-ID", app.ID)
+							if v := r.Header.Get("X-Router-Engine-Used"); v != "" {
+								w.Header().Set("X-Router-Engine-Used", v)
 							}
-						}
+							if v := r.Header.Get("X-Router-Complexity-Tier"); v != "" {
+								w.Header().Set("X-Router-Complexity-Tier", v)
+							}
+							if v := r.Header.Get("X-Router-Confidence"); v != "" {
+								w.Header().Set("X-Router-Confidence", v)
+							}
+							if v := r.Header.Get("X-Router-Local-Eligible"); v != "" {
+								w.Header().Set("X-Router-Local-Eligible", v)
+							}
+							if v := r.Header.Get("X-Session-ID"); v != "" {
+								w.Header().Set("X-Session-ID", v)
+							}
+							if v := r.Header.Get("X-Session-Turn"); v != "" {
+								w.Header().Set("X-Session-Turn", v)
+							}
+							if v := r.Header.Get("X-Agent-Task"); v != "" {
+								w.Header().Set("X-Agent-Task", v)
+							}
 
-						wrapped.Header().Set("Content-Type", "application/json")
-						wrapped.WriteHeader(res.StatusCode)
-						_, _ = wrapped.Write(res.Payload)
-						return
+							wantOpenAI := isOpenAIChat || strings.EqualFold(r.Header.Get("X-OpenAI-Format"), "true")
+							if wantOpenAI {
+								if openAIStream {
+									ssePayload := translateGeminiStreamToOpenAISSE(res.Payload, routedModel, fmt.Sprintf("chatcmpl-%d", time.Now().UnixNano()), time.Now().Unix())
+									wrapped.Header().Set("Content-Type", "text/event-stream")
+									wrapped.WriteHeader(res.StatusCode)
+									_, _ = wrapped.Write(ssePayload)
+									return
+								}
+								oaiPayload, err := translateGeminiToOpenAIResponse(res.Payload, routedModel)
+								if err == nil {
+									wrapped.Header().Set("Content-Type", "application/json")
+									wrapped.WriteHeader(res.StatusCode)
+									_, _ = wrapped.Write(oaiPayload)
+									return
+								}
+							}
+
+							wrapped.Header().Set("Content-Type", "application/json")
+							wrapped.WriteHeader(res.StatusCode)
+							_, _ = wrapped.Write(res.Payload)
+							return
+						}
 					}
 				}
 			}
@@ -1117,8 +1240,10 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Check if routed to (or fallen back to) a Direct HTTP Endpoint in Providers["local"]
 	if ep, ok := rp.resolveDirectEndpoint(routedModel, r.Header.Get("X-Routed-Model-Location")); ok {
-		rp.forwardToDirectEndpoint(wrapped, r, ep, bodyBytes, routedModel, client.Tier, app.ID, isOpenAIChat || strings.EqualFold(r.Header.Get("X-OpenAI-Format"), "true"), openAIStream)
-		return
+		if rp.forwardToDirectEndpoint(wrapped, r, ep, bodyBytes, routedModel, client.Tier, app.ID, isOpenAIChat || strings.EqualFold(r.Header.Get("X-OpenAI-Format"), "true"), openAIStream) {
+			return
+		}
+		routedModel = r.Header.Get("X-Routed-Model")
 	}
 
 	// Fetch OAuth2 token for upstream Vertex AI API
@@ -1152,6 +1277,12 @@ func (rp *RouterProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if v := r.Header.Get("X-Router-Complexity-Tier"); v != "" {
 		w.Header().Set("X-Router-Complexity-Tier", v)
+	}
+	if v := r.Header.Get("X-Router-Confidence"); v != "" {
+		w.Header().Set("X-Router-Confidence", v)
+	}
+	if v := r.Header.Get("X-Router-Local-Eligible"); v != "" {
+		w.Header().Set("X-Router-Local-Eligible", v)
 	}
 	if v := r.Header.Get("X-Session-ID"); v != "" {
 		w.Header().Set("X-Session-ID", v)
@@ -1386,6 +1517,12 @@ type classifierResponse struct {
 			} `json:"parts"`
 		} `json:"content"`
 	} `json:"candidates"`
+	UsageMetadata struct {
+		PromptTokenCount     int `json:"promptTokenCount"`
+		CandidatesTokenCount int `json:"candidatesTokenCount"`
+		ThoughtsTokenCount   int `json:"thoughtsTokenCount"`
+		TotalTokenCount      int `json:"totalTokenCount"`
+	} `json:"usageMetadata"`
 }
 
 // extractPromptAndMeta parses user prompt text, char length, tools, and multimodal presence from request body.
@@ -1476,7 +1613,7 @@ func (rp *RouterProxy) classifyComplexity(ctx context.Context, body []byte, c co
 	if c.UseLLMClassifier {
 		classifierModel := c.ClassifierModel
 		if classifierModel == "" {
-			classifierModel = "gemini-3.1-flash-lite"
+			classifierModel = "gemini-3.5-flash-lite"
 		}
 
 		log.Printf("[Complexity Classifier] Invoking dynamic classifier (%s) for prompt (length: %d characters)...", classifierModel, charCount)
@@ -1516,14 +1653,21 @@ func (rp *RouterProxy) classifyComplexity(ctx context.Context, body []byte, c co
 
 // callLLMClassifier sends a rapid structured OIDC JSON query to the Vertex AI Gemini API.
 func (rp *RouterProxy) callLLMClassifier(ctx context.Context, modelName string, prompt string, additionalInstructions string) (string, error) {
+	tier, _, _, err := rp.callLLMClassifierWithUsage(ctx, modelName, prompt, additionalInstructions, true)
+	return tier, err
+}
+
+func (rp *RouterProxy) callLLMClassifierWithUsage(ctx context.Context, modelName string, prompt string, additionalInstructions string, useCache bool) (string, int, int, error) {
 	cleanModel := config.StripLocationSuffix(modelName)
 	classifierLoc := config.GetDefaultLocationForModel(modelName, rp.Location)
 
 	cacheKey := fmt.Sprintf("%s|%s|%s", cleanModel, prompt, additionalInstructions)
-	if cachedVal, ok := rp.classifierCache.Load(cacheKey); ok {
-		if cachedStr, ok := cachedVal.(string); ok {
-			log.Printf("[Complexity Classifier] Cache HIT: classified complexity as %s", cachedStr)
-			return cachedStr, nil
+	if useCache {
+		if cachedVal, ok := rp.classifierCache.Load(cacheKey); ok {
+			if cachedStr, ok := cachedVal.(string); ok {
+				log.Printf("[Complexity Classifier] Cache HIT: classified complexity as %s", cachedStr)
+				return cachedStr, 0, 0, nil
+			}
 		}
 	}
 
@@ -1557,6 +1701,7 @@ func (rp *RouterProxy) callLLMClassifier(ctx context.Context, modelName string, 
 		Text string `json:"text"`
 	}
 	type internalContent struct {
+		Role  string         `json:"role,omitempty"`
 		Parts []internalPart `json:"parts"`
 	}
 	type internalReq struct {
@@ -1568,6 +1713,7 @@ func (rp *RouterProxy) callLLMClassifier(ctx context.Context, modelName string, 
 	reqBody := internalReq{
 		Contents: []internalContent{
 			{
+				Role:  "user",
 				Parts: []internalPart{{Text: "Prompt to classify:\n" + prompt}},
 			},
 		},
@@ -1587,13 +1733,13 @@ func (rp *RouterProxy) callLLMClassifier(ctx context.Context, modelName string, 
 				Required: []string{"complexity"},
 			},
 			Temperature:     0.0,
-			MaxOutputTokens: 20,
+			MaxOutputTokens: 256,
 		},
 	}
 
 	reqJSON, err := json.Marshal(reqBody)
 	if err != nil {
-		return "", err
+		return "", 0, 0, err
 	}
 
 	// Resolve regional/global Vertex AI endpoint host for classifier model
@@ -1607,40 +1753,40 @@ func (rp *RouterProxy) callLLMClassifier(ctx context.Context, modelName string, 
 	targetURL := fmt.Sprintf("%s://%s/v1/projects/%s/locations/%s/publishers/google/models/%s:generateContent",
 		scheme, host, rp.ProjectID, classifierLoc, cleanModel)
 
-	// Tight timeout for classification overhead safety (3s)
-	callCtx, cancel := context.WithTimeout(ctx, 3000*time.Millisecond)
+	// Tight timeout for classification overhead safety (5s)
+	callCtx, cancel := context.WithTimeout(ctx, 5000*time.Millisecond)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(callCtx, "POST", targetURL, bytes.NewReader(reqJSON))
 	if err != nil {
-		return "", err
+		return "", 0, 0, err
 	}
 
 	token, err := rp.TokenSource.Token()
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch credentials: %w", err)
+		return "", 0, 0, fmt.Errorf("failed to fetch credentials: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+token.AccessToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := rp.ClassifierClient.Do(req)
 	if err != nil {
-		return "", err
+		return "", 0, 0, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		bodyErr, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("classifier API returned status %s: %s", resp.Status, string(bodyErr))
+		return "", 0, 0, fmt.Errorf("classifier API returned status %s: %s", resp.Status, string(bodyErr))
 	}
 
 	var res classifierResponse
 	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
-		return "", err
+		return "", 0, 0, err
 	}
 
 	if len(res.Candidates) == 0 || len(res.Candidates[0].Content.Parts) == 0 {
-		return "", fmt.Errorf("empty candidates in classifier response")
+		return "", 0, 0, fmt.Errorf("empty candidates in classifier response")
 	}
 
 	rawJSON := res.Candidates[0].Content.Parts[0].Text
@@ -1648,14 +1794,67 @@ func (rp *RouterProxy) callLLMClassifier(ctx context.Context, modelName string, 
 		Complexity string `json:"complexity"`
 	}
 	if err := json.Unmarshal([]byte(rawJSON), &out); err != nil {
-		return "", fmt.Errorf("failed to parse output JSON %q: %w", rawJSON, err)
+		return "", 0, 0, fmt.Errorf("failed to parse output JSON %q: %w", rawJSON, err)
 	}
 
-	if out.Complexity == "simple" || out.Complexity == "medium" || out.Complexity == "complex" {
+	if useCache && (out.Complexity == "simple" || out.Complexity == "medium" || out.Complexity == "complex") {
 		rp.classifierCache.Store(cacheKey, out.Complexity)
 	}
 
-	return out.Complexity, nil
+	outTokens := res.UsageMetadata.CandidatesTokenCount + res.UsageMetadata.ThoughtsTokenCount
+	return out.Complexity, res.UsageMetadata.PromptTokenCount, outTokens, nil
+}
+
+// InspectLLMClassifier runs an uncached live generative JSON classification (e.g. gemini-3.5-flash-lite)
+// and returns full token telemetry and execution mode for administrative inspection and evaluation.
+func (rp *RouterProxy) InspectLLMClassifier(ctx context.Context, prompt string, c config.ComplexityRouting, hasTools, hasMultimodal bool) (decision.DecisionResult, error) {
+	features := decision.ExtractPromptFeatures(prompt, hasTools, hasMultimodal)
+	if hasTools && c.ForceComplexTools {
+		return decision.DecisionResult{
+			Tier:          "complex",
+			TargetModel:   decision.ResolveModelByTier("complex", c),
+			Engine:        "llm",
+			ExecutionMode: "policy_bypass",
+			Confidence:    0.99,
+			Rationale:     "Forced complex tier due to active tools.",
+			Features:      features,
+		}, nil
+	}
+	if hasMultimodal && c.ForceComplexMultimodal {
+		return decision.DecisionResult{
+			Tier:          "complex",
+			TargetModel:   decision.ResolveModelByTier("complex", c),
+			Engine:        "llm",
+			ExecutionMode: "policy_bypass",
+			Confidence:    0.99,
+			Rationale:     "Forced complex tier due to multimodal payload.",
+			Features:      features,
+		}, nil
+	}
+
+	classifierModel := strings.TrimSpace(c.ClassifierModel)
+	if classifierModel == "" {
+		classifierModel = "gemini-3.5-flash-lite"
+	}
+	snippet := prompt
+	if len(snippet) > 4000 {
+		snippet = snippet[:4000]
+	}
+
+	tier, inTok, outTok, err := rp.callLLMClassifierWithUsage(ctx, classifierModel, snippet, c.AdditionalInstructions, false)
+	if err != nil {
+		return decision.DecisionResult{}, err
+	}
+	return decision.DecisionResult{
+		Tier:          tier,
+		TargetModel:   decision.ResolveModelByTier(tier, c),
+		Engine:        "llm",
+		ExecutionMode: "vertex_generative_json",
+		InputTokens:   inTok,
+		OutputTokens:  outTok,
+		Rationale:     fmt.Sprintf("%s generative JSON: tier=%s in_tokens=%d out_tokens=%d (uncalibrated)", classifierModel, tier, inTok, outTok),
+		Features:      features,
+	}, nil
 }
 
 // resolveComplexityWithClusterProviders enriches a ComplexityRouting configuration with any
@@ -1668,6 +1867,11 @@ func (rp *RouterProxy) resolveComplexityWithClusterProviders(c config.Complexity
 					decision.SyncDecisionProvidersFromLocalConfig(p)
 				}
 			}
+		}
+	}
+	if strings.TrimSpace(c.GeminiDecisionEndpoint) == "" {
+		if ep := decision.GetEngineEndpoint("gemini-decision"); ep != "" {
+			c.GeminiDecisionEndpoint = ep
 		}
 	}
 	if strings.TrimSpace(c.CLMEndpoint) == "" {
@@ -1765,8 +1969,144 @@ func (rp *RouterProxy) resolveDirectEndpoint(routedModel, loc string) (config.Di
 	return config.DirectEndpoint{}, false
 }
 
+// isDecisionsPassthroughPath checks if a request targets the Gemini Decisions API endpoint directly.
+func isDecisionsPassthroughPath(path string) bool {
+	cleaned := strings.TrimRight(strings.TrimSpace(path), "/")
+	return cleaned == "/v1beta/decisions" || cleaned == "/v1/decisions"
+}
+
+// handleDecisionsPassthrough proxies native Gemini Decisions API calls (POST /v1beta/decisions)
+// authenticated with Smart Router App API keys/OIDC, scrubbing client credentials and attaching keyless upstream ADC.
+func (rp *RouterProxy) handleDecisionsPassthrough(w *responseWriterWrapper, r *http.Request, bodyBytes []byte, app config.App, client config.Client, estimatedTokens int) {
+	if r.Method != http.MethodPost {
+		writeJSONError(w, http.StatusMethodNotAllowed, "INVALID_ARGUMENT", "Only POST is supported for /v1beta/decisions.")
+		return
+	}
+
+	reqModel := decision.GeminiDecisionModel
+	var bodyMeta struct {
+		Model string `json:"model"`
+	}
+	if err := json.Unmarshal(bodyBytes, &bodyMeta); err == nil && strings.TrimSpace(bodyMeta.Model) != "" {
+		reqModel = strings.TrimSpace(bodyMeta.Model)
+	}
+	r.Header.Set("X-Requested-Model", reqModel)
+	r.Header.Set("X-Routed-Model", reqModel)
+	r.Header.Set("X-Routed-Model-Location", "global")
+
+	effectiveCfg := rp.resolveComplexityWithClusterProviders(app.Complexity)
+	endpoint := rp.GeminiDecisionEngine.ResolveEndpoint(effectiveCfg)
+	if err := rp.GeminiDecisionEngine.ValidatePassthroughEndpoint(endpoint); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "INVALID_ARGUMENT", err.Error())
+		return
+	}
+
+	outReq, err := http.NewRequestWithContext(r.Context(), http.MethodPost, endpoint, bytes.NewReader(bodyBytes))
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "INTERNAL", fmt.Sprintf("Failed constructing upstream decisions request: %v", err))
+		return
+	}
+	outReq.Header.Set("Content-Type", "application/json")
+	if err := rp.GeminiDecisionEngine.AttachUpstreamAuth(r.Context(), outReq, effectiveCfg.SecretRef); err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "INTERNAL", fmt.Sprintf("Failed attaching upstream credentials: %v", err))
+		return
+	}
+
+	httpClient := rp.ClassifierClient
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: 10 * time.Second}
+	}
+
+	resp, err := httpClient.Do(outReq)
+	if err != nil {
+		writeJSONError(w, http.StatusBadGateway, "BAD_GATEWAY", fmt.Sprintf("Gemini Decisions API request failed: %v", err))
+		return
+	}
+	defer resp.Body.Close()
+
+	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	if err != nil {
+		writeJSONError(w, http.StatusBadGateway, "BAD_GATEWAY", fmt.Sprintf("Failed reading Gemini Decisions API response: %v", err))
+		return
+	}
+
+	if resp.StatusCode == http.StatusOK && !app.OptOutTPM && estimatedTokens > 0 {
+		var usageEnvelope struct {
+			Usage struct {
+				TotalTokens      int `json:"total_tokens"`
+				TotalInputTokens int `json:"total_input_tokens"`
+			} `json:"usage"`
+		}
+		if json.Unmarshal(respBytes, &usageEnvelope) == nil {
+			actual := usageEnvelope.Usage.TotalTokens
+			if actual == 0 {
+				actual = usageEnvelope.Usage.TotalInputTokens
+			}
+			if actual > 0 {
+				rp.Limiter.AdjustLimiter(app.ID, actual-estimatedTokens)
+			}
+		}
+	}
+
+	w.Header().Set("X-Routed-Model", reqModel)
+	w.Header().Set("X-Requested-Model", reqModel)
+	w.Header().Set("X-Routed-Model-Location", "global")
+	w.Header().Set("X-Client-Tier", client.Tier)
+	w.Header().Set("X-App-ID", app.ID)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(resp.StatusCode)
+	_, _ = w.Write(respBytes)
+	rp.Scheduler.ReportRequestStatus(reqModel, resp.StatusCode)
+}
+
+// hasOnlineCapableRunner checks whether at least one online runner (heartbeat <= 30s) assigned to clusterID supports routedModel.
+func (rp *RouterProxy) hasOnlineCapableRunner(clusterID string, matchedCluster *config.LocalCluster, routedModel string) bool {
+	if rp.Store == nil {
+		return false
+	}
+	baseModel := config.StripLocationSuffix(strings.TrimSpace(routedModel))
+	supports := func(models []string) bool {
+		if len(models) == 0 || baseModel == "" {
+			return true
+		}
+		for _, sm := range models {
+			t := strings.TrimSpace(sm)
+			if t == "*" || strings.EqualFold(config.StripLocationSuffix(t), baseModel) {
+				return true
+			}
+		}
+		return false
+	}
+
+	for _, r := range rp.Store.GetCachedRunners() {
+		if !store.IsRunnerNodeOnline(r.Node) || !supports(r.Node.SupportedModels) {
+			continue
+		}
+		if clusterID == "" || clusterID == "local-cluster" {
+			if len(r.AssignedClusters) == 0 {
+				return true
+			}
+		}
+		for _, cid := range r.AssignedClusters {
+			if cid == clusterID || (matchedCluster != nil && matchedCluster.QueueName != "" && cid == matchedCluster.QueueName) {
+				return true
+			}
+		}
+	}
+
+	if matchedCluster != nil {
+		for _, n := range matchedCluster.Nodes {
+			if store.IsRunnerNodeOnline(n) && supports(n.SupportedModels) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // forwardToDirectEndpoint forwards inference requests directly to an unmanaged HTTP server (Ollama, vLLM, SGLang, MLX, llama.cpp).
-func (rp *RouterProxy) forwardToDirectEndpoint(w http.ResponseWriter, r *http.Request, ep config.DirectEndpoint, bodyBytes []byte, routedModel, clientTier, appID string, wantOpenAI, openAIStream bool) {
+// Returns true if the request was fully handled (response written to w), or false if a configured cloud FallbackModel was activated so ServeHTTP should continue to Vertex AI.
+func (rp *RouterProxy) forwardToDirectEndpoint(w http.ResponseWriter, r *http.Request, ep config.DirectEndpoint, bodyBytes []byte, routedModel, clientTier, appID string, wantOpenAI, openAIStream bool) bool {
 	baseURL := strings.TrimRight(strings.TrimSpace(ep.URL), "/")
 	targetURL := baseURL
 	if !strings.HasSuffix(baseURL, "/chat/completions") && !strings.HasSuffix(baseURL, "/api/chat") && !strings.HasSuffix(baseURL, "/generate") {
@@ -1778,12 +2118,42 @@ func (rp *RouterProxy) forwardToDirectEndpoint(w http.ResponseWriter, r *http.Re
 		targetModel = config.StripLocationSuffix(routedModel)
 	}
 
+	isStream := openAIStream || strings.Contains(r.URL.Path, ":streamGenerateContent")
+
+	applyDirectFailover := func(reason string) bool {
+		fbRaw := strings.TrimSpace(ep.FallbackModel)
+		fbLoc := strings.TrimSpace(ep.FallbackLocation)
+		if fbRaw == "" {
+			fbRaw = strings.TrimSpace(r.Header.Get("X-Fallback-Target-Model"))
+			if fbLoc == "" {
+				fbLoc = strings.TrimSpace(r.Header.Get("X-Fallback-Model-Location"))
+			}
+		}
+		if fbRaw == "" {
+			return false
+		}
+		fbModel, fbLocSuffix := config.SplitModelAndLocation(fbRaw)
+		if fbLoc == "" {
+			fbLoc = fbLocSuffix
+		}
+		if fbLoc == "" {
+			fbLoc = config.GetDefaultLocationForModel(fbModel, rp.Location)
+		}
+		log.Printf("[Proxy DirectEndpoint Failover] Endpoint %q failed (%s); failing over to model %q in location %q", ep.ID, reason, fbModel, fbLoc)
+		r.Header.Set("X-Routed-Model", fbModel)
+		r.Header.Set("X-Routed-Model-Location", fbLoc)
+		w.Header().Set("X-Cluster-Fallback", "true")
+		w.Header().Set("X-Cluster-Fallback-Reason", "direct_endpoint_error")
+		return true
+	}
+
 	// Build OpenAI-compatible chat request from Gemini bodyBytes (or forward if already OpenAI format)
 	var reqPayload []byte
 	var rawMap map[string]interface{}
 	if err := json.Unmarshal(bodyBytes, &rawMap); err == nil {
 		if _, hasMessages := rawMap["messages"]; hasMessages {
 			rawMap["model"] = targetModel
+			rawMap["stream"] = isStream
 			reqPayload, _ = json.Marshal(rawMap)
 		} else {
 			var gReq struct {
@@ -1830,7 +2200,7 @@ func (rp *RouterProxy) forwardToDirectEndpoint(w http.ResponseWriter, r *http.Re
 			reqPayload, _ = json.Marshal(map[string]interface{}{
 				"model":    targetModel,
 				"messages": msgs,
-				"stream":   false,
+				"stream":   isStream,
 			})
 		}
 	}
@@ -1840,10 +2210,16 @@ func (rp *RouterProxy) forwardToDirectEndpoint(w http.ResponseWriter, r *http.Re
 
 	outReq, err := http.NewRequestWithContext(r.Context(), "POST", targetURL, bytes.NewReader(reqPayload))
 	if err != nil {
+		if applyDirectFailover(err.Error()) {
+			return false
+		}
 		writeJSONError(w, http.StatusBadGateway, "BAD_GATEWAY", fmt.Sprintf("invalid direct endpoint request: %v", err))
-		return
+		return true
 	}
 	outReq.Header.Set("Content-Type", "application/json")
+	if isStream {
+		outReq.Header.Set("Accept", "text/event-stream")
+	}
 	if ep.SecretRef != "" {
 		if secret := decision.ResolveEngineSecret(ep.Engine, ep.SecretRef); secret != "" {
 			outReq.Header.Set("Authorization", "Bearer "+secret)
@@ -1856,30 +2232,122 @@ func (rp *RouterProxy) forwardToDirectEndpoint(w http.ResponseWriter, r *http.Re
 	}
 	resp, err := client.Do(outReq)
 	if err != nil {
+		if applyDirectFailover(err.Error()) {
+			return false
+		}
 		writeJSONError(w, http.StatusBadGateway, "BAD_GATEWAY", fmt.Sprintf("direct endpoint %q unreachable: %v", ep.ID, err))
-		return
+		return true
 	}
 	defer resp.Body.Close()
 
-	respBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		writeJSONError(w, http.StatusBadGateway, "BAD_GATEWAY", fmt.Sprintf("failed reading direct endpoint %q response: %v", ep.ID, err))
-		return
-	}
-	if resp.StatusCode >= http.StatusBadRequest {
-		writeJSONError(w, http.StatusBadGateway, "BAD_GATEWAY", fmt.Sprintf("direct endpoint %q returned %d: %s", ep.ID, resp.StatusCode, strings.TrimSpace(string(respBytes))))
-		return
+	if resp.StatusCode >= http.StatusInternalServerError {
+		errBodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		if applyDirectFailover(fmt.Sprintf("HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(errBodyBytes)))) {
+			return false
+		}
+		writeJSONError(w, http.StatusBadGateway, "BAD_GATEWAY", fmt.Sprintf("direct endpoint %q returned %d: %s", ep.ID, resp.StatusCode, strings.TrimSpace(string(errBodyBytes))))
+		return true
 	}
 
 	locHeader := ep.ClusterID
 	if locHeader == "" {
 		locHeader = ep.ID
 	}
-	w.Header().Set("X-Routed-Model", routedModel)
-	w.Header().Set("X-Requested-Model", r.Header.Get("X-Requested-Model"))
-	w.Header().Set("X-Routed-Model-Location", locHeader)
-	w.Header().Set("X-Client-Tier", clientTier)
-	w.Header().Set("X-App-ID", appID)
+	setDirectAuditHeaders := func() {
+		w.Header().Set("X-Routed-Model", routedModel)
+		w.Header().Set("X-Requested-Model", r.Header.Get("X-Requested-Model"))
+		w.Header().Set("X-Routed-Model-Location", locHeader)
+		w.Header().Set("X-Client-Tier", clientTier)
+		w.Header().Set("X-App-ID", appID)
+		if v := r.Header.Get("X-Router-Engine-Used"); v != "" {
+			w.Header().Set("X-Router-Engine-Used", v)
+		}
+		if v := r.Header.Get("X-Router-Complexity-Tier"); v != "" {
+			w.Header().Set("X-Router-Complexity-Tier", v)
+		}
+		if v := r.Header.Get("X-Router-Confidence"); v != "" {
+			w.Header().Set("X-Router-Confidence", v)
+		}
+		if v := r.Header.Get("X-Router-Local-Eligible"); v != "" {
+			w.Header().Set("X-Router-Local-Eligible", v)
+		}
+	}
+
+	// Real-time SSE streaming path (OpenAI stream:true or Gemini :streamGenerateContent?alt=sse)
+	if isStream && resp.StatusCode == http.StatusOK && strings.Contains(strings.ToLower(resp.Header.Get("Content-Type")), "text/event-stream") {
+		setDirectAuditHeaders()
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.WriteHeader(http.StatusOK)
+		flusher, _ := w.(http.Flusher)
+
+		scanner := bufio.NewScanner(resp.Body)
+		scanner.Buffer(make([]byte, 0, 64*1024), 2*1024*1024)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if wantOpenAI {
+				_, _ = w.Write([]byte(line + "\n"))
+				if line == "" && flusher != nil {
+					flusher.Flush()
+				}
+				continue
+			}
+			// Translate OpenAI SSE chunks into Gemini SSE candidate events
+			trimmed := strings.TrimSpace(line)
+			if !strings.HasPrefix(trimmed, "data:") {
+				continue
+			}
+			dataStr := strings.TrimSpace(strings.TrimPrefix(trimmed, "data:"))
+			if dataStr == "" || dataStr == "[DONE]" {
+				continue
+			}
+			var chunk struct {
+				Choices []struct {
+					Delta struct {
+						Content string `json:"content"`
+					} `json:"delta"`
+					FinishReason *string `json:"finish_reason"`
+				} `json:"choices"`
+			}
+			if json.Unmarshal([]byte(dataStr), &chunk) == nil && len(chunk.Choices) > 0 {
+				cand := map[string]interface{}{
+					"content": map[string]interface{}{
+						"role":  "model",
+						"parts": []map[string]string{{"text": chunk.Choices[0].Delta.Content}},
+					},
+				}
+				if chunk.Choices[0].FinishReason != nil && *chunk.Choices[0].FinishReason != "" {
+					cand["finishReason"] = "STOP"
+				}
+				gemEvent, _ := json.Marshal(map[string]interface{}{
+					"candidates": []interface{}{cand},
+				})
+				_, _ = w.Write([]byte("data: " + string(gemEvent) + "\n\n"))
+				if flusher != nil {
+					flusher.Flush()
+				}
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			log.Printf("[Proxy DirectEndpoint Stream] Scanner error on %q: %v", ep.ID, err)
+		}
+		return true
+	}
+
+	respBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		if applyDirectFailover(err.Error()) {
+			return false
+		}
+		writeJSONError(w, http.StatusBadGateway, "BAD_GATEWAY", fmt.Sprintf("failed reading direct endpoint %q response: %v", ep.ID, err))
+		return true
+	}
+	if resp.StatusCode >= http.StatusBadRequest {
+		writeJSONError(w, http.StatusBadGateway, "BAD_GATEWAY", fmt.Sprintf("direct endpoint %q returned %d: %s", ep.ID, resp.StatusCode, strings.TrimSpace(string(respBytes))))
+		return true
+	}
+
+	setDirectAuditHeaders()
 
 	// Convert between OpenAI choices and Gemini candidates based on client expectation
 	var oaiResp struct {
@@ -1901,13 +2369,13 @@ func (rp *RouterProxy) forwardToDirectEndpoint(w http.ResponseWriter, r *http.Re
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write(respBytes)
-			return
+			return true
 		}
 		if oaiPayload, err := translateGeminiToOpenAIResponse(respBytes, routedModel); err == nil {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write(oaiPayload)
-			return
+			return true
 		}
 	} else if isUpstreamOpenAI {
 		geminiPayload, _ := json.Marshal(map[string]interface{}{
@@ -1929,12 +2397,13 @@ func (rp *RouterProxy) forwardToDirectEndpoint(w http.ResponseWriter, r *http.Re
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(geminiPayload)
-		return
+		return true
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(respBytes)
+	return true
 }
 
 

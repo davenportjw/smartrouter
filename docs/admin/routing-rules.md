@@ -16,7 +16,7 @@ Routing rules evaluate request variables (application ID, client tier, requested
    * **Target Application Scope**: Bind the rule to a specific App, or select `Global (All Applications)`.
    * **Client Tier Eligibility**: Apply the rule to specific tiers (e.g. `Premium Tier Only`), or select `All Tiers`.
    * **Classifier & Task Match Conditions (Optional)**:
-     * **Decision Engine (`decision_engine`)**: Require classification by a specific engine (`jev`, `fastino`, `contrastive-lm`, `llm`, `heuristics`), or `Any Decision Engine`.
+     * **Decision Engine (`decision_engine`)**: Require classification by a specific engine (`gemini-decision`, `jev`, `fastino`, `contrastive-lm`, `llm`, `heuristics`), or `Any Decision Engine`.
      * **Complexity Tier (`complexity_tier`)**: Require a specific classified complexity bucket (`simple`, `medium`, `complex`).
      * **Minimum Confidence (`min_confidence`)**: Require the classifier confidence score to be $\ge$ a threshold (e.g., `0.75`).
      * **Agent Task Kind (`task_kind`)**: Require a specific active task context (e.g., `code_generation`, `debugging`, `security_audit`, `triage`).
@@ -56,6 +56,7 @@ Clients can request the virtual model **`gemini-dynamic`**. The proxy evaluates 
 
 ### Decision Engines
 You can configure the decision engine per application in `/admin/complexity`:
+* **`gemini-decision` (Google Gemini Decisions API — `gemini-decision-1`)**: Single-pass calibrated probability scoring (`POST /v1beta/decisions`) returning calibrated probabilities for `complexity`, `task_kind`, and `local_eligible` with zero output tokens (`\$0.10` / 1M input tokens, `\$0.00` output) via keyless Google Cloud ADC OAuth2.
 * **`jev` (Jev Structured Decision Model)**: Fast microsecond rule-based logit scoring using extracted prompt features (code density, algorithmic/math signals, multi-step patterns, length), or remote `/v1/systemone` endpoint evaluation.
 * **`fastino` (Fastino GLiClass / Pioneer Classifier)**: Sub-millisecond zero-shot sequence classification via a remote Fastino endpoint (`FastinoEndpoint`) or local zero-shot structural density fallback.
 * **`contrastive-lm` / `clm` (Contrastive-LM Embedding Classifier)**: Microsecond 5D Euclidean contrastive distance classifier comparing prompt feature vectors against Simple, Medium, and Complex anchor profiles, or remote `/rank` endpoint evaluation (`CLMEndpoint`).

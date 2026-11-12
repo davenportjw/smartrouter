@@ -60,7 +60,7 @@ chmod +x deploy.sh
 1. **Environment Checks**: Validates `.env` file variables.
 2. **Firebase Provisioning**: Programmatically checks, links Firebase if necessary, registers the Web App, and updates `.env` with client SDK details.
 3. **Infrastructure & Secret Manager Containers (Terraform)**:
-   * Enables APIs (Cloud Run, Firestore, Secret Manager, Cloud Build, Identity Toolkit).
+   * Enables APIs (`run.googleapis.com`, `firestore.googleapis.com`, `secretmanager.googleapis.com`, `iam.googleapis.com`, `monitoring.googleapis.com`, `identitytoolkit.googleapis.com`, `aiplatform.googleapis.com`, `generativelanguage.googleapis.com`, and `apikeys.googleapis.com` for ADC-backed authorization key resolution against the Gemini Decisions API).
    * Provisions Firestore in Native mode and configures IAM Roles.
    * Provisions `google_secret_manager_secret` containers (`JEV_API_KEY`, `FASTINO_API_KEY`, `CLM_API_KEY`, `BACKEND_SHARED_SECRET`) and grants `roles/secretmanager.secretAccessor` to the Cloud Run service account **without** reading `.env` or storing secret values in `terraform.tfstate`.
 4. **Out-of-Band Secret Sync & Upstream Auth**:
@@ -81,8 +81,8 @@ Each Cloud Run service runs as its own least-privilege service account (defined 
 
 | Service | Service account | Roles (scope) |
 | --- | --- | --- |
-| `gemini-smart-router` (backend) | `smart-router-api-sa` | `roles/aiplatform.user`, `roles/datastore.user` (project); `roles/secretmanager.secretAccessor` on `BACKEND_SHARED_SECRET` |
-| `gemini-smart-router-ui` | `smart-router-ui-sa` | `roles/firebaseauth.admin`, `roles/aiplatform.user`, `roles/logging.viewer` (project); `roles/secretmanager.secretAccessor` on `BACKEND_SHARED_SECRET`; `roles/run.invoker` on the backend |
+| `gemini-smart-router` (backend) | `smart-router-api-sa` | `roles/aiplatform.user`, `roles/datastore.user`, `roles/serviceusage.serviceUsageConsumer`, `roles/serviceusage.apiKeysViewer` (project); `roles/secretmanager.secretAccessor` on `BACKEND_SHARED_SECRET` + mounted decision secrets |
+| `gemini-smart-router-ui` | `smart-router-ui-sa` | `roles/firebaseauth.admin`, `roles/aiplatform.user`, `roles/logging.viewer`, `roles/serviceusage.serviceUsageConsumer`, `roles/serviceusage.apiKeysViewer` (project); `roles/secretmanager.secretAccessor` on `BACKEND_SHARED_SECRET`; `roles/run.invoker` on the backend |
 | `gemini-traffic-generator` | `smart-router-traffic-sa` | `roles/run.invoker` on the backend only |
 
 `gemini-router-runner` no longer runs any Cloud Run service. It is kept as the identity operators impersonate to mint OIDC tokens for `cmd/verify` (and for an existing GKE Workload Identity binding), and it keeps `roles/run.invoker` on the backend.

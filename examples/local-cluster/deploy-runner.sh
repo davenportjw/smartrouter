@@ -48,7 +48,7 @@ if [ -z "$CHOICE_ARG" ]; then
     echo -e "------------------------------------------------------------"
     echo -e "Select the computing tier for your GKE inference runners:"
     echo -e "  1) 🟢 GPU Mode (Standard Nvidia L4 Spot VMs - recommended for production)"
-    echo -e "  2) 🔵 CPU-only Mode (Cost-Saver - runs Gemma 2B on CPU without GPU costs)"
+    echo -e "  2) 🔵 CPU-only Mode (Cost-Saver - runs Gemma 4 4B on CPU without GPU costs)"
     read -rp "Enter selection (1 or 2, default: 1): " CHOICE
 else
     CHOICE="$CHOICE_ARG"
@@ -166,10 +166,10 @@ spec:
         command: ["sh", "-c"]
         args:
         - |
-          echo "Downloading lightweight Gemma 2B GGUF model weight..."
+          echo "Downloading Gemma 4 4B GGUF model weight..."
           apk add --no-cache wget unzip
           mkdir -p /models
-          wget -O /models/model.gguf https://huggingface.co/lmstudio-community/gemma-2-2b-it-GGUF/resolve/main/gemma-2-2b-it-Q4_K_M.gguf
+          wget -O /models/model.gguf https://huggingface.co/unsloth/gemma-4-4b-it-GGUF/resolve/main/gemma-4-4b-it-Q4_K_M.gguf
           
           echo "Downloading precompiled CPU llama-server binary..."
           wget -O /models/llama.zip https://github.com/ggerganov/llama.cpp/releases/download/b4719/llama-b4719-bin-ubuntu-x64.zip

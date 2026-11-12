@@ -3764,6 +3764,33 @@ func TestTDD_SmartRouting_AgentTaskSwitching(t *testing.T) {
 	if lastTargetModel != "gemini-3.8-flash" {
 		t.Errorf("expected gemini-3.8-flash for summarization task, got %s", lastTargetModel)
 	}
+
+	// 4. Multi-turn sticky session + mid-session X-Agent-Task escalation (Turn 1 lock -> Turn 2 task switch -> Turn 3 retains upgraded lock)
+	reqS1 := httptest.NewRequest("POST", "/v1/models/gemini-dynamic:generateContent?key=key-agent-smart", strings.NewReader(`{"contents":[{"parts":[{"text":"Hi!"}]}]}`))
+	reqS1.Header.Set("X-Session-ID", "sess-task-upgrade")
+	reqS1.Header.Set("X-Session-Policy", "lock")
+	rrS1 := httptest.NewRecorder()
+	rp.ServeHTTP(rrS1, reqS1)
+	if rrS1.Code != http.StatusOK || lastTargetModel != "gemini-3.5-flash-lite" {
+		t.Fatalf("Turn 1 expected gemini-3.5-flash-lite, got code=%d model=%s", rrS1.Code, lastTargetModel)
+	}
+
+	reqS2 := httptest.NewRequest("POST", "/v1/models/gemini-dynamic:generateContent?key=key-agent-smart", strings.NewReader(`{"contents":[{"parts":[{"text":"Audit auth token checks"}]}]}`))
+	reqS2.Header.Set("X-Session-ID", "sess-task-upgrade")
+	reqS2.Header.Set("X-Agent-Task", "security_audit")
+	rrS2 := httptest.NewRecorder()
+	rp.ServeHTTP(rrS2, reqS2)
+	if rrS2.Code != http.StatusOK || lastTargetModel != "gemini-3.1-pro" {
+		t.Fatalf("Turn 2 with X-Agent-Task=security_audit expected session lock upgrade to gemini-3.1-pro, got code=%d model=%s", rrS2.Code, lastTargetModel)
+	}
+
+	reqS3 := httptest.NewRequest("POST", "/v1/models/gemini-dynamic:generateContent?key=key-agent-smart", strings.NewReader(`{"contents":[{"parts":[{"text":"Thanks!"}]}]}`))
+	reqS3.Header.Set("X-Session-ID", "sess-task-upgrade")
+	rrS3 := httptest.NewRecorder()
+	rp.ServeHTTP(rrS3, reqS3)
+	if rrS3.Code != http.StatusOK || lastTargetModel != "gemini-3.1-pro" {
+		t.Fatalf("Turn 3 expected sticky session to retain upgraded gemini-3.1-pro lock, got code=%d model=%s", rrS3.Code, lastTargetModel)
+	}
 }
 
 func TestTDD_SmartRouting_JevAndCLMEngines(t *testing.T) {

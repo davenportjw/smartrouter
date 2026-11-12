@@ -210,7 +210,172 @@ func (cs *ConfigStore) LookupActiveModel(modelID string, routerLoc string) (conf
 		return m, true
 	}
 
+	// 5. Check local-cluster / local registrations
+	baseModel := config.StripLocationSuffix(modelID)
+	if m, ok := checkActive(baseModel + "@local-cluster"); ok {
+		return m, true
+	}
+	if m, ok := checkActive(baseModel + "@local"); ok {
+		return m, true
+	}
+	if config.ExtractLocationSuffix(modelID) == "" {
+		for _, m := range cs.models {
+			if m.Active && strings.EqualFold(config.StripLocationSuffix(m.ID), baseModel) && (m.Type == "local" || m.Location == "local-cluster") {
+				return m, true
+			}
+		}
+	}
+
 	return config.ModelConfig{}, false
+}
+
+// IsRunnerNodeOnline reports whether a runner node is actively online (within a 30s heartbeat window).
+func IsRunnerNodeOnline(n config.Node) bool {
+	status := strings.ToLower(strings.TrimSpace(n.Status))
+	if status == "offline" || status == "dead" || status == "disconnected" {
+		return false
+	}
+	if status != "" && status != "online" && status != "idle" && status != "busy" && status != "alive" {
+		return false
+	}
+	if !n.LastHeartbeat.IsZero() && time.Since(n.LastHeartbeat) > 30*time.Second {
+		return false
+	}
+	return true
+}
+
+// GetCachedRunners returns a lock-safe snapshot of in-memory registered runners.
+func (cs *ConfigStore) GetCachedRunners() []config.RunnerResponse {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+	list := make([]config.RunnerResponse, 0, len(cs.runners))
+	for _, r := range cs.runners {
+		list = append(list, r)
+	}
+	return list
+}
+
+func runnerSupportsModel(supported []string, baseModel string) bool {
+	if baseModel == "" {
+		return false
+	}
+	for _, sm := range supported {
+		trimmed := strings.TrimSpace(sm)
+		if trimmed == "*" || strings.EqualFold(config.StripLocationSuffix(trimmed), baseModel) {
+			return true
+		}
+	}
+	return false
+}
+
+// ResolveLocalModelLocation resolves a bare open-weights/local model identifier (e.g., "gemma-4-4b")
+// to an active DirectEndpoint ID, assigned LocalCluster ID, or "local-cluster" without requiring
+// "@cluster-id" suffixes or duplicate Stage-4 routing rules.
+func (cs *ConfigStore) ResolveLocalModelLocation(modelID string) (string, bool) {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+
+	trimmed := strings.TrimSpace(modelID)
+	if trimmed == "" {
+		return "", false
+	}
+	if suf := config.ExtractLocationSuffix(trimmed); suf != "" {
+		if suf == "local-cluster" {
+			return suf, true
+		}
+		if prov, ok := cs.providers["local"]; ok && prov.Enabled {
+			for _, reg := range prov.Regions {
+				if reg.LocalConfig == nil {
+					continue
+				}
+				for _, ep := range reg.LocalConfig.DirectEndpoints {
+					if ep.Active && (strings.EqualFold(ep.ID, suf) || (ep.ClusterID != "" && strings.EqualFold(ep.ClusterID, suf))) {
+						return suf, true
+					}
+				}
+				for _, cl := range reg.LocalConfig.Clusters {
+					if cl.ID == suf || (cl.QueueName != "" && cl.QueueName == suf) {
+						return cl.ID, true
+					}
+				}
+			}
+		}
+		return "", false
+	}
+
+	baseModel := config.StripLocationSuffix(trimmed)
+
+	// 1. Check active DirectEndpoints serving baseModel
+	if prov, ok := cs.providers["local"]; ok && prov.Enabled {
+		for _, reg := range prov.Regions {
+			if reg.LocalConfig == nil {
+				continue
+			}
+			for _, ep := range reg.LocalConfig.DirectEndpoints {
+				if !ep.Active || strings.TrimSpace(ep.URL) == "" || ep.Role == "decision_engine" {
+					continue
+				}
+				if strings.EqualFold(config.StripLocationSuffix(ep.ModelName), baseModel) {
+					if ep.ClusterID != "" {
+						return ep.ClusterID, true
+					}
+					return ep.ID, true
+				}
+			}
+		}
+	}
+
+	// 2. Check online registered runners supporting baseModel
+	for _, r := range cs.runners {
+		if !IsRunnerNodeOnline(r.Node) || !runnerSupportsModel(r.Node.SupportedModels, baseModel) {
+			continue
+		}
+		for _, cid := range r.AssignedClusters {
+			if strings.TrimSpace(cid) != "" {
+				return strings.TrimSpace(cid), true
+			}
+		}
+		return "local-cluster", true
+	}
+
+	// 3. Check online cluster nodes or fallback-capable clusters registered for baseModel
+	if prov, ok := cs.providers["local"]; ok && prov.Enabled {
+		for _, reg := range prov.Regions {
+			if reg.LocalConfig == nil {
+				continue
+			}
+			for _, cl := range reg.LocalConfig.Clusters {
+				for _, n := range cl.Nodes {
+					if IsRunnerNodeOnline(n) && runnerSupportsModel(n.SupportedModels, baseModel) {
+						return cl.ID, true
+					}
+				}
+			}
+			// If a runner for baseModel is temporarily offline, route to its FallbackModel-enabled cluster so instant cloud spillover engages cleanly
+			for _, cl := range reg.LocalConfig.Clusters {
+				if strings.TrimSpace(cl.FallbackModel) == "" {
+					continue
+				}
+				for _, n := range cl.Nodes {
+					if runnerSupportsModel(n.SupportedModels, baseModel) {
+						return cl.ID, true
+					}
+				}
+				for _, r := range cs.runners {
+					if !runnerSupportsModel(r.Node.SupportedModels, baseModel) {
+						continue
+					}
+					for _, cid := range r.AssignedClusters {
+						if cid == cl.ID {
+							return cl.ID, true
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return "", false
 }
 
 func (cs *ConfigStore) sortRulesLocked() {

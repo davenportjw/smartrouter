@@ -226,3 +226,59 @@ func TestCoreRunnerEngineHeartbeatDynamicSyncAndConcurrency(t *testing.T) {
 	}
 }
 
+func TestCoreRunnerEnginePreservesUsageMetadataAndSystemInstruction(t *testing.T) {
+	var seenMessages []map[string]string
+	llamaServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		var req struct {
+			Messages []map[string]string `json:"messages"`
+		}
+		_ = json.Unmarshal(body, &req)
+		seenMessages = req.Messages
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{
+			"choices": [{"message": {"role": "assistant", "content": "8.05 kilometers"}}],
+			"usage": {"prompt_tokens": 19, "completion_tokens": 4, "total_tokens": 23}
+		}`))
+	}))
+	defer llamaServer.Close()
+
+	runner := NewCoreRunnerEngine("http://localhost:8080", []string{"gemma-4-4b"})
+	runner.LlamaServerURL = llamaServer.URL
+
+	geminiPayload := []byte(`{
+		"systemInstruction": {"parts": [{"text": "Reply concisely."}]},
+		"contents": [{"role": "user", "parts": [{"text": "Convert 5 miles to km"}]}]
+	}`)
+	out, code, err := runner.forwardToLlamaCpp("gemma-4-4b", geminiPayload)
+	if err != nil || code != http.StatusOK {
+		t.Fatalf("expected 200 OK from forwardToLlamaCpp, got code=%d err=%v", code, err)
+	}
+	if len(seenMessages) != 2 || seenMessages[0]["role"] != "system" || seenMessages[0]["content"] != "Reply concisely." {
+		t.Fatalf("expected systemInstruction to map to OpenAI system message, got: %#v", seenMessages)
+	}
+
+	var parsed struct {
+		Candidates []struct {
+			FinishReason string `json:"finishReason"`
+		} `json:"candidates"`
+		UsageMetadata struct {
+			PromptTokenCount     int `json:"promptTokenCount"`
+			CandidatesTokenCount int `json:"candidatesTokenCount"`
+			TotalTokenCount      int `json:"totalTokenCount"`
+		} `json:"usageMetadata"`
+	}
+	if err := json.Unmarshal(out, &parsed); err != nil {
+		t.Fatalf("failed unmarshalling translated Gemini response: %v", err)
+	}
+	if parsed.UsageMetadata.PromptTokenCount != 19 || parsed.UsageMetadata.CandidatesTokenCount != 4 || parsed.UsageMetadata.TotalTokenCount != 23 {
+		t.Fatalf("expected usageMetadata (19/4/23) to be preserved from llama.cpp usage, got: %+v", parsed.UsageMetadata)
+	}
+	if len(parsed.Candidates) == 0 || parsed.Candidates[0].FinishReason != "STOP" {
+		t.Fatalf("expected finishReason='STOP', got: %+v", parsed.Candidates)
+	}
+}
+
+

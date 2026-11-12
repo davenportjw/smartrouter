@@ -854,12 +854,38 @@ func ClusterEditModal(resourceType string, cl config.LocalCluster, ep config.Dir
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 101, ">Disabled (Offline)</option></select></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 101, ">Disabled (Offline)</option></select></div></div><div class=\"grid grid-cols-1 sm:grid-cols-2 gap-4\"><div><label for=\"edit-ep-fallback-model\" class=\"block text-xs font-semibold text-slate-700 mb-1\">Failover Target Model (Optional)</label> <input type=\"text\" id=\"edit-ep-fallback-model\" name=\"fallback_model\" value=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var39 string
+			templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.ResolveAttributeValue(ep.FallbackModel)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/runner_modal.templ`, Line: 517, Col: 32}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var39)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 102, "\" placeholder=\"e.g. gemini-3.8-flash\" class=\"block w-full rounded-md border-slate-300 bg-white p-2 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300\"></div><div><label for=\"edit-ep-fallback-location\" class=\"block text-xs font-semibold text-slate-700 mb-1\">Failover Location (Optional)</label> <input type=\"text\" id=\"edit-ep-fallback-location\" name=\"fallback_location\" value=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var40 string
+			templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.ResolveAttributeValue(ep.FallbackLocation)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/runner_modal.templ`, Line: 528, Col: 35}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var40)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 103, "\" placeholder=\"e.g. global or us-central1\" class=\"block w-full rounded-md border-slate-300 bg-white p-2 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300\"></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 102, "<div class=\"flex items-center justify-end gap-3 pt-4 border-t border-slate-200\"><button type=\"button\" onclick=\"document.getElementById('cluster-edit-modal').remove();\" class=\"rounded-md bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 border border-slate-300 hover:bg-slate-50 transition cursor-pointer\">Cancel</button> <button type=\"submit\" class=\"rounded-md bg-blue-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-blue-700 transition shadow-sm cursor-pointer\">Save Changes</button></div></form></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 104, "<div class=\"flex items-center justify-end gap-3 pt-4 border-t border-slate-200\"><button type=\"button\" onclick=\"document.getElementById('cluster-edit-modal').remove();\" class=\"rounded-md bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 border border-slate-300 hover:bg-slate-50 transition cursor-pointer\">Cancel</button> <button type=\"submit\" class=\"rounded-md bg-blue-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-blue-700 transition shadow-sm cursor-pointer\">Save Changes</button></div></form></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

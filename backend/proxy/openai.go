@@ -125,12 +125,16 @@ func (rp *RouterProxy) handleOpenAIModels(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	// Ensure standard baseline Gemini 3.x / 2.5 / Gemma 4 models are listed
+	// Ensure standard baseline Gemini 4 / Decisions / 3.x / 2.5 / Gemma 4 models are listed
+	addModel("gemini-4-argon", "Gemini 4 Argon", "google")
+	addModel("gemini-decision-1", "Gemini Decision 1", "google")
 	addModel("gemini-3.8-flash", "Gemini 3.8 Flash", "google")
 	addModel("gemini-3.5-flash-lite", "Gemini 3.5 Flash Lite", "google")
 	addModel("gemini-3.1-pro", "Gemini 3.1 Pro", "google")
 	addModel("gemini-2.5-flash", "Gemini 2.5 Flash", "google")
+	addModel("gemma-4-4b", "Gemma 4 4B", "google")
 	addModel("gemma-4-26b", "Gemma 4 26B", "google")
+	addModel("gemma-4-31b", "Gemma 4 31B", "google")
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

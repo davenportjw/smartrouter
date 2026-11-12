@@ -75,10 +75,10 @@ Instead of choosing a specific physical model like `gemini-2.5-flash-lite`, your
 url = "http://localhost:8080/v1/models/gemini-dynamic:generateContent"
 ```
 
-The smart router intercepts this call, analyzes the contents, and maps it to your configured complexity models:
-* **`simple`** -> Routes to `gemini-2.5-flash-lite` (ultra-low latency, cheap)
-* **`medium`** -> Routes to `gemini-2.5-flash` (perfect balance)
-* **`complex`** -> Routes to `gemini-2.5-pro` (heavy reasoning, code, logic)
+The smart router intercepts this call, analyzes the contents (via the **Gemini Decisions API (`gemini-decision-1`)**, Jev, Fastino, CLM, or structural heuristics), and maps it to your configured hybrid local/cloud complexity models:
+* **`simple`** -> Routes to local `gemma-4-4b` (or cloud `gemini-3.5-flash-lite`)
+* **`medium`** -> Routes to `gemini-3.8-flash`
+* **`complex`** -> Routes to `gemini-4-argon` (or `gemini-3.1-pro`)
 
 ### Run the Complexity Routing Example
 ```bash
@@ -96,17 +96,17 @@ You can configure declarative `RoutingRules` in the Smart Router database (e.g. 
 ```json
 {
   "id": "rule-priority-vip",
-  "model_pattern": "gemini-1.5-pro",
+  "model_pattern": "gemini-2.5-flash",
   "client_tier": "premium",
   "header_name": "X-Route-Priority",
   "header_value": "gold",
-  "target_model": "gemini-2.5-pro",
-  "target_location": "us-central1",
-  "priority_weight": 1
+  "target_model": "gemini-4-argon",
+  "target_location": "global",
+  "priority_weight": 5
 }
 ```
 
-When a premium client submits a request targeting `gemini-1.5-pro` and provides the header `X-Route-Priority: gold`, the router dynamically upgrades the model target to `gemini-2.5-pro` at runtime!
+When a premium client submits a request targeting `gemini-2.5-flash` and provides the header `X-Route-Priority: gold`, the router dynamically upgrades the model target to `gemini-4-argon` at runtime!
 
 ### Run the Rules-Based Routing Example
 ```bash

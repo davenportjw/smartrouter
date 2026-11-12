@@ -36,13 +36,17 @@ type PromptFeatures struct {
 
 // DecisionResult represents the outcome of prompt complexity classification or routing.
 type DecisionResult struct {
-	Tier        string             `json:"tier"` // "simple", "medium", "complex"
-	TargetModel string             `json:"target_model"`
-	Engine      string             `json:"engine"` // "jev", "fastino", "clm", "contrastive-lm", "llm", "heuristics", "task_mapping", "session_lock", "prompt_override"
-	Confidence  float64            `json:"confidence"`
-	Rationale   string             `json:"rationale"`
-	Scores      map[string]float64 `json:"scores,omitempty"`
-	Features    PromptFeatures     `json:"features"`
+	Tier              string             `json:"tier"` // "simple", "medium", "complex"
+	TargetModel       string             `json:"target_model"`
+	Engine            string             `json:"engine"` // "gemini-decision", "jev", "fastino", "clm", "contrastive-lm", "llm", "heuristics", "task_mapping", "session_lock", "prompt_override"
+	ExecutionMode     string             `json:"execution_mode,omitempty"`
+	Confidence        float64            `json:"confidence"`
+	LocalEligibleProb float64            `json:"local_eligible_prob,omitempty"`
+	InputTokens       int                `json:"input_tokens,omitempty"`
+	OutputTokens      int                `json:"output_tokens,omitempty"`
+	Rationale         string             `json:"rationale"`
+	Scores            map[string]float64 `json:"scores,omitempty"`
+	Features          PromptFeatures     `json:"features"`
 }
 
 var (
@@ -172,14 +176,35 @@ func criteriaOverlapBoost(text, criteria string) float64 {
 	return math.Min(float64(matches)*1.6, 4.0)
 }
 
-// applyMinConfidenceFallback downgrades/normalizes uncertain predictions to the "medium" tier
-// when c.MinConfidence > 0 and the classifier's confidence is below that threshold.
+// applyMinConfidenceFallback enforces upward-only safety escalation when c.MinConfidence > 0
+// and the classifier's confidence falls below that threshold:
+//   - "simple" -> escalates to "medium"
+//   - "medium" -> escalates to "complex" when no calibrated simplex exists, when cumulative
+//     coverage (simple+medium) < c.MinConfidence, or when upward tail p_complex > p_simple
+//   - "complex" -> never downgraded (already at maximum capability tier)
 func applyMinConfidenceFallback(res DecisionResult, c config.ComplexityRouting) DecisionResult {
-	if c.MinConfidence > 0 && res.Confidence < c.MinConfidence && res.Tier != "medium" {
-		origTier := res.Tier
+	if c.MinConfidence <= 0 || res.Confidence >= c.MinConfidence {
+		return res
+	}
+	origTier := res.Tier
+	switch res.Tier {
+	case "simple":
 		res.Tier = "medium"
 		res.TargetModel = resolveModelByTier("medium", c)
 		res.Rationale = fmt.Sprintf("%s [min_confidence_fallback: %s@%.2f < %.2f -> medium]", res.Rationale, origTier, res.Confidence, c.MinConfidence)
+	case "medium":
+		pSimple, hasSimple := res.Scores["simple"]
+		pMedium, hasMedium := res.Scores["medium"]
+		pComplex, hasComplex := res.Scores["complex"]
+		simplexSum := pSimple + pMedium + pComplex
+		hasSimplex := hasSimple && hasMedium && hasComplex && math.Abs(simplexSum-1.0) < 0.05
+		if !hasSimplex || (pSimple+pMedium) < c.MinConfidence || pComplex > pSimple {
+			res.Tier = "complex"
+			res.TargetModel = resolveModelByTier("complex", c)
+			res.Rationale = fmt.Sprintf("%s [min_confidence_fallback: %s@%.2f < %.2f -> complex]", res.Rationale, origTier, res.Confidence, c.MinConfidence)
+		}
+	case "complex":
+		// Never downgrade an already-complex classification.
 	}
 	return res
 }
@@ -433,6 +458,7 @@ func (j *JevDecisionEngine) Classify(ctx context.Context, text string, c config.
 	}
 	if endpoint != "" {
 		if res, err := j.callRemoteJevWithConfig(ctx, endpoint, text, features, c); err == nil {
+			res.ExecutionMode = "remote_api"
 			res.TargetModel = resolveModelByTier(res.Tier, c)
 			return applyMinConfidenceFallback(res, c)
 		}
@@ -524,13 +550,14 @@ func (j *JevDecisionEngine) Classify(ctx context.Context, text string, c config.
 	}
 
 	res := DecisionResult{
-		Tier:        tier,
-		TargetModel: resolveModelByTier(tier, c),
-		Engine:      "jev",
-		Confidence:  math.Round(conf*100) / 100,
-		Rationale:   rationale,
-		Scores:      scores,
-		Features:    features,
+		Tier:          tier,
+		TargetModel:   resolveModelByTier(tier, c),
+		Engine:        "jev",
+		ExecutionMode: "local_fallback",
+		Confidence:    math.Round(conf*100) / 100,
+		Rationale:     rationale,
+		Scores:        scores,
+		Features:      features,
 	}
 	return applyMinConfidenceFallback(res, c)
 }
@@ -655,6 +682,8 @@ func ProbeDecisionProvider(ctx context.Context, engine, endpointOverride string)
 	}
 	if endpoint == "" && mode != "local" {
 		switch canonical {
+		case "gemini-decision":
+			endpoint = strings.TrimSpace(os.Getenv("GEMINI_DECISION_ENDPOINT"))
 		case "jev":
 			endpoint = strings.TrimSpace(os.Getenv("JEV_ENDPOINT"))
 		case "fastino":
@@ -662,6 +691,20 @@ func ProbeDecisionProvider(ctx context.Context, engine, endpointOverride string)
 		case "contrastive-lm":
 			endpoint = strings.TrimSpace(os.Getenv("CLM_ENDPOINT"))
 		}
+	}
+
+	if canonical == "gemini-decision" {
+		if endpoint == "" {
+			endpoint = DefaultGeminiDecisionEndpoint
+		}
+		cfg.GeminiDecisionEndpoint = endpoint
+		projID := strings.TrimSpace(os.Getenv("GOOGLE_CLOUD_PROJECT"))
+		if projID == "" {
+			projID = strings.TrimSpace(os.Getenv("GCP_PROJECT"))
+		}
+		eng := NewGeminiDecisionEngine(nil, projID)
+		res, err := eng.ClassifyWithInput(ctx, []DecisionInputBlock{{Type: "text", Text: samplePrompt}}, cfg, false, false)
+		return res, time.Since(start), endpoint, err
 	}
 
 	if endpoint != "" {
@@ -733,6 +776,7 @@ func (fEngine *FastinoDecisionEngine) Classify(ctx context.Context, text string,
 	}
 	if endpoint != "" {
 		if res, err := callRemoteDecisionEndpoint(ctx, fEngine.Client, endpoint, "fastino", "fastino-remote", text, features, c); err == nil {
+			res.ExecutionMode = "remote_api"
 			res.TargetModel = resolveModelByTier(res.Tier, c)
 			return applyMinConfidenceFallback(res, c)
 		}
@@ -806,13 +850,14 @@ func (fEngine *FastinoDecisionEngine) Classify(ctx context.Context, text string,
 	}
 
 	res := DecisionResult{
-		Tier:        tier,
-		TargetModel: resolveModelByTier(tier, c),
-		Engine:      "fastino",
-		Confidence:  math.Round(conf*100) / 100,
-		Rationale:   fmt.Sprintf("fastino-local[tier=%s task=%s conf=%.2f]", tier, features.ExtractedTask, conf),
-		Scores:      scores,
-		Features:    features,
+		Tier:          tier,
+		TargetModel:   resolveModelByTier(tier, c),
+		Engine:        "fastino",
+		ExecutionMode: "local_fallback",
+		Confidence:    math.Round(conf*100) / 100,
+		Rationale:     fmt.Sprintf("fastino-local[tier=%s task=%s conf=%.2f]", tier, features.ExtractedTask, conf),
+		Scores:        scores,
+		Features:      features,
 	}
 	return applyMinConfidenceFallback(res, c)
 }
@@ -875,6 +920,7 @@ func (cEngine *CLMContrastiveEngine) Classify(ctx context.Context, text string, 
 	}
 	if endpoint != "" {
 		if res, err := callRemoteDecisionEndpoint(ctx, cEngine.Client, endpoint, engineLabel, "clm-remote", text, features, c); err == nil {
+			res.ExecutionMode = "remote_api"
 			res.TargetModel = resolveModelByTier(res.Tier, c)
 			return applyMinConfidenceFallback(res, c)
 		}
@@ -944,13 +990,14 @@ func (cEngine *CLMContrastiveEngine) Classify(ctx context.Context, text string, 
 	}
 
 	res := DecisionResult{
-		Tier:        tier,
-		TargetModel: resolveModelByTier(tier, c),
-		Engine:      engineLabel,
-		Confidence:  math.Round(math.Min(bestSim, 0.99)*100) / 100,
-		Rationale:   rationale,
-		Scores:      scores,
-		Features:    features,
+		Tier:          tier,
+		TargetModel:   resolveModelByTier(tier, c),
+		Engine:        engineLabel,
+		ExecutionMode: "local_fallback",
+		Confidence:    math.Round(math.Min(bestSim, 0.99)*100) / 100,
+		Rationale:     rationale,
+		Scores:        scores,
+		Features:      features,
 	}
 	return applyMinConfidenceFallback(res, c)
 }
@@ -980,11 +1027,11 @@ func ResolveTaskModel(task string, c config.ComplexityRouting) (model string, ti
 
 	// 2. Default intelligent task matrix
 	switch cleanedTask {
-	case "code", "coding", "code_generation", "debug", "debugging", "refactor", "architecture", "planning", "reasoning", "deep_analysis", "complex":
+	case "code", "coding", "code_generation", "debug", "debugging", "refactor", "refactoring", "architecture", "planning", "reasoning", "deep_reasoning", "deep_analysis", "math", "security_audit", "complex":
 		return ResolveModelByTier("complex", c), "complex", true
-	case "summarization", "summary", "translate", "translation", "draft", "drafting", "chat", "general", "medium":
+	case "summarization", "summary", "translate", "translation", "draft", "drafting", "writing", "analysis", "data_extraction", "explanation", "creative", "chat", "general", "medium":
 		return ResolveModelByTier("medium", c), "medium", true
-	case "triage", "fast_query", "fact_check", "lookup", "greeting", "classification", "simple":
+	case "triage", "fast_query", "fact_check", "lookup", "greeting", "classification", "formatting", "routing", "validation", "simple":
 		return ResolveModelByTier("simple", c), "simple", true
 	}
 
@@ -1029,10 +1076,10 @@ func InferTierFromModel(model string, c config.ComplexityRouting) string {
 	if simpleModel == "" {
 		simpleModel = "gemini-3.5-flash-lite"
 	}
-	if cleanModel == config.StripLocationSuffix(complexModel) || strings.Contains(cleanModel, "pro") {
+	if cleanModel == config.StripLocationSuffix(complexModel) || strings.Contains(cleanModel, "pro") || strings.Contains(cleanModel, "argon") {
 		return "complex"
 	}
-	if cleanModel == config.StripLocationSuffix(simpleModel) || strings.Contains(cleanModel, "lite") {
+	if cleanModel == config.StripLocationSuffix(simpleModel) || strings.Contains(cleanModel, "lite") || cleanModel == "gemma-4-4b" {
 		return "simple"
 	}
 	return "medium"

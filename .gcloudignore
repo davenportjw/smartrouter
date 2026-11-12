@@ -1,0 +1,10 @@
+#!include:.gitignore
+.git
+.gitignore
+.ast-graph/
+terraform/
+examples/
+bin/
+scratch/
+.skills/
+skills/

@@ -97,10 +97,17 @@ def main():
     print(f"Targeting Router URL: {ROUTER_URL}")
     print(f"Using API Key       : {API_KEY[:10]}...")
 
+    # 0. Gemini Decisions API (`gemini-decision-1`) -> Zero-output-token calibrated semantic routing
+    send_router_request(
+        "Hi, what is the capital of Japan?",
+        "0. Gemini Decisions API -> Simple Query (Calibrated probabilities + local_eligible)",
+        custom_headers={"X-Router-Engine": "gemini-decision"}
+    )
+
     # 1. Fast Jev Decision Model Classification
     send_router_request(
         "Hi, what is the capital of Japan?",
-        "1. Jev Model -> Simple Query (Target: gemini-3.8-flash-lite)",
+        "1. Jev Model -> Simple Query (Target: gemini-3.5-flash-lite)",
         custom_headers={"X-Router-Engine": "jev"}
     )
 
@@ -114,8 +121,8 @@ def main():
     # 3. Per-Prompt Override (Immediate model pinning)
     send_router_request(
         "Calculate 1+1",
-        "3. Per-Prompt Override -> Force gemini-3.8-pro via X-Router-Model",
-        custom_headers={"X-Router-Model": "gemini-3.8-pro"}
+        "3. Per-Prompt Override -> Force gemini-4-argon via X-Router-Model",
+        custom_headers={"X-Router-Model": "gemini-4-argon"}
     )
 
     # 4. Multi-Turn Session Continuation (Sticky Session Lock)
@@ -130,7 +137,7 @@ def main():
     )
     send_router_request(
         "Thanks! Can you add unit tests for that?",
-        "4b. Session Turn 2 -> Short prompt inherits locked gemini-3.8-pro model",
+        "4b. Session Turn 2 -> Short prompt inherits locked complex model",
         custom_headers={
             "X-Session-ID": session_id,
             "X-Session-Policy": "lock"

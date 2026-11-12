@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"fmt"
@@ -24,11 +25,13 @@ type APIController struct {
 	Store         *store.ConfigStore
 	Scheduler     *proxy.RequestScheduler
 	Queue         *proxy.ClusterQueue
-	Sessions      *config.SessionRegistry
-	JevEngine     *decision.JevDecisionEngine
-	FastinoEngine *decision.FastinoDecisionEngine
-	CLMEngine     *decision.CLMContrastiveEngine
-	SharedSecret  string
+	Sessions             *config.SessionRegistry
+	GeminiDecisionEngine *decision.GeminiDecisionEngine
+	JevEngine            *decision.JevDecisionEngine
+	FastinoEngine        *decision.FastinoDecisionEngine
+	CLMEngine            *decision.CLMContrastiveEngine
+	LLMClassifier        func(ctx context.Context, prompt string, c config.ComplexityRouting, hasTools, hasMultimodal bool) (decision.DecisionResult, error)
+	SharedSecret         string
 
 	// Thread-safe dynamic registry of active nodes and their cluster assignments
 	runnersMu         sync.RWMutex
@@ -38,17 +41,22 @@ type APIController struct {
 
 // NewAPIController initializes a new backend API controller.
 func NewAPIController(store *store.ConfigStore, scheduler *proxy.RequestScheduler, queue *proxy.ClusterQueue, sharedSecret string) *APIController {
+	projID := strings.TrimSpace(os.Getenv("GOOGLE_CLOUD_PROJECT"))
+	if projID == "" {
+		projID = strings.TrimSpace(os.Getenv("GCP_PROJECT"))
+	}
 	return &APIController{
-		Store:             store,
-		Scheduler:         scheduler,
-		Queue:             queue,
-		Sessions:          config.NewSessionRegistry(30 * time.Minute),
-		JevEngine:         decision.NewJevDecisionEngine(),
-		FastinoEngine:     decision.NewFastinoDecisionEngine(),
-		CLMEngine:         decision.NewCLMContrastiveEngine(),
-		SharedSecret:      sharedSecret,
-		registeredRunners: make(map[string]config.Node),
-		nodeAttachments:   make(map[string][]string),
+		Store:                store,
+		Scheduler:            scheduler,
+		Queue:                queue,
+		Sessions:             config.NewSessionRegistry(30 * time.Minute),
+		GeminiDecisionEngine: decision.NewGeminiDecisionEngine(nil, projID),
+		JevEngine:            decision.NewJevDecisionEngine(),
+		FastinoEngine:        decision.NewFastinoDecisionEngine(),
+		CLMEngine:            decision.NewCLMContrastiveEngine(),
+		SharedSecret:         sharedSecret,
+		registeredRunners:    make(map[string]config.Node),
+		nodeAttachments:      make(map[string][]string),
 	}
 }
 
@@ -493,6 +501,7 @@ func (ac *APIController) HandleModelsRefresh(w http.ResponseWriter, r *http.Requ
 
 	baselineModels := []config.ModelConfig{
 		{ID: "gemini-4-argon", DisplayName: "gemini-4-argon", Location: "global", Type: "foundation", Active: true},
+		{ID: "gemini-decision-1", DisplayName: "gemini-decision-1", Location: "global", Type: "foundation", Active: true},
 		{ID: "gemini-3.8-flash", DisplayName: "gemini-3.8-flash", Location: "global", Type: "foundation", Active: true},
 		{ID: "gemini-3.5-flash", DisplayName: "gemini-3.5-flash", Location: "global", Type: "foundation", Active: true},
 		{ID: "gemini-3.5-flash-lite", DisplayName: "gemini-3.5-flash-lite", Location: "global", Type: "foundation", Active: true},
@@ -1503,6 +1512,9 @@ func (ac *APIController) HandleComplexityInspect(w http.ResponseWriter, r *http.
 		}
 	}
 
+	if ac.GeminiDecisionEngine == nil {
+		ac.GeminiDecisionEngine = decision.NewGeminiDecisionEngine(nil, strings.TrimSpace(os.Getenv("GOOGLE_CLOUD_PROJECT")))
+	}
 	if ac.JevEngine == nil {
 		ac.JevEngine = decision.NewJevDecisionEngine()
 	}
@@ -1525,6 +1537,24 @@ func (ac *APIController) HandleComplexityInspect(w http.ResponseWriter, r *http.
 
 	var result decision.DecisionResult
 	switch selectedEngine {
+	case "gemini-decision", "gemini-decisions", "gemini-decision-1", "decisions":
+		res, err := ac.GeminiDecisionEngine.Classify(r.Context(), req.Prompt, compConfig, req.HasTools, req.HasMultimodal)
+		if err != nil {
+			respondWithError(w, http.StatusBadGateway, err.Error())
+			return
+		}
+		result = res
+	case "llm":
+		if ac.LLMClassifier == nil {
+			respondWithError(w, http.StatusServiceUnavailable, "LLM classifier is not wired on this API instance")
+			return
+		}
+		res, err := ac.LLMClassifier(r.Context(), req.Prompt, compConfig, req.HasTools, req.HasMultimodal)
+		if err != nil {
+			respondWithError(w, http.StatusBadGateway, err.Error())
+			return
+		}
+		result = res
 	case "fastino":
 		result = ac.FastinoEngine.Classify(r.Context(), req.Prompt, compConfig, req.HasTools, req.HasMultimodal)
 	case "clm", "contrastive-lm":
@@ -1542,11 +1572,12 @@ func (ac *APIController) HandleComplexityInspect(w http.ResponseWriter, r *http.
 			tier = "medium"
 		}
 		result = decision.DecisionResult{
-			Tier:        tier,
-			TargetModel: decision.ResolveModelByTier(tier, compConfig),
-			Engine:      "heuristics",
-			Features:    decision.ExtractPromptFeatures(req.Prompt, req.HasTools, req.HasMultimodal),
-			Rationale:   fmt.Sprintf("Character limit evaluation (count: %d, tier: %s)", charCount, tier),
+			Tier:          tier,
+			TargetModel:   decision.ResolveModelByTier(tier, compConfig),
+			Engine:        "heuristics",
+			ExecutionMode: "static_bounds",
+			Features:      decision.ExtractPromptFeatures(req.Prompt, req.HasTools, req.HasMultimodal),
+			Rationale:     fmt.Sprintf("Character limit evaluation (count: %d, tier: %s)", charCount, tier),
 		}
 	default: // jev
 		result = ac.JevEngine.Classify(r.Context(), req.Prompt, compConfig, req.HasTools, req.HasMultimodal)

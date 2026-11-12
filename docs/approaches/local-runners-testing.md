@@ -52,7 +52,7 @@ go test -v ./pkg/runner/engine/...
 
 ## 🔵 Layer 2: Cost-Saver GKE CPU Runner E2E Verification
 
-This plan verifies unaccelerated CPU serving using standard x86_64 cores. It downloads a lightweight `Qwen 1.5B` GGUF model and a precompiled static `llama-server` binary to run unprivileged on GKE CPU spot pools.
+This plan verifies unaccelerated CPU serving using standard x86_64 cores. It downloads a quantized `Gemma 4 4B` GGUF model (`gemma-4-4b-it-Q4_K_M.gguf`) and a precompiled static `llama-server` binary to run unprivileged on GKE CPU spot pools.
 
 ### Prerequisites
 * Active GCP Project (your target sandbox project ID).

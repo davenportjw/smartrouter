@@ -148,7 +148,9 @@ func TestIsValidModelName(t *testing.T) {
 		model string
 		valid bool
 	}{
-		// Verified 3.8 models
+		// Verified 4.x, Decisions, & 3.8 models
+		{"gemini-4-argon is valid", "gemini-4-argon", true},
+		{"gemini-decision-1 is valid", "gemini-decision-1", true},
 		{"gemini-3.8-flash is valid", "gemini-3.8-flash", true},
 		{"gemini-3.8-flash-cyber is valid", "gemini-3.8-flash-cyber", true},
 		{"gemini-3.8-pro is invalid (does not exist)", "gemini-3.8-pro", false},

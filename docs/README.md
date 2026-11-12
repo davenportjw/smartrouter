@@ -39,3 +39,4 @@ Developer guidelines for modifying the Smart Router codebase safely.
 * 🧪 **[TDD Feature Development](./approaches/tdd-feature-development.md)**: Implement proxy features using Test-Driven Development and full in-memory integration tests.
 * 🛡️ **[Model Version Compliance](./approaches/model-compliance.md)**: Keep rules and configs compliant with the Gemini 2.5+ series baseline.
 * 🔬 **[Local Runners E2E Testing Plan](./approaches/local-runners-testing.md)**: Comprehensive plan for local queue unit testing, GKE CPU spot-pool E2E testing, and GPU VM verification.
+* 🎯 **[Adversarial Routing Evaluation Harness](./approaches/routing-eval-harness.md)**: Multi-engine adversarial prompt corpus, live hybrid spillover stress scenarios, and 100-point router rating rubric (`cmd/eval`).
