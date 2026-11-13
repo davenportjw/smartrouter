@@ -152,9 +152,9 @@ func ClustersTab(vm ClustersViewModel) templ.Component {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var6 string
-					templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%ds", cl.MaxQueueAge))
+					templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%ds", maxQueueAgeSeconds(cl.MaxQueueAge)))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/clusters.templ`, Line: 143, Col: 49}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/clusters.templ`, Line: 143, Col: 69}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 					if templ_7745c5c3_Err != nil {
@@ -981,6 +981,16 @@ func effectiveConcurrency(maxConc int) int {
 		return 1
 	}
 	return maxConc
+}
+
+func maxQueueAgeSeconds(d time.Duration) int {
+	if d <= 0 {
+		return 90
+	}
+	if d >= time.Second {
+		return int(d / time.Second)
+	}
+	return int(d)
 }
 
 func modelCapWidthStyle(maxModelGB int, totalMemGB int) string {

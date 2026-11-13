@@ -412,9 +412,9 @@ func ClusterEditModal(resourceType string, cl config.LocalCluster, ep config.Dir
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var20 string
-			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("%d", defaultIntIfZero(int(cl.MaxQueueAge), 90)))
+			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("%d", maxQueueAgeSeconds(cl.MaxQueueAge)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/runner_modal.templ`, Line: 310, Col: 76}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/runner_modal.templ`, Line: 310, Col: 69}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var20)
 			if templ_7745c5c3_Err != nil {

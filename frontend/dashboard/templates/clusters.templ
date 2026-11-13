@@ -140,7 +140,7 @@ templ ClustersTab(vm ClustersViewModel) {
 										<div class="flex flex-wrap items-center gap-1.5">
 											if cl.MaxQueueAge > 0 {
 												<span class="text-xs font-mono text-slate-700 tabular-nums">
-													{ fmt.Sprintf("%ds", cl.MaxQueueAge) }
+													{ fmt.Sprintf("%ds", maxQueueAgeSeconds(cl.MaxQueueAge)) }
 												</span>
 											} else {
 												<span class="text-xs font-mono text-slate-600 tabular-nums">
@@ -654,6 +654,16 @@ func effectiveConcurrency(maxConc int) int {
 		return 1
 	}
 	return maxConc
+}
+
+func maxQueueAgeSeconds(d time.Duration) int {
+	if d <= 0 {
+		return 90
+	}
+	if d >= time.Second {
+		return int(d / time.Second)
+	}
+	return int(d)
 }
 
 func modelCapWidthStyle(maxModelGB int, totalMemGB int) string {

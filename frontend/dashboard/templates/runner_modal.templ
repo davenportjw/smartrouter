@@ -307,7 +307,7 @@ templ ClusterEditModal(resourceType string, cl config.LocalCluster, ep config.Di
 								id="edit-cluster-max-age"
 								name="max_queue_age"
 								min="1"
-								value={ fmt.Sprintf("%d", defaultIntIfZero(int(cl.MaxQueueAge), 90)) }
+								value={ fmt.Sprintf("%d", maxQueueAgeSeconds(cl.MaxQueueAge)) }
 								class="block w-full rounded-md border-slate-300 bg-white p-2 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300"
 							/>
 						</div>

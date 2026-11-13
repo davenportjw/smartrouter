@@ -3330,16 +3330,26 @@ func TestTDD_DashboardGeminiDecisionPricingInspectAndDirectEndpointFailover(t *t
 		t.Fatalf("expected saved Engine='gemini-decision' and GeminiDecisionEndpoint, got %+v", savedApp.Complexity)
 	}
 
-	// 2. HandleComplexityInspect executes GeminiDecisionEngine and renders Local Eligibility + Tier Scores
+	// 1b. ServeComplexity renders "Gemini Decisions" badge for engine="gemini-decision" (never falling back to "Jev Model")
+	reqTab := httptest.NewRequest("GET", "/admin/complexity", nil)
+	rrTab := httptest.NewRecorder()
+	dash.ServeComplexity(rrTab, reqTab)
+	if rrTab.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK from ServeComplexity, got %d", rrTab.Code)
+	}
+	tabHTML := rrTab.Body.String()
+	if !strings.Contains(tabHTML, "Gemini Decisions") {
+		t.Fatalf("expected ServeComplexity table row to render 'Gemini Decisions' when Engine='gemini-decision'")
+	}
+
+	// 2. HandleComplexityInspect executes GeminiDecisionEngine (inheriting app_id models) and renders Local Eligibility + Tier Scores
 	decision.SetEngineEndpoint("gemini-decision", decisionsSrv.URL+"/v1beta/decisions")
 	defer decision.SetEngineEndpoint("gemini-decision", "")
 
 	inspectForm := url.Values{
-		"prompt":        {"Convert 100C to Fahrenheit"},
-		"engine":        {"gemini-decision"},
-		"simple_model":  {"gemma-4-4b"},
-		"medium_model":  {"gemini-3.8-flash"},
-		"complex_model": {"gemini-4-argon"},
+		"app_id": {"app-dash"},
+		"prompt": {"Convert 100C to Fahrenheit"},
+		"engine": {"gemini-decision"},
 	}
 	reqInspect := httptest.NewRequest("POST", "/admin/complexity/inspect", strings.NewReader(inspectForm.Encode()))
 	reqInspect.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -3387,6 +3397,43 @@ func TestTDD_DashboardGeminiDecisionPricingInspectAndDirectEndpointFailover(t *t
 	}
 	if foundEP == nil || foundEP.FallbackModel != "gemini-3.8-flash" || foundEP.FallbackLocation != "global" {
 		t.Fatalf("expected DirectEndpoint FallbackModel='gemini-3.8-flash' and FallbackLocation='global', got %+v", foundEP)
+	}
+
+	// 4. LocalCluster MaxQueueAge stored as time.Duration (90*time.Second) renders as "90s" / value="90" (never raw nanoseconds)
+	_ = cfgStore.SaveProvider(ctx, config.ProviderConfig{
+		ID:      config.ProviderLocal,
+		Enabled: true,
+		Regions: map[string]config.RegionConfig{
+			"local": {
+				Code:   "local",
+				Active: true,
+				LocalConfig: &config.LocalConfig{
+					Clusters: []config.LocalCluster{
+						{
+							ID:            "desk-pool",
+							Name:          "Desk Pool",
+							MaxQueueAge:   90 * time.Second,
+							FallbackModel: "gemini-3.8-flash",
+							Nodes: map[string]config.Node{
+								"n1": {ID: "n1", Status: "online", SupportedModels: []string{"gemma-4-4b"}},
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	reqCl := httptest.NewRequest("GET", "/admin/clusters", nil)
+	rrCl := httptest.NewRecorder()
+	dash.ServeClusters(rrCl, reqCl)
+	if strings.Contains(rrCl.Body.String(), "90000000000") || !strings.Contains(rrCl.Body.String(), "90s") {
+		t.Fatalf("expected ServeClusters to render 90*time.Second as '90s' (not raw nanoseconds)")
+	}
+	reqClEdit := httptest.NewRequest("GET", "/admin/clusters/edit-modal?type=cluster&id=desk-pool", nil)
+	rrClEdit := httptest.NewRecorder()
+	dash.ServeClusterEditModal(rrClEdit, reqClEdit)
+	if strings.Contains(rrClEdit.Body.String(), "90000000000") || !strings.Contains(rrClEdit.Body.String(), `value="90"`) {
+		t.Fatalf("expected ClusterEditModal to render 90*time.Second as value=\"90\" (not raw nanoseconds)")
 	}
 }
 

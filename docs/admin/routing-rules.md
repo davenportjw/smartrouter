@@ -81,10 +81,11 @@ In `/admin/complexity`, the **Decision Engine Secret Keys & Cloud Secret Manager
 7. **Tuning Semantic Criteria**: If **Use LLM Semantic Classifier** is active, specify **Additional Classification Guidelines** (e.g., `"always classify coding requests as complex"`).
 8. Click **Save Settings**.
 
-### 🔬 Smart Routing Inspector & Simulator
-Directly inside `/admin/complexity`, use the **Smart Routing Inspector & Simulator** to test prompts in real time:
-* Enter any test prompt, select an engine (`jev`, `fastino`, `contrastive-lm`, or `heuristics`), and optionally specify an **Agent Task Context** (`code_generation`, `debugging`, `triage`, `summarization`).
-* Click **Analyze & Route Prompt** to inspect the resolved Target Model, Complexity Tier, Confidence score, Extracted Feature Signals, and Decision Rationale.
+### 🔬 Smart Routing Inspector & Live Tester
+Directly inside `/admin/complexity`, use the **Smart Routing Inspector & Live Tester** to test prompts in real time:
+* Select an **Application Profile** (`app_id`) to inherit its configured `SimpleModel`, `MediumModel`, `ComplexModel`, and custom tier criteria (e.g. `gemma-4-4b` / `gemini-3.8-flash` / `gemini-4-argon`), or run with router defaults.
+* Choose an engine (`gemini-decision`, `jev`, `fastino`, `contrastive-lm`, `llm`, or `heuristics`) and optionally specify an **Agent Task Context** (`code_generation`, `debugging`, `triage`, `summarization`).
+* Click **Analyze & Route Prompt** to inspect the resolved Target Model, Complexity Tier, Confidence score, Calibrated Simplex (`simple` / `medium` / `complex`), Local Gemma 4 Eligibility score, Extracted Feature Signals, and Decision Rationale.
 
 ---
 

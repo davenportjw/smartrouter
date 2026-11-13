@@ -3792,15 +3792,33 @@ func (dc *DashboardController) HandleComplexityInspect(w http.ResponseWriter, r 
 	}
 	task := strings.TrimSpace(r.FormValue("task"))
 
+	appID := strings.TrimSpace(r.FormValue("app_id"))
 	simpleModel := strings.TrimSpace(r.FormValue("simple_model"))
+	mediumModel := strings.TrimSpace(r.FormValue("medium_model"))
+	complexModel := strings.TrimSpace(r.FormValue("complex_model"))
+
+	var appComplexity config.ComplexityRouting
+	if appID != "" && dc.Store != nil {
+		if app, ok := dc.Store.LookupApp(appID); ok {
+			appComplexity = app.Complexity
+			if simpleModel == "" {
+				simpleModel = app.Complexity.SimpleModel
+			}
+			if mediumModel == "" {
+				mediumModel = app.Complexity.MediumModel
+			}
+			if complexModel == "" {
+				complexModel = app.Complexity.ComplexModel
+			}
+		}
+	}
+
 	if simpleModel == "" {
 		simpleModel = "gemini-3.5-flash-lite"
 	}
-	mediumModel := strings.TrimSpace(r.FormValue("medium_model"))
 	if mediumModel == "" {
 		mediumModel = "gemini-3.8-flash"
 	}
-	complexModel := strings.TrimSpace(r.FormValue("complex_model"))
 	if complexModel == "" {
 		complexModel = "gemini-3.1-pro"
 	}
@@ -3811,10 +3829,19 @@ func (dc *DashboardController) HandleComplexityInspect(w http.ResponseWriter, r 
 		SimpleModel:            simpleModel,
 		MediumModel:            mediumModel,
 		ComplexModel:           complexModel,
+		MinConfidence:          appComplexity.MinConfidence,
+		SimpleCriteria:         appComplexity.SimpleCriteria,
+		MediumCriteria:         appComplexity.MediumCriteria,
+		ComplexCriteria:        appComplexity.ComplexCriteria,
+		AdditionalInstructions: appComplexity.AdditionalInstructions,
+		TaskMapping:            appComplexity.TaskMapping,
 		GeminiDecisionEndpoint: decision.GetEngineEndpoint("gemini-decision"),
 		CLMEndpoint:            decision.GetEngineEndpoint("contrastive-lm"),
 		JevEndpoint:            decision.GetEngineEndpoint("jev"),
 		FastinoEndpoint:        decision.GetEngineEndpoint("fastino"),
+	}
+	if complexityCfg.GeminiDecisionEndpoint == "" && appComplexity.GeminiDecisionEndpoint != "" {
+		complexityCfg.GeminiDecisionEndpoint = appComplexity.GeminiDecisionEndpoint
 	}
 
 	var result decision.DecisionResult

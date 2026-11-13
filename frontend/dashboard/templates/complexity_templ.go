@@ -41,7 +41,7 @@ func ComplexityTab(items []ComplexityViewModel) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"space-y-8\"><!-- Header & Description --><div class=\"sm:flex sm:items-center sm:justify-between\"><div><h1 class=\"text-2xl font-bold tracking-tight text-gray-900\">Dynamic Complexity Routing</h1><p class=\"mt-2 text-sm text-gray-700\">Configure semantic or fast decision models (Jev, Fastino, Contrastive-LM, LLM, or Heuristics) to dynamically select models based on request complexity and agent task.</p></div></div><!-- Pipeline Explanation Card --><div class=\"bg-blue-50/60 border border-blue-200/80 rounded-lg p-4 text-xs text-blue-800 leading-relaxed max-w-4xl flex items-start gap-3 shadow-sm\"><div class=\"bg-blue-100 text-blue-600 rounded-full p-1 mt-0.5\"><svg class=\"h-4 w-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z\"></path></svg></div><div><span class=\"font-semibold text-blue-950 block mb-1\">🔄 How Dynamic Complexity Routing works in the Pipeline:</span><ul class=\"list-disc pl-4 space-y-1\"><li><strong>Stage 0 (Per-Prompt Overrides)</strong>: Headers like <code class=\"bg-blue-100 px-1 py-0.5 rounded font-mono text-[10px] text-blue-900\">X-Router-Model</code> or <code class=\"bg-blue-100 px-1 py-0.5 rounded font-mono text-[10px] text-blue-900\">X-Router-Engine</code> immediately override dynamic decisions.</li><li><strong>Stage 1 (Session Affinity)</strong>: Multi-turn conversations locked via <code class=\"bg-blue-100 px-1 py-0.5 rounded font-mono text-[10px] text-blue-900\">X-Session-ID</code> retain model consistency across turns.</li><li><strong>Stage 2 (Agent Task Switching)</strong>: Agent task signals via <code class=\"bg-blue-100 px-1 py-0.5 rounded font-mono text-[10px] text-blue-900\">X-Agent-Task</code> (e.g. debugging vs summarization) route to task-optimized tiers.</li><li><strong>Stage 3 (Decision Engine)</strong>: Jev, Fastino, or Contrastive-LM (CLM) classifiers assign Simple, Medium, or Complex tiers in microseconds.</li></ul></div></div><!-- Master-Detail Split Layout: Applications Table (Left) + Contextual Complexity Inspector (Right) --><div data-layout=\"master-detail-split\" class=\"flex flex-col lg:flex-row gap-6 items-start\"><div class=\"flex-1 min-w-0 w-full bg-white shadow-xs ring-1 ring-slate-900/5 sm:rounded-xl overflow-hidden\"><div class=\"overflow-x-auto\"><table class=\"min-w-full divide-y divide-gray-300\"><thead class=\"bg-gray-50\"><tr><th scope=\"col\" class=\"py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6\">Application Name</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Status</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Engine / Method</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Simple Model & Max Chars</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Medium Model & Max Chars</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Complex Model</th><th scope=\"col\" class=\"relative py-3.5 pl-3 pr-4 sm:pr-6\"><span class=\"sr-only\">Actions</span></th></tr></thead> <tbody class=\"divide-y divide-gray-200 bg-white\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"space-y-8\"><!-- Header & Description --><div class=\"sm:flex sm:items-center sm:justify-between\"><div><h1 class=\"text-2xl font-bold tracking-tight text-gray-900\">Dynamic Complexity Routing</h1><p class=\"mt-2 text-sm text-gray-700\">Configure calibrated single-pass decision models (Gemini Decisions API, Contrastive-LM, Fastino, Jev, LLM, or Heuristics) to route requests across local Gemma 4 runners and cloud Gemini tiers.</p></div></div><!-- Pipeline Explanation Card --><div class=\"bg-blue-50/60 border border-blue-200/80 rounded-lg p-4 text-xs text-blue-800 leading-relaxed max-w-4xl flex items-start gap-3 shadow-sm\"><div class=\"bg-blue-100 text-blue-600 rounded-full p-1 mt-0.5\"><svg class=\"h-4 w-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z\"></path></svg></div><div><span class=\"font-semibold text-blue-950 block mb-1\">🔄 How Dynamic Complexity Routing works in the Pipeline:</span><ul class=\"list-disc pl-4 space-y-1\"><li><strong>Stage 0 (Per-Prompt Overrides)</strong>: Headers like <code class=\"bg-blue-100 px-1 py-0.5 rounded font-mono text-[10px] text-blue-900\">X-Router-Model</code> or <code class=\"bg-blue-100 px-1 py-0.5 rounded font-mono text-[10px] text-blue-900\">X-Router-Engine</code> immediately override dynamic decisions.</li><li><strong>Stage 1 (Session Affinity)</strong>: Multi-turn conversations locked via <code class=\"bg-blue-100 px-1 py-0.5 rounded font-mono text-[10px] text-blue-900\">X-Session-ID</code> retain model consistency across turns.</li><li><strong>Stage 2 (Agent Task Switching)</strong>: Agent task signals via <code class=\"bg-blue-100 px-1 py-0.5 rounded font-mono text-[10px] text-blue-900\">X-Agent-Task</code> (e.g. debugging vs summarization) route to task-optimized tiers.</li><li><strong>Stage 3 (Decision Engine)</strong>: <code class=\"bg-blue-100 px-1 py-0.5 rounded font-mono text-[10px] text-blue-900\">gemini-decision-1</code> (0 output tokens, calibrated simplex) or pluggable decision engines assign Simple, Medium, or Complex tiers and local Gemma 4 eligibility.</li></ul></div></div><!-- Master-Detail Split Layout: Applications Table (Left) + Contextual Complexity Inspector (Right) --><div data-layout=\"master-detail-split\" class=\"flex flex-col lg:flex-row gap-6 items-start\"><div class=\"flex-1 min-w-0 w-full bg-white shadow-xs ring-1 ring-slate-900/5 sm:rounded-xl overflow-hidden\"><div class=\"overflow-x-auto\"><table class=\"min-w-full divide-y divide-gray-300\"><thead class=\"bg-gray-50\"><tr><th scope=\"col\" class=\"py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6\">Application Name</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Status</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Engine / Method</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Simple Model & Max Chars</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Medium Model & Max Chars</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-gray-900\">Complex Model</th><th scope=\"col\" class=\"relative py-3.5 pl-3 pr-4 sm:pr-6\"><span class=\"sr-only\">Actions</span></th></tr></thead> <tbody class=\"divide-y divide-gray-200 bg-white\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -118,156 +118,161 @@ func ComplexityTab(items []ComplexityViewModel) templ.Component {
 					return templ_7745c5c3_Err
 				}
 				if item.App.Complexity.Enabled {
-					if item.App.Complexity.Engine == "fastino" {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<div class=\"text-xs font-medium text-slate-700\">Fastino Sub-ms</div>")
+					if item.App.Complexity.Engine == "gemini-decision" || item.App.Complexity.Engine == "gemini-decisions" || item.App.Complexity.Engine == "gemini-decision-1" {
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<div class=\"text-xs font-semibold text-indigo-700\">Gemini Decisions</div><div class=\"text-[10px] font-mono text-gray-400\">gemini-decision-1</div>")
+						if templ_7745c5c3_Err != nil {
+							return templ_7745c5c3_Err
+						}
+					} else if item.App.Complexity.Engine == "fastino" {
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<div class=\"text-xs font-medium text-slate-700\">Fastino Sub-ms</div>")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 					} else if item.App.Complexity.Engine == "clm" || item.App.Complexity.Engine == "contrastive-lm" {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<div class=\"text-xs font-medium text-slate-700\">Contrastive-LM</div>")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<div class=\"text-xs font-medium text-slate-700\">Contrastive-LM</div>")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 					} else if item.App.Complexity.Engine == "llm" || item.App.Complexity.UseLLMClassifier {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<div class=\"text-xs font-medium text-blue-700\">LLM Classifier</div><div class=\"text-[10px] font-mono text-gray-400\">")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<div class=\"text-xs font-medium text-blue-700\">LLM Classifier</div><div class=\"text-[10px] font-mono text-gray-400\">")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 						var templ_7745c5c3_Var5 string
 						templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(item.App.Complexity.ClassifierModel)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 102, Col: 99}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 105, Col: 99}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</div>")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</div>")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 					} else if item.App.Complexity.Engine == "heuristics" {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<div class=\"text-xs font-medium text-slate-700\">Heuristics</div>")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<div class=\"text-xs font-medium text-slate-700\">Heuristics</div>")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 					} else {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<div class=\"text-xs font-medium text-slate-700\">Jev Model</div>")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<div class=\"text-xs font-medium text-slate-700\">Jev Model</div>")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 					}
 				} else {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<span class=\"text-gray-400\">-</span>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<span class=\"text-gray-400\">-</span>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</td><td class=\"whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-mono text-xs\"><div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</td><td class=\"whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-mono text-xs\"><div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var6 string
 				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(item.App.Complexity.SimpleModel)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 113, Col: 49}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 116, Col: 49}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				if item.App.Complexity.Enabled && !item.App.Complexity.UseLLMClassifier {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<div class=\"text-[10px] text-gray-400\">&lt;= ")
+				if item.App.Complexity.Enabled && item.App.Complexity.Engine == "heuristics" {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<div class=\"text-[10px] text-gray-400\">&lt;= ")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var7 string
 					templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(intToString(item.App.Complexity.SimpleCharLimit))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 115, Col: 107}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 118, Col: 107}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, " chars</div>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, " chars</div>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</td><td class=\"whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-mono text-xs\"><div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</td><td class=\"whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-mono text-xs\"><div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(item.App.Complexity.MediumModel)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 119, Col: 49}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 122, Col: 49}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				if item.App.Complexity.Enabled && !item.App.Complexity.UseLLMClassifier {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "<div class=\"text-[10px] text-gray-400\">&lt;= ")
+				if item.App.Complexity.Enabled && item.App.Complexity.Engine == "heuristics" {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<div class=\"text-[10px] text-gray-400\">&lt;= ")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var9 string
 					templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(intToString(item.App.Complexity.MediumCharLimit))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 121, Col: 107}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 124, Col: 107}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, " chars</div>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, " chars</div>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</td><td class=\"whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-mono text-xs\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</td><td class=\"whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-mono text-xs\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var10 string
 				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(item.App.Complexity.ComplexModel)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 125, Col: 45}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 128, Col: 45}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</td><td class=\"relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6\"><button hx-get=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</td><td class=\"relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6\"><button hx-get=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var11 string
 				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.ResolveAttributeValue("/admin/complexity/edit?app_id=" + item.App.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 129, Col: 67}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 132, Col: 67}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "\" hx-target=\"#modal-container\" onclick=\"document.querySelectorAll('[data-edit-row]').forEach(r => r.classList.remove('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30')); this.closest('tr').classList.add('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30')\" class=\"text-blue-600 hover:text-blue-900 transition font-semibold\">Configure Settings</button></td></tr>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "\" hx-target=\"#modal-container\" onclick=\"document.querySelectorAll('[data-edit-row]').forEach(r => r.classList.remove('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30')); this.closest('tr').classList.add('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30')\" class=\"text-blue-600 hover:text-blue-900 transition font-semibold\">Configure Settings</button></td></tr>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</tbody></table></div></div><!-- Right Contextual Complexity Settings Inspector Pane --><aside id=\"modal-container\" class=\"w-full lg:w-[460px] xl:w-[520px] shrink-0 lg:sticky lg:top-6 hidden [&:has(*)]:block\"></aside></div><!-- Decision Engine Providers & Cluster Setup --><div class=\"bg-white shadow-sm border border-gray-200 rounded-lg p-6 space-y-5\"><div class=\"flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 pb-3 gap-2\"><div><h2 class=\"text-base font-bold text-gray-900\">⚙️ Decision Engine Providers &amp; Cluster Setup</h2><p class=\"text-xs text-gray-500\">Configure Contrastive-LM local/cluster runners (Gemma 4 / CLM rankers), external Jev &amp; Fastino APIs, runtime secrets, and live health probes.</p></div></div><!-- Master-Detail Split View: Compact Selectable Provider List (Left) + Inline Detail & Configuration Inspector (Right) --><div id=\"decision-providers-master-detail\" class=\"grid grid-cols-1 lg:grid-cols-12 gap-6 items-start\"><!-- Left Master Pane: Compact Selectable Provider List --><div class=\"lg:col-span-5 border border-slate-200 rounded-lg overflow-hidden bg-white shadow-xs\"><div class=\"bg-slate-50 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between\"><span class=\"text-xs font-bold uppercase tracking-wider text-slate-700\">Decision Engine Providers</span> <span class=\"text-[11px] font-mono text-slate-500\">Select to configure</span></div><div id=\"decision-provider-list\" class=\"divide-y divide-slate-200\" role=\"listbox\" aria-label=\"Decision Engine Providers\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "</tbody></table></div></div><!-- Right Contextual Complexity Settings Inspector Pane --><aside id=\"modal-container\" class=\"w-full lg:w-[460px] xl:w-[520px] shrink-0 lg:sticky lg:top-6 hidden [&:has(*)]:block\"></aside></div><!-- Decision Engine Providers & Cluster Setup --><div class=\"bg-white shadow-sm border border-gray-200 rounded-lg p-6 space-y-5\"><div class=\"flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 pb-3 gap-2\"><div><h2 class=\"text-base font-bold text-gray-900\">⚙️ Decision Engine Providers &amp; Cluster Setup</h2><p class=\"text-xs text-gray-500\">Configure Contrastive-LM local/cluster runners (Gemma 4 / CLM rankers), external Jev &amp; Fastino APIs, runtime secrets, and live health probes.</p></div></div><!-- Master-Detail Split View: Compact Selectable Provider List (Left) + Inline Detail & Configuration Inspector (Right) --><div id=\"decision-providers-master-detail\" class=\"grid grid-cols-1 lg:grid-cols-12 gap-6 items-start\"><!-- Left Master Pane: Compact Selectable Provider List --><div class=\"lg:col-span-5 border border-slate-200 rounded-lg overflow-hidden bg-white shadow-xs\"><div class=\"bg-slate-50 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between\"><span class=\"text-xs font-bold uppercase tracking-wider text-slate-700\">Decision Engine Providers</span> <span class=\"text-[11px] font-mono text-slate-500\">Select to configure</span></div><div id=\"decision-provider-list\" class=\"divide-y divide-slate-200\" role=\"listbox\" aria-label=\"Decision Engine Providers\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -277,85 +282,85 @@ func ComplexityTab(items []ComplexityViewModel) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<div id=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "<div id=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var13 string
 			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.ResolveAttributeValue("provider-row-" + st.Engine)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 169, Col: 40}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 172, Col: 40}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var13)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "\" data-provider-row=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "\" data-provider-row=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var14 string
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.ResolveAttributeValue(st.Engine)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 170, Col: 37}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 173, Col: 37}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var14)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "\" data-provider-name=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "\" data-provider-name=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.ResolveAttributeValue(st.DisplayName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 171, Col: 43}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 174, Col: 43}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var15)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "\" data-provider-mode=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "\" data-provider-mode=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var16 string
 			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.ResolveAttributeValue(st.ConnectionMode)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 172, Col: 46}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 175, Col: 46}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var16)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "\" data-provider-endpoint=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "\" data-provider-endpoint=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var17 string
 			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.ResolveAttributeValue(st.Endpoint)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 173, Col: 44}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 176, Col: 44}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var17)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "\" data-provider-cluster=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "\" data-provider-cluster=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var18 string
 			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.ResolveAttributeValue(st.ClusterID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 174, Col: 44}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 177, Col: 44}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var18)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "\" onclick=\"selectDecisionProvider(this.dataset.providerRow)\" role=\"option\" tabindex=\"0\" class=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "\" onclick=\"selectDecisionProvider(this.dataset.providerRow)\" role=\"option\" tabindex=\"0\" class=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -368,181 +373,240 @@ func ComplexityTab(items []ComplexityViewModel) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "\"><div class=\"flex items-center justify-between gap-2\"><div class=\"flex items-center gap-1.5 min-w-0\"><span class=\"text-xs font-bold text-slate-900 truncate\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "\"><div class=\"flex items-center justify-between gap-2\"><div class=\"flex items-center gap-1.5 min-w-0\"><span class=\"text-xs font-bold text-slate-900 truncate\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var20 string
 			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(st.DisplayName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 182, Col: 82}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 185, Col: 82}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</span> <span class=\"text-[11px] font-mono text-slate-500\">(")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "</span> <span class=\"text-[11px] font-mono text-slate-500\">(")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var21 string
 			templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(st.Engine)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 183, Col: 73}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 186, Col: 73}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, ")</span></div><div class=\"flex items-center gap-1.5 shrink-0\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, ")</span></div><div class=\"flex items-center gap-1.5 shrink-0\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if st.ConnectionMode == "cluster" || st.ConnectionMode == "direct" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "<span class=\"text-[11px] font-medium text-slate-500\">Cluster Runner</span> ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "<span class=\"text-[11px] font-medium text-slate-500\">Cluster Runner</span> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			} else if st.ConnectionMode == "remote" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "<span class=\"text-[11px] font-medium text-slate-500\">Remote API</span> ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "<span class=\"text-[11px] font-medium text-slate-500\">Remote API</span> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			} else {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "<span class=\"text-[11px] font-medium text-slate-500\">Local Embedded</span> ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "<span class=\"text-[11px] font-medium text-slate-500\">Local Embedded</span> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "<span class=\"text-xs text-slate-400 font-semibold\">&rarr;</span></div></div><div class=\"flex items-center justify-between gap-2 text-[11px]\"><div class=\"font-mono text-slate-600 truncate\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "<span class=\"text-xs text-slate-400 font-semibold\">&rarr;</span></div></div><div class=\"flex items-center justify-between gap-2 text-[11px]\"><div class=\"font-mono text-slate-600 truncate\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if st.Endpoint != "" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "<span title=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "<span title=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var22 string
 				templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.ResolveAttributeValue(st.Endpoint)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 200, Col: 36}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 203, Col: 36}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var22)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var23 string
 				templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(st.Endpoint)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 200, Col: 52}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 203, Col: 52}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "</span>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "</span>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			} else if st.ClusterID != "" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "<span>Cluster: ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "<span>Cluster: ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var24 string
 				templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(st.ClusterID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 202, Col: 40}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 205, Col: 40}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "</span>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "</span>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			} else if st.Engine == "contrastive-lm" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "<span>Embedded Contrastive Prototypes (Local)</span>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "<span>Embedded Contrastive Prototypes (Local)</span>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			} else {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "<span>Default / Embedded</span>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "<span>Default / Embedded</span>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "</div><div class=\"flex items-center gap-1.5 shrink-0\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "</div><div class=\"flex items-center gap-1.5 shrink-0\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if st.Source == "adc" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "<span class=\"text-[11px] text-slate-500\">Application Default Credentials</span> ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "<span class=\"text-[11px] text-slate-500\">Application Default Credentials</span> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			} else if st.Source == "secret_manager" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "<span class=\"text-[11px] text-slate-500\">Secret Manager</span> ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "<span class=\"text-[11px] text-slate-500\">Secret Manager</span> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			} else if st.Source == "dotenv" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "<span class=\"text-[11px] text-slate-500\">Local .env</span> ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "<span class=\"text-[11px] text-slate-500\">Local .env</span> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			} else if st.Source == "memory" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "<span class=\"text-[11px] text-slate-500\">Runtime Vault</span> ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "<span class=\"text-[11px] text-slate-500\">Runtime Vault</span> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			} else if st.Source == "env" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "<span class=\"text-[11px] text-slate-500\">Environment</span> ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "<span class=\"text-[11px] text-slate-500\">Environment</span> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			} else {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "<span class=\"text-[11px] text-slate-400\">No Secret</span> ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "<span class=\"text-[11px] text-slate-400\">No Secret</span> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
 			if st.Configured {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "<span class=\"inline-flex items-center rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-mono font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "<span class=\"inline-flex items-center rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-mono font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var25 string
 				templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(st.MaskedPreview)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 224, Col: 195}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 227, Col: 195}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "</span>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "</span>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			} else {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "<span class=\"inline-flex items-center rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-mono text-gray-500\">Unconfigured</span>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "<span class=\"inline-flex items-center rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-mono text-gray-500\">Unconfigured</span>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "</div></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, "</div></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, "</div></div><!-- Right Detail & Configuration Inspector --><div id=\"provider-detail-inspector\" class=\"lg:col-span-7 border border-slate-200 rounded-lg bg-slate-50/40 p-4 space-y-4\"><div class=\"flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200\"><div class=\"flex items-center gap-2\"><span class=\"text-xs font-bold text-slate-900\" id=\"inspector-selected-name\">Jev Decision Engine</span> <span class=\"text-xs font-mono text-slate-500\" id=\"inspector-selected-engine\">jev</span></div><div class=\"flex items-center gap-3\"><button id=\"inspector-probe-btn\" type=\"button\" hx-post=\"/admin/complexity/providers/probe\" hx-vals='{\"engine\": \"jev\"}' hx-target=\"#provider-probe-result\" hx-swap=\"innerHTML\" class=\"inline-flex items-center gap-1 rounded bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 shadow-xs ring-1 ring-inset ring-slate-300 hover:bg-slate-50 cursor-pointer\"><span>⚡ Probe Selected Provider</span></button> <a href=\"/admin/clusters\" class=\"text-[11px] font-medium text-blue-600 hover:text-blue-800\">Cluster Pool &rarr;</a></div></div><div id=\"provider-probe-result\"></div><!-- Form B: External Provider Credentials & Endpoints (Synced with Selected Provider) --><form id=\"provider-credentials-form\" method=\"POST\" action=\"/admin/complexity/keys\" class=\"bg-white border border-slate-200 rounded-lg p-4 space-y-3 shadow-2xs\"><div class=\"flex items-center justify-between\"><div><h3 class=\"text-xs font-bold text-slate-900 uppercase tracking-wider\">Provider Credentials &amp; Remote Endpoints</h3><p class=\"text-[11px] text-slate-600\">Hot-swap API keys and remote URLs in the runtime vault and sync with the backend proxy.</p></div></div><div class=\"grid grid-cols-1 sm:grid-cols-2 gap-3\"><div><label for=\"secret-engine\" class=\"block text-xs font-semibold text-gray-700 mb-1\">Target Engine</label> <select id=\"secret-engine\" name=\"engine\" onchange=\"selectDecisionProvider(this.value)\" class=\"block w-full rounded-md border-gray-300 bg-white shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono\"><option value=\"gemini-decision\">gemini-decision (Keyless ADC)</option> <option value=\"jev\">jev (JEV_API_KEY)</option> <option value=\"fastino\">fastino (FASTINO_API_KEY)</option> <option value=\"contrastive-lm\">contrastive-lm (CLM_API_KEY)</option></select></div><div><label for=\"secret-ref\" class=\"block text-xs font-semibold text-gray-700 mb-1\">Secret Manager Ref (Optional)</label> <input type=\"text\" id=\"secret-ref\" name=\"secret_ref\" placeholder=\"projects/*/secrets/FASTINO_API_KEY\" class=\"block w-full rounded-md border-gray-300 bg-white shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono\"></div><div class=\"sm:col-span-2\"><label for=\"provider-endpoint\" class=\"block text-xs font-semibold text-gray-700 mb-1\">Remote Provider Endpoint Override (Optional)</label> <input type=\"url\" id=\"provider-endpoint\" name=\"endpoint\" placeholder=\"https://api.fastino.ai/v1/classify or https://jev.internal/v1/evaluate\" class=\"block w-full rounded-md border-gray-300 bg-white shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono\"></div><div class=\"sm:col-span-2\"><label for=\"secret-api-key\" class=\"block text-xs font-semibold text-gray-700 mb-1\">Write-Only API Key / Bearer Token</label> <input type=\"password\" id=\"secret-api-key\" name=\"api_key\" placeholder=\"sk-...\" class=\"block w-full rounded-md border-gray-300 bg-white shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono\"></div></div><div class=\"flex justify-end pt-1\"><button type=\"submit\" class=\"inline-flex justify-center items-center rounded-md bg-slate-800 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-slate-700 transition cursor-pointer\">Store Provider Key &amp; Endpoint</button></div></form><!-- Form A: Contrastive-LM Local / Cluster Runner Setup (Contextual to contrastive-lm selection) --><form id=\"clm-cluster-setup-form\" method=\"POST\" action=\"/admin/complexity/keys\" class=\"hidden bg-indigo-50/40 border border-indigo-200 rounded-lg p-4 space-y-3 transition-all\"><input type=\"hidden\" name=\"engine\" value=\"contrastive-lm\"><div class=\"flex items-center justify-between\"><div><h3 class=\"text-xs font-bold text-indigo-950 uppercase tracking-wider\">Contrastive-LM Cluster &amp; Local Runner Setup</h3><p class=\"text-[11px] text-indigo-700\">Bind Contrastive-LM to an on-prem/project-local cluster endpoint (vLLM / Ollama / CLM Runner) or use embedded contrastive prototypes.</p></div></div><div class=\"grid grid-cols-1 sm:grid-cols-2 gap-3\"><div><label for=\"clm-connection-mode\" class=\"block text-xs font-semibold text-gray-700 mb-1\">Execution Mode</label> <select id=\"clm-connection-mode\" name=\"connection_mode\" class=\"block w-full rounded-md border-gray-300 bg-white shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono\"><option value=\"cluster\">Cluster / Local Runner Endpoint</option> <option value=\"remote\">Remote Contrastive API</option> <option value=\"local\">Local Embedded Prototypes (Zero-Latency)</option></select></div><div><label for=\"clm-cluster-id\" class=\"block text-xs font-semibold text-gray-700 mb-1\">Cluster / Direct Endpoint ID</label> <input type=\"text\" id=\"clm-cluster-id\" name=\"cluster_id\" value=\"clm-cluster-default\" placeholder=\"clm-cluster-default\" class=\"block w-full rounded-md border-gray-300 bg-white shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono\"></div><div class=\"sm:col-span-2\"><label for=\"clm-cluster-endpoint\" class=\"block text-xs font-semibold text-gray-700 mb-1\">Cluster / Runner HTTP Endpoint (`CLM_ENDPOINT`)</label> <input type=\"url\" id=\"clm-cluster-endpoint\" name=\"endpoint\" placeholder=\"http://clm-runner.local:8090/rank or http://10.0.0.12:8000/v1/rank\" class=\"block w-full rounded-md border-gray-300 bg-white shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono\"></div><div class=\"sm:col-span-2\"><label for=\"clm-cluster-api-key\" class=\"block text-xs font-semibold text-gray-700 mb-1\">Optional Cluster Bearer Token (`CLM_API_KEY`)</label> <input type=\"password\" id=\"clm-cluster-api-key\" name=\"api_key\" placeholder=\"Leave blank for unauthenticated local/VPC cluster runners\" class=\"block w-full rounded-md border-gray-300 bg-white shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono\"></div></div><div class=\"flex justify-end pt-1\"><button type=\"submit\" class=\"inline-flex justify-center items-center rounded-md bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition cursor-pointer\">Save Contrastive-LM Cluster Config</button></div></form></div></div><script>\n\t\t\t\tfunction selectDecisionProvider(engine) {\n\t\t\t\t\tif (!engine) return;\n\t\t\t\t\tconst rows = document.querySelectorAll('#decision-provider-list [data-provider-row]');\n\t\t\t\t\tlet activeRow = null;\n\t\t\t\t\trows.forEach((row) => {\n\t\t\t\t\t\tif (row.dataset.providerRow === engine) {\n\t\t\t\t\t\t\tactiveRow = row;\n\t\t\t\t\t\t\trow.classList.add('bg-blue-50/50', 'border-l-blue-600');\n\t\t\t\t\t\t\trow.classList.remove('hover:bg-slate-50', 'border-l-transparent');\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\trow.classList.remove('bg-blue-50/50', 'border-l-blue-600');\n\t\t\t\t\t\t\trow.classList.add('hover:bg-slate-50', 'border-l-transparent');\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\t\t\t\t\tconst selectEl = document.getElementById('secret-engine');\n\t\t\t\t\tif (selectEl && selectEl.value !== engine) {\n\t\t\t\t\t\tselectEl.value = engine;\n\t\t\t\t\t}\n\t\t\t\t\tconst nameEl = document.getElementById('inspector-selected-name');\n\t\t\t\t\tconst badgeEl = document.getElementById('inspector-selected-engine');\n\t\t\t\t\tif (activeRow) {\n\t\t\t\t\t\tif (nameEl) nameEl.textContent = activeRow.dataset.providerName || engine;\n\t\t\t\t\t\tif (badgeEl) badgeEl.textContent = engine;\n\t\t\t\t\t\tconst epInput = document.getElementById('provider-endpoint');\n\t\t\t\t\t\tif (epInput) {\n\t\t\t\t\t\t\tepInput.value = activeRow.dataset.providerEndpoint || '';\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t\tconst probeBtn = document.getElementById('inspector-probe-btn');\n\t\t\t\t\tif (probeBtn) {\n\t\t\t\t\t\tprobeBtn.setAttribute('hx-vals', JSON.stringify({ engine: engine }));\n\t\t\t\t\t}\n\t\t\t\t\tconst clmForm = document.getElementById('clm-cluster-setup-form');\n\t\t\t\t\tif (clmForm) {\n\t\t\t\t\t\tclmForm.classList.toggle('hidden', engine !== 'contrastive-lm');\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t</script><details class=\"group border border-slate-200 rounded-md bg-slate-50/70\"><summary class=\"cursor-pointer px-3 py-2 text-xs font-semibold text-slate-700 flex items-center justify-between\"><span>Cloud Secret Manager &amp; .env CLI Reference</span> <span class=\"text-[11px] font-mono text-slate-500\">Click to expand</span></summary><div class=\"relative bg-slate-900 text-slate-100 rounded-b-md p-3 pr-10 text-[11px] font-mono overflow-x-auto space-y-1\" data-code-snippet><button type=\"button\" onclick=\"copyCodeSnippet(this)\" title=\"Copy to clipboard\" aria-label=\"Copy to clipboard\" class=\"copy-snippet-btn absolute top-2 right-2 p-1.5 rounded-md bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer\"><svg class=\"w-3.5 h-3.5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z\"></path></svg></button> <code><span class=\"block text-slate-400\"># 1. Local Development (.env is gitignored and auto-loaded on startup when K_SERVICE is unset):</span> <span class=\"block\">JEV_API_KEY=\"jev-live-...\" FASTINO_API_KEY=\"pio-live-...\" CLM_API_KEY=\"clm-live-...\" CLM_ENDPOINT=\"http://clm-runner.local:8090/rank\"</span> <span class=\"block text-slate-400 pt-1\"># 2. Production Secret Manager Sync (Terraform creates secret containers; push values with gcloud):</span> <span class=\"block\">gcloud secrets create FASTINO_API_KEY --replication-policy=\"automatic\" &amp;&amp; gcloud run services update gemini-smart-router --set-secrets=\"FASTINO_API_KEY=FASTINO_API_KEY:latest,JEV_API_KEY=JEV_API_KEY:latest,CLM_API_KEY=CLM_API_KEY:latest\"</span></code></div></details></div><!-- Smart Routing Inspector & Simulator --><div class=\"bg-white shadow-sm border border-gray-200 rounded-lg p-6 space-y-4\"><div class=\"flex items-center justify-between border-b border-gray-200 pb-3\"><div><h2 class=\"text-base font-bold text-gray-900\">🔬 Smart Routing Inspector & Simulator</h2><p class=\"text-xs text-gray-500\">Test prompt complexity in real-time through Jev, Fastino, and Contrastive-LM decision models to inspect features, logits, and rationales.</p></div></div><form hx-post=\"/admin/complexity/inspect\" hx-target=\"#inspect-results\" hx-swap=\"innerHTML\" class=\"space-y-4\"><div><label for=\"inspect-prompt\" class=\"block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1\">Test Prompt / Query</label> <textarea id=\"inspect-prompt\" name=\"prompt\" rows=\"3\" required placeholder=\"Type or paste a test prompt (e.g. 'What is 2+2?' or 'Write a thread-safe LRU cache in Go with sync.RWMutex and benchmarks')...\" class=\"block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono focus:border-blue-500 focus:ring-blue-500\"></textarea></div><div class=\"grid grid-cols-1 sm:grid-cols-3 gap-4\"><div><label for=\"inspect-engine\" class=\"block text-xs font-semibold text-gray-700 mb-1\">Decision Engine</label> <select id=\"inspect-engine\" name=\"engine\" class=\"block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs\"><option value=\"gemini-decision\">Gemini Decisions API (gemini-decision-1)</option> <option value=\"jev\" selected>Jev Decision Engine (Rule Logits)</option> <option value=\"fastino\">Fastino Decision Engine (Sub-ms Feature Scoring)</option> <option value=\"contrastive-lm\">Contrastive-LM (5D Euclidean Anchor Profiles)</option> <option value=\"clm\">CLM Contrastive Engine (Alias)</option> <option value=\"heuristics\">Static Heuristics</option></select></div><div><label for=\"inspect-task\" class=\"block text-xs font-semibold text-gray-700 mb-1\">Agent Task Context (Optional)</label> <input type=\"text\" id=\"inspect-task\" name=\"task\" placeholder=\"e.g. code_generation, debugging, triage\" class=\"block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono\"></div><div class=\"flex items-end\"><button type=\"submit\" class=\"w-full inline-flex justify-center items-center rounded-md bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-500 transition cursor-pointer\">Analyze & Route Prompt</button></div></div></form><div id=\"inspect-results\"><div class=\"p-4 border border-dashed border-gray-200 rounded-md text-center text-xs text-gray-400 italic\">Submit a prompt above to view real-time extracted signals, logit scores, and explainable decision rationales.</div></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 63, "</div></div><!-- Right Detail & Configuration Inspector --><div id=\"provider-detail-inspector\" class=\"lg:col-span-7 border border-slate-200 rounded-lg bg-slate-50/40 p-4 space-y-4\"><div class=\"flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200\"><div class=\"flex items-center gap-2\"><span class=\"text-xs font-bold text-slate-900\" id=\"inspector-selected-name\">Gemini Decisions API</span> <span class=\"text-xs font-mono text-slate-500\" id=\"inspector-selected-engine\">gemini-decision</span></div><div class=\"flex items-center gap-3\"><button id=\"inspector-probe-btn\" type=\"button\" hx-post=\"/admin/complexity/providers/probe\" hx-vals='{\"engine\": \"gemini-decision\"}' hx-target=\"#provider-probe-result\" hx-swap=\"innerHTML\" class=\"inline-flex items-center gap-1 rounded bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 shadow-xs ring-1 ring-inset ring-slate-300 hover:bg-slate-50 cursor-pointer\"><span>⚡ Probe Selected Provider</span></button> <a href=\"/admin/clusters\" class=\"text-[11px] font-medium text-blue-600 hover:text-blue-800\">Cluster Pool &rarr;</a></div></div><div id=\"provider-probe-result\"></div><!-- Form B: External Provider Credentials & Endpoints (Synced with Selected Provider) --><form id=\"provider-credentials-form\" method=\"POST\" action=\"/admin/complexity/keys\" class=\"bg-white border border-slate-200 rounded-lg p-4 space-y-3 shadow-2xs\"><div class=\"flex items-center justify-between\"><div><h3 class=\"text-xs font-bold text-slate-900 uppercase tracking-wider\">Provider Credentials &amp; Remote Endpoints</h3><p class=\"text-[11px] text-slate-600\">Hot-swap API keys and remote URLs in the runtime vault and sync with the backend proxy.</p></div></div><div class=\"grid grid-cols-1 sm:grid-cols-2 gap-3\"><div><label for=\"secret-engine\" class=\"block text-xs font-semibold text-gray-700 mb-1\">Target Engine</label> <select id=\"secret-engine\" name=\"engine\" onchange=\"selectDecisionProvider(this.value)\" class=\"block w-full rounded-md border-gray-300 bg-white shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono\"><option value=\"gemini-decision\">gemini-decision (Keyless ADC)</option> <option value=\"jev\">jev (JEV_API_KEY)</option> <option value=\"fastino\">fastino (FASTINO_API_KEY)</option> <option value=\"contrastive-lm\">contrastive-lm (CLM_API_KEY)</option></select></div><div><label for=\"secret-ref\" class=\"block text-xs font-semibold text-gray-700 mb-1\">Secret Manager Ref (Optional)</label> <input type=\"text\" id=\"secret-ref\" name=\"secret_ref\" placeholder=\"projects/*/secrets/FASTINO_API_KEY\" class=\"block w-full rounded-md border-gray-300 bg-white shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono\"></div><div class=\"sm:col-span-2\"><label for=\"provider-endpoint\" class=\"block text-xs font-semibold text-gray-700 mb-1\">Remote Provider Endpoint Override (Optional)</label> <input type=\"url\" id=\"provider-endpoint\" name=\"endpoint\" placeholder=\"https://api.fastino.ai/v1/classify or https://jev.internal/v1/evaluate\" class=\"block w-full rounded-md border-gray-300 bg-white shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono\"></div><div class=\"sm:col-span-2\"><label for=\"secret-api-key\" class=\"block text-xs font-semibold text-gray-700 mb-1\">Write-Only API Key / Bearer Token</label> <input type=\"password\" id=\"secret-api-key\" name=\"api_key\" placeholder=\"sk-...\" class=\"block w-full rounded-md border-gray-300 bg-white shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono\"></div></div><div class=\"flex justify-end pt-1\"><button type=\"submit\" class=\"inline-flex justify-center items-center rounded-md bg-slate-800 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-slate-700 transition cursor-pointer\">Store Provider Key &amp; Endpoint</button></div></form><!-- Form A: Contrastive-LM Local / Cluster Runner Setup (Contextual to contrastive-lm selection) --><form id=\"clm-cluster-setup-form\" method=\"POST\" action=\"/admin/complexity/keys\" class=\"hidden bg-indigo-50/40 border border-indigo-200 rounded-lg p-4 space-y-3 transition-all\"><input type=\"hidden\" name=\"engine\" value=\"contrastive-lm\"><div class=\"flex items-center justify-between\"><div><h3 class=\"text-xs font-bold text-indigo-950 uppercase tracking-wider\">Contrastive-LM Cluster &amp; Local Runner Setup</h3><p class=\"text-[11px] text-indigo-700\">Bind Contrastive-LM to an on-prem/project-local cluster endpoint (vLLM / Ollama / CLM Runner) or use embedded contrastive prototypes.</p></div></div><div class=\"grid grid-cols-1 sm:grid-cols-2 gap-3\"><div><label for=\"clm-connection-mode\" class=\"block text-xs font-semibold text-gray-700 mb-1\">Execution Mode</label> <select id=\"clm-connection-mode\" name=\"connection_mode\" class=\"block w-full rounded-md border-gray-300 bg-white shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono\"><option value=\"cluster\">Cluster / Local Runner Endpoint</option> <option value=\"remote\">Remote Contrastive API</option> <option value=\"local\">Local Embedded Prototypes (Zero-Latency)</option></select></div><div><label for=\"clm-cluster-id\" class=\"block text-xs font-semibold text-gray-700 mb-1\">Cluster / Direct Endpoint ID</label> <input type=\"text\" id=\"clm-cluster-id\" name=\"cluster_id\" value=\"clm-cluster-default\" placeholder=\"clm-cluster-default\" class=\"block w-full rounded-md border-gray-300 bg-white shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono\"></div><div class=\"sm:col-span-2\"><label for=\"clm-cluster-endpoint\" class=\"block text-xs font-semibold text-gray-700 mb-1\">Cluster / Runner HTTP Endpoint (`CLM_ENDPOINT`)</label> <input type=\"url\" id=\"clm-cluster-endpoint\" name=\"endpoint\" placeholder=\"http://clm-runner.local:8090/rank or http://10.0.0.12:8000/v1/rank\" class=\"block w-full rounded-md border-gray-300 bg-white shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono\"></div><div class=\"sm:col-span-2\"><label for=\"clm-cluster-api-key\" class=\"block text-xs font-semibold text-gray-700 mb-1\">Optional Cluster Bearer Token (`CLM_API_KEY`)</label> <input type=\"password\" id=\"clm-cluster-api-key\" name=\"api_key\" placeholder=\"Leave blank for unauthenticated local/VPC cluster runners\" class=\"block w-full rounded-md border-gray-300 bg-white shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono\"></div></div><div class=\"flex justify-end pt-1\"><button type=\"submit\" class=\"inline-flex justify-center items-center rounded-md bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition cursor-pointer\">Save Contrastive-LM Cluster Config</button></div></form></div></div><script>\n\t\t\t\tfunction selectDecisionProvider(engine) {\n\t\t\t\t\tif (!engine) return;\n\t\t\t\t\tconst rows = document.querySelectorAll('#decision-provider-list [data-provider-row]');\n\t\t\t\t\tlet activeRow = null;\n\t\t\t\t\trows.forEach((row) => {\n\t\t\t\t\t\tif (row.dataset.providerRow === engine) {\n\t\t\t\t\t\t\tactiveRow = row;\n\t\t\t\t\t\t\trow.classList.add('bg-blue-50/50', 'border-l-blue-600');\n\t\t\t\t\t\t\trow.classList.remove('hover:bg-slate-50', 'border-l-transparent');\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\trow.classList.remove('bg-blue-50/50', 'border-l-blue-600');\n\t\t\t\t\t\t\trow.classList.add('hover:bg-slate-50', 'border-l-transparent');\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\t\t\t\t\tconst selectEl = document.getElementById('secret-engine');\n\t\t\t\t\tif (selectEl && selectEl.value !== engine) {\n\t\t\t\t\t\tselectEl.value = engine;\n\t\t\t\t\t}\n\t\t\t\t\tconst nameEl = document.getElementById('inspector-selected-name');\n\t\t\t\t\tconst badgeEl = document.getElementById('inspector-selected-engine');\n\t\t\t\t\tif (activeRow) {\n\t\t\t\t\t\tif (nameEl) nameEl.textContent = activeRow.dataset.providerName || engine;\n\t\t\t\t\t\tif (badgeEl) badgeEl.textContent = engine;\n\t\t\t\t\t\tconst epInput = document.getElementById('provider-endpoint');\n\t\t\t\t\t\tif (epInput) {\n\t\t\t\t\t\t\tepInput.value = activeRow.dataset.providerEndpoint || '';\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t\tconst probeBtn = document.getElementById('inspector-probe-btn');\n\t\t\t\t\tif (probeBtn) {\n\t\t\t\t\t\tprobeBtn.setAttribute('hx-vals', JSON.stringify({ engine: engine }));\n\t\t\t\t\t}\n\t\t\t\t\tconst clmForm = document.getElementById('clm-cluster-setup-form');\n\t\t\t\t\tif (clmForm) {\n\t\t\t\t\t\tclmForm.classList.toggle('hidden', engine !== 'contrastive-lm');\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t</script><details class=\"group border border-slate-200 rounded-md bg-slate-50/70\"><summary class=\"cursor-pointer px-3 py-2 text-xs font-semibold text-slate-700 flex items-center justify-between\"><span>Cloud Secret Manager &amp; .env CLI Reference</span> <span class=\"text-[11px] font-mono text-slate-500\">Click to expand</span></summary><div class=\"relative bg-slate-900 text-slate-100 rounded-b-md p-3 pr-10 text-[11px] font-mono overflow-x-auto space-y-1\" data-code-snippet><button type=\"button\" onclick=\"copyCodeSnippet(this)\" title=\"Copy to clipboard\" aria-label=\"Copy to clipboard\" class=\"copy-snippet-btn absolute top-2 right-2 p-1.5 rounded-md bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer\"><svg class=\"w-3.5 h-3.5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z\"></path></svg></button> <code><span class=\"block text-slate-400\"># 1. Local Development (.env is gitignored and auto-loaded on startup when K_SERVICE is unset):</span> <span class=\"block\">JEV_API_KEY=\"jev-live-...\" FASTINO_API_KEY=\"pio-live-...\" CLM_API_KEY=\"clm-live-...\" CLM_ENDPOINT=\"http://clm-runner.local:8090/rank\"</span> <span class=\"block text-slate-400 pt-1\"># 2. Production Secret Manager Sync (Terraform creates secret containers; push values with gcloud):</span> <span class=\"block\">gcloud secrets create FASTINO_API_KEY --replication-policy=\"automatic\" &amp;&amp; gcloud run services update gemini-smart-router --set-secrets=\"FASTINO_API_KEY=FASTINO_API_KEY:latest,JEV_API_KEY=JEV_API_KEY:latest,CLM_API_KEY=CLM_API_KEY:latest\"</span></code></div></details></div><!-- Smart Routing Inspector & Simulator --><div class=\"bg-white shadow-sm border border-gray-200 rounded-lg p-6 space-y-4\"><div class=\"flex items-center justify-between border-b border-gray-200 pb-3\"><div><h2 class=\"text-base font-bold text-gray-900\">🔬 Smart Routing Inspector &amp; Live Tester</h2><p class=\"text-xs text-gray-500\">Test prompt complexity in real time through Gemini Decisions (gemini-decision-1), Contrastive-LM, Fastino, Jev, or Static Heuristics to inspect calibrated simplex probabilities, local Gemma 4 eligibility, and rationales.</p></div></div><form hx-post=\"/admin/complexity/inspect\" hx-target=\"#inspect-results\" hx-swap=\"innerHTML\" class=\"space-y-4\"><div><label for=\"inspect-prompt\" class=\"block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1\">Test Prompt / Query</label> <textarea id=\"inspect-prompt\" name=\"prompt\" rows=\"3\" required placeholder=\"Type or paste a test prompt (e.g. 'Two-phase commit coordinator crashed after prepare. What blocks?' or a verbose shipping notice hiding a ZIP lookup)...\" class=\"block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono focus:border-blue-500 focus:ring-blue-500\"></textarea></div><div class=\"grid grid-cols-1 sm:grid-cols-4 gap-4\"><div><label for=\"inspect-app\" class=\"block text-xs font-semibold text-gray-700 mb-1\">Application Profile</label> <select id=\"inspect-app\" name=\"app_id\" class=\"block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		for idx, item := range items {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 64, "<option value=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var26 string
+			templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.ResolveAttributeValue(item.App.ID)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 438, Col: 35}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var26)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if idx == 0 {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, " selected")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, ">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var27 string
+			templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(item.App.Name)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 438, Col: 78}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 68, " (")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var28 string
+			templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(item.App.ID)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 438, Col: 95}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, ")</option> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "<option value=\"\">Default Tier Mapping</option></select></div><div><label for=\"inspect-engine\" class=\"block text-xs font-semibold text-gray-700 mb-1\">Decision Engine</label> <select id=\"inspect-engine\" name=\"engine\" class=\"block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs\"><option value=\"gemini-decision\" selected>Gemini Decisions API (gemini-decision-1)</option> <option value=\"jev\">Jev Decision Engine (Rule Logits)</option> <option value=\"fastino\">Fastino Decision Engine (Sub-ms Feature Scoring)</option> <option value=\"contrastive-lm\">Contrastive-LM (5D Euclidean Anchor Profiles)</option> <option value=\"clm\">CLM Contrastive Engine (Alias)</option> <option value=\"heuristics\">Static Heuristics</option></select></div><div><label for=\"inspect-task\" class=\"block text-xs font-semibold text-gray-700 mb-1\">Agent Task Context (Optional)</label> <input type=\"text\" id=\"inspect-task\" name=\"task\" placeholder=\"e.g. code_generation, debugging, triage\" class=\"block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono\"></div><div class=\"flex items-end\"><button type=\"submit\" class=\"w-full inline-flex justify-center items-center rounded-md bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-500 transition cursor-pointer\">Analyze &amp; Route Prompt</button></div></div></form><div id=\"inspect-results\"><div class=\"p-4 border border-dashed border-gray-200 rounded-md text-center text-xs text-gray-400 italic\">Submit a prompt above to view real-time extracted signals, logit scores, and explainable decision rationales.</div></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -566,552 +630,552 @@ func ComplexityModal(app config.App, activeModels []config.ModelConfig) templ.Co
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var26 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var26 == nil {
-			templ_7745c5c3_Var26 = templ.NopComponent
+		templ_7745c5c3_Var29 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var29 == nil {
+			templ_7745c5c3_Var29 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 63, "<!-- Contextual Complexity Configuration Inspector Panel --><div id=\"edit-complexity-modal\" class=\"rounded-xl bg-white shadow-md border border-slate-200 overflow-hidden max-h-[calc(100vh-5rem)] flex flex-col\" aria-labelledby=\"modal-title\" role=\"region\"><div class=\"bg-slate-100/90 border-b border-slate-200 px-5 py-3.5 flex items-center justify-between gap-3\"><div><div class=\"text-[11px] font-semibold uppercase tracking-wider text-blue-600\">Complexity Inspector</div><h3 class=\"text-sm font-bold text-slate-900\" id=\"modal-title\">Complexity Routing Settings: <span class=\"text-blue-600\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "<!-- Contextual Complexity Configuration Inspector Panel --><div id=\"edit-complexity-modal\" class=\"rounded-xl bg-white shadow-md border border-slate-200 overflow-hidden max-h-[calc(100vh-5rem)] flex flex-col\" aria-labelledby=\"modal-title\" role=\"region\"><div class=\"bg-slate-100/90 border-b border-slate-200 px-5 py-3.5 flex items-center justify-between gap-3\"><div><div class=\"text-[11px] font-semibold uppercase tracking-wider text-blue-600\">Complexity Inspector</div><h3 class=\"text-sm font-bold text-slate-900\" id=\"modal-title\">Complexity Routing Settings: <span class=\"text-blue-600\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var27 string
-		templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(app.Name)
+		var templ_7745c5c3_Var30 string
+		templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(app.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 472, Col: 72}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 484, Col: 72}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 64, "</span></h3><p class=\"text-[11px] text-slate-500 font-mono\">")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var28 string
-		templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(app.ID)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 474, Col: 60}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 72, "</span></h3><p class=\"text-[11px] text-slate-500 font-mono\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "</p></div><button type=\"button\" onclick=\"document.querySelectorAll('[data-edit-row]').forEach(r => r.classList.remove('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30')); document.getElementById('edit-complexity-modal').remove()\" class=\"rounded-md p-1 text-slate-400 hover:bg-slate-200/60 hover:text-slate-600 focus:outline-none transition\"><span class=\"sr-only\">Close</span> <svg class=\"h-5 w-5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div><div class=\"p-5 overflow-y-auto\"><!-- Settings Form --><form hx-post=\"/admin/complexity/save\" class=\"space-y-5\"><div id=\"error-alert-container\"></div><input type=\"hidden\" name=\"app_id\" value=\"")
+		var templ_7745c5c3_Var31 string
+		templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(app.ID)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 486, Col: 60}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var29 string
-		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.ResolveAttributeValue(app.ID)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 495, Col: 57}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var29)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 73, "</p></div><button type=\"button\" onclick=\"document.querySelectorAll('[data-edit-row]').forEach(r => r.classList.remove('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30')); document.getElementById('edit-complexity-modal').remove()\" class=\"rounded-md p-1 text-slate-400 hover:bg-slate-200/60 hover:text-slate-600 focus:outline-none transition\"><span class=\"sr-only\">Close</span> <svg class=\"h-5 w-5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div><div class=\"p-5 overflow-y-auto\"><!-- Settings Form --><form hx-post=\"/admin/complexity/save\" class=\"space-y-5\"><div id=\"error-alert-container\"></div><input type=\"hidden\" name=\"app_id\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, "\"><!-- General Routing Enablers --><div class=\"bg-gray-50 p-4 rounded-md border border-gray-200 space-y-3\"><div class=\"flex items-center justify-between\"><div class=\"flex flex-col\"><label for=\"enabled\" class=\"text-sm font-semibold text-gray-950\">Enable Dynamic Complexity Routing</label> <span class=\"text-[11px] text-gray-500\">Allow the router to dynamically choose target models.</span></div><input type=\"checkbox\" name=\"enabled\" id=\"enabled\" value=\"true\" class=\"h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500\"")
+		var templ_7745c5c3_Var32 string
+		templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.ResolveAttributeValue(app.ID)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 507, Col: 57}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var32)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 74, "\"><!-- General Routing Enablers --><div class=\"bg-gray-50 p-4 rounded-md border border-gray-200 space-y-3\"><div class=\"flex items-center justify-between\"><div class=\"flex flex-col\"><label for=\"enabled\" class=\"text-sm font-semibold text-gray-950\">Enable Dynamic Complexity Routing</label> <span class=\"text-[11px] text-gray-500\">Allow the router to dynamically choose target models.</span></div><input type=\"checkbox\" name=\"enabled\" id=\"enabled\" value=\"true\" class=\"h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if app.Complexity.Enabled {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, " checked")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 75, " checked")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 68, "></div><div class=\"flex items-center justify-between border-t border-gray-200 pt-3\"><div class=\"flex flex-col\"><label for=\"always_override\" class=\"text-sm font-semibold text-gray-950\">Always Override Requested Model</label> <span class=\"text-[11px] text-gray-500\">Override standard models. When unchecked, only routes if requested model is 'gemini-dynamic'.</span></div><input type=\"checkbox\" name=\"always_override\" id=\"always_override\" value=\"true\" class=\"h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 76, "></div><div class=\"flex items-center justify-between border-t border-gray-200 pt-3\"><div class=\"flex flex-col\"><label for=\"always_override\" class=\"text-sm font-semibold text-gray-950\">Always Override Requested Model</label> <span class=\"text-[11px] text-gray-500\">Override standard models. When unchecked, only routes if requested model is 'gemini-dynamic'.</span></div><input type=\"checkbox\" name=\"always_override\" id=\"always_override\" value=\"true\" class=\"h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if app.Complexity.AlwaysOverride {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, " checked")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 77, " checked")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "></div></div><!-- Model Allocations --><div><h4 class=\"text-xs font-bold text-gray-950 tracking-wider uppercase mb-3\">Model Allocations</h4><div class=\"grid grid-cols-3 gap-4\"><div><label for=\"simple_model\" class=\"block text-xs font-medium text-gray-700\">Simple Model</label> <select name=\"simple_model\" id=\"simple_model\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 78, "></div></div><!-- Model Allocations --><div><h4 class=\"text-xs font-bold text-gray-950 tracking-wider uppercase mb-3\">Model Allocations</h4><div class=\"grid grid-cols-3 gap-4\"><div><label for=\"simple_model\" class=\"block text-xs font-medium text-gray-700\">Simple Model</label> <select name=\"simple_model\" id=\"simple_model\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		for _, m := range activeModels {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "<option value=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var30 string
-			templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.ResolveAttributeValue(m.ID)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 538, Col: 33}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var30)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 72, "\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			if app.Complexity.SimpleModel == m.ID || (app.Complexity.SimpleModel == "" && m.ID == "gemini-3.5-flash-lite") {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 73, " selected")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 74, ">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var31 string
-			templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(m.DisplayName)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 538, Col: 175}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 75, "</option>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 76, "</select></div><div><label for=\"medium_model\" class=\"block text-xs font-medium text-gray-700\">Medium Model</label> <select name=\"medium_model\" id=\"medium_model\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		for _, m := range activeModels {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 77, "<option value=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var32 string
-			templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.ResolveAttributeValue(m.ID)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 546, Col: 33}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var32)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 78, "\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			if app.Complexity.MediumModel == m.ID || (app.Complexity.MediumModel == "" && m.ID == "gemini-3.8-flash") {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 79, " selected")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 80, ">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 79, "<option value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var33 string
-			templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(m.DisplayName)
+			templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.ResolveAttributeValue(m.ID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 546, Col: 170}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 550, Col: 33}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 81, "</option>")
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var33)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 82, "</select></div><div><label for=\"complex_model\" class=\"block text-xs font-medium text-gray-700\">Complex Model</label> <select name=\"complex_model\" id=\"complex_model\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		for _, m := range activeModels {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 83, "<option value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 80, "\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var34 string
-			templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.ResolveAttributeValue(m.ID)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 554, Col: 33}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var34)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 84, "\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			if app.Complexity.ComplexModel == m.ID || (app.Complexity.ComplexModel == "" && m.ID == "gemini-3.1-pro") {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 85, " selected")
+			if app.Complexity.SimpleModel == m.ID || (app.Complexity.SimpleModel == "" && m.ID == "gemini-3.5-flash-lite") {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 81, " selected")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 86, ">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 82, ">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var34 string
+			templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(m.DisplayName)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 550, Col: 175}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 83, "</option>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 84, "</select></div><div><label for=\"medium_model\" class=\"block text-xs font-medium text-gray-700\">Medium Model</label> <select name=\"medium_model\" id=\"medium_model\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		for _, m := range activeModels {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 85, "<option value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var35 string
-			templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(m.DisplayName)
+			templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.ResolveAttributeValue(m.ID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 554, Col: 170}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 558, Col: 33}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var35)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 87, "</option>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 86, "\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if app.Complexity.MediumModel == m.ID || (app.Complexity.MediumModel == "" && m.ID == "gemini-3.8-flash") {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 87, " selected")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 88, ">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var36 string
+			templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(m.DisplayName)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 558, Col: 170}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 89, "</option>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 88, "</select></div></div></div><!-- Method Options: Jev vs Fastino vs Contrastive-LM vs LLM Classifier vs Static Heuristics --><div class=\"border-t border-gray-200 pt-4\"><h4 class=\"text-xs font-bold text-gray-950 tracking-wider uppercase mb-3\">Classification &amp; Decision Engine</h4><div class=\"space-y-4\"><div><label for=\"engine\" class=\"block text-xs font-medium text-gray-700 mb-1\">Routing Engine</label> <select name=\"engine\" id=\"engine\" class=\"block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono\"><option value=\"gemini-decision\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 90, "</select></div><div><label for=\"complex_model\" class=\"block text-xs font-medium text-gray-700\">Complex Model</label> <select name=\"complex_model\" id=\"complex_model\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		for _, m := range activeModels {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 91, "<option value=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var37 string
+			templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.ResolveAttributeValue(m.ID)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 566, Col: 33}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var37)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 92, "\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if app.Complexity.ComplexModel == m.ID || (app.Complexity.ComplexModel == "" && m.ID == "gemini-3.1-pro") {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 93, " selected")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 94, ">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var38 string
+			templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(m.DisplayName)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 566, Col: 170}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 95, "</option>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 96, "</select></div></div></div><!-- Method Options: Jev vs Fastino vs Contrastive-LM vs LLM Classifier vs Static Heuristics --><div class=\"border-t border-gray-200 pt-4\"><h4 class=\"text-xs font-bold text-gray-950 tracking-wider uppercase mb-3\">Classification &amp; Decision Engine</h4><div class=\"space-y-4\"><div><label for=\"engine\" class=\"block text-xs font-medium text-gray-700 mb-1\">Routing Engine</label> <select name=\"engine\" id=\"engine\" class=\"block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono\"><option value=\"gemini-decision\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if app.Complexity.Engine == "gemini-decision" || app.Complexity.Engine == "gemini-decisions" || app.Complexity.Engine == "gemini-decision-1" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 89, " selected")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 90, ">Gemini Decisions API (gemini-decision-1 · Calibrated Zero-Output Routing)</option> <option value=\"jev\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		if app.Complexity.Engine == "jev" || (app.Complexity.Engine == "" && !app.Complexity.UseLLMClassifier) {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 91, " selected")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 92, ">Jev Structured Decision Model (Microsecond rule-based logit scoring)</option> <option value=\"fastino\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		if app.Complexity.Engine == "fastino" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 93, " selected")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 94, ">Fastino Decision Engine (Sub-millisecond structural &amp; lexical scoring)</option> <option value=\"contrastive-lm\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		if app.Complexity.Engine == "contrastive-lm" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 95, " selected")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 96, ">Contrastive-LM (5D Euclidean distance to anchor profiles)</option> <option value=\"clm\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		if app.Complexity.Engine == "clm" {
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 97, " selected")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 98, ">CLM Contrastive Language Model (Alias for Contrastive-LM)</option> <option value=\"llm\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 98, ">Gemini Decisions API (gemini-decision-1 · Calibrated Zero-Output Routing)</option> <option value=\"jev\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if app.Complexity.Engine == "llm" || app.Complexity.UseLLMClassifier {
+		if app.Complexity.Engine == "jev" || (app.Complexity.Engine == "" && !app.Complexity.UseLLMClassifier) {
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 99, " selected")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 100, ">LLM Semantic Classifier (Gemini 3.5 Flash-Lite semantic routing)</option> <option value=\"heuristics\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 100, ">Jev Structured Decision Model (Microsecond rule-based logit scoring)</option> <option value=\"fastino\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if app.Complexity.Engine == "heuristics" {
+		if app.Complexity.Engine == "fastino" {
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 101, " selected")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 102, ">Static Heuristics (Character length bounds)</option></select></div><div class=\"grid grid-cols-1 sm:grid-cols-2 gap-3\"><div><label for=\"gemini_decision_endpoint\" class=\"block text-xs font-medium text-gray-700\">Gemini Decisions Endpoint (Optional)</label> <input type=\"text\" name=\"gemini_decision_endpoint\" id=\"gemini_decision_endpoint\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 102, ">Fastino Decision Engine (Sub-millisecond structural &amp; lexical scoring)</option> <option value=\"contrastive-lm\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var36 string
-		templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.ResolveAttributeValue(app.Complexity.GeminiDecisionEndpoint)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 586, Col: 58}
+		if app.Complexity.Engine == "contrastive-lm" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 103, " selected")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var36)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 103, "\" placeholder=\"https://generativelanguage.googleapis.com/v1beta/decisions\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono\"></div><div><label for=\"jev_endpoint\" class=\"block text-xs font-medium text-gray-700\">Jev Endpoint (Optional)</label> <input type=\"text\" name=\"jev_endpoint\" id=\"jev_endpoint\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 104, ">Contrastive-LM (5D Euclidean distance to anchor profiles)</option> <option value=\"clm\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var37 string
-		templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.ResolveAttributeValue(app.Complexity.JevEndpoint)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 597, Col: 47}
+		if app.Complexity.Engine == "clm" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 105, " selected")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var37)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 104, "\" placeholder=\"https://jev-model.internal/v1/systemone\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono\"></div><div><label for=\"fastino_endpoint\" class=\"block text-xs font-medium text-gray-700\">Fastino Endpoint (Optional)</label> <input type=\"text\" name=\"fastino_endpoint\" id=\"fastino_endpoint\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 106, ">CLM Contrastive Language Model (Alias for Contrastive-LM)</option> <option value=\"llm\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var38 string
-		templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.ResolveAttributeValue(app.Complexity.FastinoEndpoint)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 608, Col: 51}
+		if app.Complexity.Engine == "llm" || app.Complexity.UseLLMClassifier {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 107, " selected")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var38)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 108, ">LLM Semantic Classifier (Gemini 3.5 Flash-Lite semantic routing)</option> <option value=\"heuristics\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 105, "\" placeholder=\"https://fastino.internal/v1/systemone\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono\"></div><div><label for=\"clm_endpoint\" class=\"block text-xs font-medium text-gray-700\">Contrastive-LM Endpoint (Optional)</label> <input type=\"text\" name=\"clm_endpoint\" id=\"clm_endpoint\" value=\"")
+		if app.Complexity.Engine == "heuristics" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 109, " selected")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 110, ">Static Heuristics (Character length bounds)</option></select></div><div class=\"grid grid-cols-1 sm:grid-cols-2 gap-3\"><div><label for=\"gemini_decision_endpoint\" class=\"block text-xs font-medium text-gray-700\">Gemini Decisions Endpoint (Optional)</label> <input type=\"text\" name=\"gemini_decision_endpoint\" id=\"gemini_decision_endpoint\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var39 string
-		templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.ResolveAttributeValue(app.Complexity.CLMEndpoint)
+		templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.ResolveAttributeValue(app.Complexity.GeminiDecisionEndpoint)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 619, Col: 47}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 598, Col: 58}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var39)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 106, "\" placeholder=\"https://clm.internal/rank\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono\"></div></div><div class=\"grid grid-cols-1 sm:grid-cols-3 gap-3\"><div><label for=\"secret_ref\" class=\"block text-xs font-medium text-gray-700\">Secret Env / Vault Reference</label> <input type=\"text\" name=\"secret_ref\" id=\"secret_ref\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 111, "\" placeholder=\"https://generativelanguage.googleapis.com/v1beta/decisions\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono\"></div><div><label for=\"jev_endpoint\" class=\"block text-xs font-medium text-gray-700\">Jev Endpoint (Optional)</label> <input type=\"text\" name=\"jev_endpoint\" id=\"jev_endpoint\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var40 string
-		templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.ResolveAttributeValue(app.Complexity.SecretRef)
+		templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.ResolveAttributeValue(app.Complexity.JevEndpoint)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 633, Col: 45}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 609, Col: 47}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var40)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 107, "\" placeholder=\"FASTINO_API_KEY\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono\"></div><div><label for=\"api_key\" class=\"block text-xs font-medium text-gray-700\">Write-Only Engine API Key</label> <input type=\"password\" name=\"api_key\" id=\"api_key\" placeholder=\"Stored in memory vault only\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono\"></div><div><label for=\"min_confidence\" class=\"block text-xs font-medium text-gray-700\">Min Confidence Threshold (0-1)</label> <input type=\"number\" step=\"0.01\" min=\"0\" max=\"1\" name=\"min_confidence\" id=\"min_confidence\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 112, "\" placeholder=\"https://jev-model.internal/v1/systemone\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono\"></div><div><label for=\"fastino_endpoint\" class=\"block text-xs font-medium text-gray-700\">Fastino Endpoint (Optional)</label> <input type=\"text\" name=\"fastino_endpoint\" id=\"fastino_endpoint\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var41 string
-		templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("%.2f", app.Complexity.MinConfidence))
+		templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.ResolveAttributeValue(app.Complexity.FastinoEndpoint)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 657, Col: 70}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 620, Col: 51}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var41)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 108, "\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono\"></div></div><!-- Custom Tier Criteria --><div class=\"bg-slate-50 p-3 rounded-md border border-slate-200 space-y-2\"><div class=\"text-xs font-bold text-slate-800\">Custom Tier Keyword Criteria (Comma-Separated)</div><div class=\"grid grid-cols-3 gap-3\"><div><label for=\"simple_criteria\" class=\"block text-[11px] font-medium text-slate-600\">Simple Criteria</label> <input type=\"text\" name=\"simple_criteria\" id=\"simple_criteria\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 113, "\" placeholder=\"https://fastino.internal/v1/systemone\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono\"></div><div><label for=\"clm_endpoint\" class=\"block text-xs font-medium text-gray-700\">Contrastive-LM Endpoint (Optional)</label> <input type=\"text\" name=\"clm_endpoint\" id=\"clm_endpoint\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var42 string
-		templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.ResolveAttributeValue(app.Complexity.SimpleCriteria)
+		templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.ResolveAttributeValue(app.Complexity.CLMEndpoint)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 669, Col: 113}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 631, Col: 47}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var42)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 109, "\" placeholder=\"faq, greeting, lookup\" class=\"mt-1 block w-full rounded border-slate-300 bg-white p-1.5 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300\"></div><div><label for=\"medium_criteria\" class=\"block text-[11px] font-medium text-slate-600\">Medium Criteria</label> <input type=\"text\" name=\"medium_criteria\" id=\"medium_criteria\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 114, "\" placeholder=\"https://clm.internal/rank\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono\"></div></div><div class=\"grid grid-cols-1 sm:grid-cols-3 gap-3\"><div><label for=\"secret_ref\" class=\"block text-xs font-medium text-gray-700\">Secret Env / Vault Reference</label> <input type=\"text\" name=\"secret_ref\" id=\"secret_ref\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var43 string
-		templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.ResolveAttributeValue(app.Complexity.MediumCriteria)
+		templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.ResolveAttributeValue(app.Complexity.SecretRef)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 673, Col: 113}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 645, Col: 45}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var43)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 110, "\" placeholder=\"summarize, draft, explain\" class=\"mt-1 block w-full rounded border-slate-300 bg-white p-1.5 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300\"></div><div><label for=\"complex_criteria\" class=\"block text-[11px] font-medium text-slate-600\">Complex Criteria</label> <input type=\"text\" name=\"complex_criteria\" id=\"complex_criteria\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 115, "\" placeholder=\"FASTINO_API_KEY\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono\"></div><div><label for=\"api_key\" class=\"block text-xs font-medium text-gray-700\">Write-Only Engine API Key</label> <input type=\"password\" name=\"api_key\" id=\"api_key\" placeholder=\"Stored in memory vault only\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono\"></div><div><label for=\"min_confidence\" class=\"block text-xs font-medium text-gray-700\">Min Confidence Threshold (0-1)</label> <input type=\"number\" step=\"0.01\" min=\"0\" max=\"1\" name=\"min_confidence\" id=\"min_confidence\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var44 string
-		templ_7745c5c3_Var44, templ_7745c5c3_Err = templ.ResolveAttributeValue(app.Complexity.ComplexCriteria)
+		templ_7745c5c3_Var44, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("%.2f", app.Complexity.MinConfidence))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 677, Col: 116}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 669, Col: 70}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var44)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 111, "\" placeholder=\"distributed, theorem, formal\" class=\"mt-1 block w-full rounded border-slate-300 bg-white p-1.5 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300\"></div></div></div><!-- Agent Task Mappings (Stage 2) --><div class=\"bg-slate-50 p-3 rounded-md border border-slate-200 space-y-2\"><div class=\"text-xs font-bold text-slate-800\">Agent Task-to-Model Overrides (X-Agent-Task)</div><div class=\"grid grid-cols-3 gap-3\"><div><label for=\"task_code\" class=\"block text-[11px] font-medium text-slate-600\">Task: code</label> <input type=\"text\" name=\"task_code\" id=\"task_code\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 116, "\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono\"></div></div><!-- Custom Tier Criteria --><div class=\"bg-slate-50 p-3 rounded-md border border-slate-200 space-y-2\"><div class=\"text-xs font-bold text-slate-800\">Custom Tier Keyword Criteria (Comma-Separated)</div><div class=\"grid grid-cols-3 gap-3\"><div><label for=\"simple_criteria\" class=\"block text-[11px] font-medium text-slate-600\">Simple Criteria</label> <input type=\"text\" name=\"simple_criteria\" id=\"simple_criteria\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var45 string
-		templ_7745c5c3_Var45, templ_7745c5c3_Err = templ.ResolveAttributeValue(app.Complexity.TaskMapping["code"])
+		templ_7745c5c3_Var45, templ_7745c5c3_Err = templ.ResolveAttributeValue(app.Complexity.SimpleCriteria)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 688, Col: 106}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 681, Col: 113}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var45)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 112, "\" placeholder=\"gemini-3.1-pro\" class=\"mt-1 block w-full rounded border-slate-300 bg-white p-1.5 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300\"></div><div><label for=\"task_triage\" class=\"block text-[11px] font-medium text-slate-600\">Task: triage</label> <input type=\"text\" name=\"task_triage\" id=\"task_triage\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 117, "\" placeholder=\"faq, greeting, lookup\" class=\"mt-1 block w-full rounded border-slate-300 bg-white p-1.5 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300\"></div><div><label for=\"medium_criteria\" class=\"block text-[11px] font-medium text-slate-600\">Medium Criteria</label> <input type=\"text\" name=\"medium_criteria\" id=\"medium_criteria\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var46 string
-		templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.ResolveAttributeValue(app.Complexity.TaskMapping["triage"])
+		templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.ResolveAttributeValue(app.Complexity.MediumCriteria)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 692, Col: 112}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 685, Col: 113}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var46)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 113, "\" placeholder=\"gemini-3.5-flash-lite\" class=\"mt-1 block w-full rounded border-slate-300 bg-white p-1.5 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300\"></div><div><label for=\"task_summarization\" class=\"block text-[11px] font-medium text-slate-600\">Task: summarization</label> <input type=\"text\" name=\"task_summarization\" id=\"task_summarization\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 118, "\" placeholder=\"summarize, draft, explain\" class=\"mt-1 block w-full rounded border-slate-300 bg-white p-1.5 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300\"></div><div><label for=\"complex_criteria\" class=\"block text-[11px] font-medium text-slate-600\">Complex Criteria</label> <input type=\"text\" name=\"complex_criteria\" id=\"complex_criteria\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var47 string
-		templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.ResolveAttributeValue(app.Complexity.TaskMapping["summarization"])
+		templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.ResolveAttributeValue(app.Complexity.ComplexCriteria)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 696, Col: 133}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 689, Col: 116}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var47)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 114, "\" placeholder=\"gemini-3.8-flash\" class=\"mt-1 block w-full rounded border-slate-300 bg-white p-1.5 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300\"></div></div></div><!-- LLM Toggle --><div class=\"flex items-center justify-between bg-blue-50/50 p-3 rounded-md border border-blue-100\"><div class=\"flex flex-col\"><label for=\"use_llm_classifier\" class=\"text-xs font-bold text-blue-950\">Use LLM Semantic Classifier</label> <span class=\"text-[10px] text-blue-800\">Send prompt to a low-cost model to classify complexity rather than character limits.</span></div><input type=\"checkbox\" name=\"use_llm_classifier\" id=\"use_llm_classifier\" value=\"true\" class=\"h-4 w-4 rounded border-blue-300 text-blue-600 focus:ring-blue-500\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 119, "\" placeholder=\"distributed, theorem, formal\" class=\"mt-1 block w-full rounded border-slate-300 bg-white p-1.5 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300\"></div></div></div><!-- Agent Task Mappings (Stage 2) --><div class=\"bg-slate-50 p-3 rounded-md border border-slate-200 space-y-2\"><div class=\"text-xs font-bold text-slate-800\">Agent Task-to-Model Overrides (X-Agent-Task)</div><div class=\"grid grid-cols-3 gap-3\"><div><label for=\"task_code\" class=\"block text-[11px] font-medium text-slate-600\">Task: code</label> <input type=\"text\" name=\"task_code\" id=\"task_code\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if app.Complexity.UseLLMClassifier {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 115, " checked")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
+		var templ_7745c5c3_Var48 string
+		templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.ResolveAttributeValue(app.Complexity.TaskMapping["code"])
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 700, Col: 106}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 116, "></div><div class=\"grid grid-cols-2 gap-4\"><div><label for=\"classifier_model\" class=\"block text-xs font-medium text-gray-700\">LLM Classifier Model</label> <select name=\"classifier_model\" id=\"classifier_model\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono\">")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var48)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		for _, m := range activeModels {
-			if m.Type == "foundation" && !strings.Contains(m.ID, "embedding") {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 117, "<option value=\"")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				var templ_7745c5c3_Var48 string
-				templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.ResolveAttributeValue(m.ID)
-				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 723, Col: 35}
-				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var48)
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 118, "\"")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				if app.Complexity.ClassifierModel == m.ID || (app.Complexity.ClassifierModel == "" && m.ID == "gemini-3.5-flash-lite") {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 119, " selected")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 120, ">")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				var templ_7745c5c3_Var49 string
-				templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.JoinStringErrs(m.DisplayName)
-				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 723, Col: 185}
-				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var49))
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 121, "</option>")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 122, "</select></div><!-- Heuristic Fast-Bypasses --><div class=\"bg-gray-50 p-3 rounded-md border border-gray-200 space-y-2 text-xs\"><div class=\"font-bold text-slate-700 mb-1\">Fast-Bypasses (Force Complex)</div><div class=\"flex items-center justify-between\"><label for=\"force_complex_multimodal\" class=\"text-gray-700\">Multimodal Payloads</label> <input type=\"checkbox\" name=\"force_complex_multimodal\" id=\"force_complex_multimodal\" value=\"true\" class=\"h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 120, "\" placeholder=\"gemini-3.1-pro\" class=\"mt-1 block w-full rounded border-slate-300 bg-white p-1.5 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300\"></div><div><label for=\"task_triage\" class=\"block text-[11px] font-medium text-slate-600\">Task: triage</label> <input type=\"text\" name=\"task_triage\" id=\"task_triage\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if app.Complexity.ForceComplexMultimodal {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 123, " checked")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
+		var templ_7745c5c3_Var49 string
+		templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.ResolveAttributeValue(app.Complexity.TaskMapping["triage"])
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 704, Col: 112}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 124, "></div><div class=\"flex items-center justify-between border-t border-slate-200 pt-1\"><label for=\"force_complex_tools\" class=\"text-gray-700\">Tools / Function Calls</label> <input type=\"checkbox\" name=\"force_complex_tools\" id=\"force_complex_tools\" value=\"true\" class=\"h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500\"")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var49)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if app.Complexity.ForceComplexTools {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 125, " checked")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 126, "></div></div></div><!-- Heuristics: Static Limits --><div class=\"grid grid-cols-2 gap-4 border-t border-gray-100 pt-3\"><div><label for=\"simple_char_limit\" class=\"block text-xs font-medium text-gray-700\">Simple Text Max Length (characters)</label> <input type=\"number\" name=\"simple_char_limit\" id=\"simple_char_limit\" required value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 121, "\" placeholder=\"gemini-3.5-flash-lite\" class=\"mt-1 block w-full rounded border-slate-300 bg-white p-1.5 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300\"></div><div><label for=\"task_summarization\" class=\"block text-[11px] font-medium text-slate-600\">Task: summarization</label> <input type=\"text\" name=\"task_summarization\" id=\"task_summarization\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var50 string
-		templ_7745c5c3_Var50, templ_7745c5c3_Err = templ.ResolveAttributeValue(intToString(app.Complexity.SimpleCharLimit))
+		templ_7745c5c3_Var50, templ_7745c5c3_Err = templ.ResolveAttributeValue(app.Complexity.TaskMapping["summarization"])
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 766, Col: 64}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 708, Col: 133}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var50)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 127, "\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono\"></div><div><label for=\"medium_char_limit\" class=\"block text-xs font-medium text-gray-700\">Medium Text Max Length (characters)</label> <input type=\"number\" name=\"medium_char_limit\" id=\"medium_char_limit\" required value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 122, "\" placeholder=\"gemini-3.8-flash\" class=\"mt-1 block w-full rounded border-slate-300 bg-white p-1.5 text-xs font-mono text-slate-900 ring-1 ring-inset ring-slate-300\"></div></div></div><!-- LLM Toggle --><div class=\"flex items-center justify-between bg-blue-50/50 p-3 rounded-md border border-blue-100\"><div class=\"flex flex-col\"><label for=\"use_llm_classifier\" class=\"text-xs font-bold text-blue-950\">Use LLM Semantic Classifier</label> <span class=\"text-[10px] text-blue-800\">Send prompt to a low-cost model to classify complexity rather than character limits.</span></div><input type=\"checkbox\" name=\"use_llm_classifier\" id=\"use_llm_classifier\" value=\"true\" class=\"h-4 w-4 rounded border-blue-300 text-blue-600 focus:ring-blue-500\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var51 string
-		templ_7745c5c3_Var51, templ_7745c5c3_Err = templ.ResolveAttributeValue(intToString(app.Complexity.MediumCharLimit))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 777, Col: 64}
+		if app.Complexity.UseLLMClassifier {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 123, " checked")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var51)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 128, "\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono\"></div></div><!-- Additional Classifier Instructions --><div class=\"border-t border-gray-100 pt-3\"><label for=\"additional_instructions\" class=\"block text-xs font-bold text-gray-900 uppercase tracking-wider\">Additional Classification Guidelines</label> <span class=\"block text-[11px] text-gray-500 mb-2\">Specify app-specific context or rules to append to the semantic classifier prompt (e.g., \"always classify code snippets as complex\").</span> <textarea name=\"additional_instructions\" id=\"additional_instructions\" rows=\"3\" placeholder=\"Enter any custom guidelines or semantic classification rules...\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono focus:border-blue-500 focus:ring-blue-500 w-full\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 124, "></div><div class=\"grid grid-cols-2 gap-4\"><div><label for=\"classifier_model\" class=\"block text-xs font-medium text-gray-700\">LLM Classifier Model</label> <select name=\"classifier_model\" id=\"classifier_model\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var52 string
-		templ_7745c5c3_Var52, templ_7745c5c3_Err = templ.JoinStringErrs(app.Complexity.AdditionalInstructions)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 793, Col: 51}
+		for _, m := range activeModels {
+			if m.Type == "foundation" && !strings.Contains(m.ID, "embedding") {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 125, "<option value=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var51 string
+				templ_7745c5c3_Var51, templ_7745c5c3_Err = templ.ResolveAttributeValue(m.ID)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 735, Col: 35}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var51)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 126, "\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				if app.Complexity.ClassifierModel == m.ID || (app.Complexity.ClassifierModel == "" && m.ID == "gemini-3.5-flash-lite") {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 127, " selected")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 128, ">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var52 string
+				templ_7745c5c3_Var52, templ_7745c5c3_Err = templ.JoinStringErrs(m.DisplayName)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 735, Col: 185}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var52))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 129, "</option>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var52))
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 130, "</select></div><!-- Heuristic Fast-Bypasses --><div class=\"bg-gray-50 p-3 rounded-md border border-gray-200 space-y-2 text-xs\"><div class=\"font-bold text-slate-700 mb-1\">Fast-Bypasses (Force Complex)</div><div class=\"flex items-center justify-between\"><label for=\"force_complex_multimodal\" class=\"text-gray-700\">Multimodal Payloads</label> <input type=\"checkbox\" name=\"force_complex_multimodal\" id=\"force_complex_multimodal\" value=\"true\" class=\"h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 129, "</textarea></div></div></div><!-- Action Buttons --><div class=\"mt-6 sm:mt-4 sm:flex sm:flex-row-reverse gap-3 border-t border-gray-200 pt-4\"><button type=\"submit\" class=\"inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:w-auto transition\">Save Settings</button> <button type=\"button\" onclick=\"document.querySelectorAll('[data-edit-row]').forEach(r => r.classList.remove('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30')); document.getElementById('edit-complexity-modal').remove()\" class=\"mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto transition\">Cancel</button></div></form></div></div>")
+		if app.Complexity.ForceComplexMultimodal {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 131, " checked")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 132, "></div><div class=\"flex items-center justify-between border-t border-slate-200 pt-1\"><label for=\"force_complex_tools\" class=\"text-gray-700\">Tools / Function Calls</label> <input type=\"checkbox\" name=\"force_complex_tools\" id=\"force_complex_tools\" value=\"true\" class=\"h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if app.Complexity.ForceComplexTools {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 133, " checked")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 134, "></div></div></div><!-- Heuristics: Static Limits --><div class=\"grid grid-cols-2 gap-4 border-t border-gray-100 pt-3\"><div><label for=\"simple_char_limit\" class=\"block text-xs font-medium text-gray-700\">Simple Text Max Length (characters)</label> <input type=\"number\" name=\"simple_char_limit\" id=\"simple_char_limit\" required value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var53 string
+		templ_7745c5c3_Var53, templ_7745c5c3_Err = templ.ResolveAttributeValue(intToString(app.Complexity.SimpleCharLimit))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 778, Col: 64}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var53)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 135, "\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono\"></div><div><label for=\"medium_char_limit\" class=\"block text-xs font-medium text-gray-700\">Medium Text Max Length (characters)</label> <input type=\"number\" name=\"medium_char_limit\" id=\"medium_char_limit\" required value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var54 string
+		templ_7745c5c3_Var54, templ_7745c5c3_Err = templ.ResolveAttributeValue(intToString(app.Complexity.MediumCharLimit))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 789, Col: 64}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var54)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 136, "\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-1.5 text-xs font-mono\"></div></div><!-- Additional Classifier Instructions --><div class=\"border-t border-gray-100 pt-3\"><label for=\"additional_instructions\" class=\"block text-xs font-bold text-gray-900 uppercase tracking-wider\">Additional Classification Guidelines</label> <span class=\"block text-[11px] text-gray-500 mb-2\">Specify app-specific context or rules to append to the semantic classifier prompt (e.g., \"always classify code snippets as complex\").</span> <textarea name=\"additional_instructions\" id=\"additional_instructions\" rows=\"3\" placeholder=\"Enter any custom guidelines or semantic classification rules...\" class=\"mt-1 block w-full rounded-md border-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 p-2 text-xs font-mono focus:border-blue-500 focus:ring-blue-500 w-full\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var55 string
+		templ_7745c5c3_Var55, templ_7745c5c3_Err = templ.JoinStringErrs(app.Complexity.AdditionalInstructions)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 805, Col: 51}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var55))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 137, "</textarea></div></div></div><!-- Action Buttons --><div class=\"mt-6 sm:mt-4 sm:flex sm:flex-row-reverse gap-3 border-t border-gray-200 pt-4\"><button type=\"submit\" class=\"inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:w-auto transition\">Save Settings</button> <button type=\"button\" onclick=\"document.querySelectorAll('[data-edit-row]').forEach(r => r.classList.remove('bg-blue-50/70', 'ring-1', 'ring-inset', 'ring-blue-500/30')); document.getElementById('edit-complexity-modal').remove()\" class=\"mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto transition\">Cancel</button></div></form></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1135,237 +1199,239 @@ func ComplexityInspectResult(res decision.DecisionResult) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var53 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var53 == nil {
-			templ_7745c5c3_Var53 = templ.NopComponent
+		templ_7745c5c3_Var56 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var56 == nil {
+			templ_7745c5c3_Var56 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 130, "<div class=\"mt-4 p-4 rounded-lg border border-gray-200 bg-gray-50/70 space-y-4\"><!-- Summary Header Badges --><div class=\"flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 pb-3\"><div class=\"flex items-center gap-2\"><span class=\"text-xs font-semibold text-gray-500 uppercase tracking-wider\">Target Model:</span> <span class=\"inline-flex items-center rounded-md bg-purple-50 px-2.5 py-1 text-xs font-bold text-purple-700 ring-1 ring-inset ring-purple-700/20 font-mono\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 138, "<div class=\"mt-4 p-4 rounded-lg border border-gray-200 bg-gray-50/70 space-y-4\"><!-- Summary Header Badges --><div class=\"flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 pb-3\"><div class=\"flex items-center gap-2\"><span class=\"text-xs font-semibold text-gray-500 uppercase tracking-wider\">Target Model:</span> <span class=\"inline-flex items-center rounded-md bg-purple-50 px-2.5 py-1 text-xs font-bold text-purple-700 ring-1 ring-inset ring-purple-700/20 font-mono\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var54 string
-		templ_7745c5c3_Var54, templ_7745c5c3_Err = templ.JoinStringErrs(res.TargetModel)
+		var templ_7745c5c3_Var57 string
+		templ_7745c5c3_Var57, templ_7745c5c3_Err = templ.JoinStringErrs(res.TargetModel)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 823, Col: 22}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 835, Col: 22}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var54))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var57))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 131, "</span></div><div class=\"flex items-center gap-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 139, "</span></div><div class=\"flex items-center gap-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if res.Tier == "simple" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 132, "<span class=\"inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20\">Tier: Simple</span> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 140, "<span class=\"inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20\">Tier: Simple</span> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else if res.Tier == "medium" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 133, "<span class=\"inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-600/20\">Tier: Medium</span> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 141, "<span class=\"inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-600/20\">Tier: Medium</span> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 134, "<span class=\"inline-flex items-center rounded-full bg-purple-50 px-2.5 py-0.5 text-xs font-semibold text-purple-700 ring-1 ring-inset ring-purple-600/20\">Tier: Complex</span> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 142, "<span class=\"inline-flex items-center rounded-full bg-purple-50 px-2.5 py-0.5 text-xs font-semibold text-purple-700 ring-1 ring-inset ring-purple-600/20\">Tier: Complex</span> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 135, "<span class=\"text-xs font-mono text-slate-600\">Engine: ")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var55 string
-		templ_7745c5c3_Var55, templ_7745c5c3_Err = templ.JoinStringErrs(res.Engine)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 835, Col: 25}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var55))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 136, "</span> <span class=\"text-xs font-mono text-slate-600\">Conf: ")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var56 string
-		templ_7745c5c3_Var56, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%.1f%%", res.Confidence*100))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 838, Col: 56}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var56))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 137, "</span> ")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		if res.LocalEligibleProb > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 138, "<span class=\"text-xs font-mono text-emerald-700\">Local Eligible: ")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var57 string
-			templ_7745c5c3_Var57, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%.1f%%", res.LocalEligibleProb*100))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 842, Col: 74}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var57))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 139, "</span>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 140, "</div></div><!-- Explainable Rationale --><div><h4 class=\"text-xs font-semibold text-gray-800 uppercase tracking-wider mb-1\">Decision Rationale</h4><p class=\"text-xs text-gray-700 bg-white p-3 rounded border border-gray-200 leading-relaxed font-sans\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 143, "<span class=\"text-xs font-mono text-slate-600\">Engine: ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var58 string
-		templ_7745c5c3_Var58, templ_7745c5c3_Err = templ.JoinStringErrs(res.Rationale)
+		templ_7745c5c3_Var58, templ_7745c5c3_Err = templ.JoinStringErrs(res.Engine)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 852, Col: 19}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 847, Col: 25}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var58))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 141, "</p></div><!-- Extracted Prompt Features Grid --><div><h4 class=\"text-xs font-semibold text-gray-800 uppercase tracking-wider mb-2\">Extracted Feature Signals</h4><div class=\"grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs\"><div class=\"bg-white p-2.5 rounded border border-gray-200\"><span class=\"text-gray-400 block text-[10px] uppercase\">Length / Words</span> <span class=\"font-semibold text-gray-800\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 144, "</span> <span class=\"text-xs font-mono text-slate-600\">Conf: ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var59 string
-		templ_7745c5c3_Var59, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d chars / %d words", res.Features.Length, res.Features.WordCount))
+		templ_7745c5c3_Var59, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%.1f%%", res.Confidence*100))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 862, Col: 128}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 850, Col: 56}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var59))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 142, "</span></div><div class=\"bg-white p-2.5 rounded border border-gray-200\"><span class=\"text-gray-400 block text-[10px] uppercase\">Code Syntax</span> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 145, "</span> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if res.Features.HasCode {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 143, "<span class=\"font-semibold text-emerald-600\">")
+		if res.LocalEligibleProb > 0 {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 146, "<span class=\"text-xs font-mono text-emerald-700\">Local Eligible: ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var60 string
-			templ_7745c5c3_Var60, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("Yes (%d lines, %.0f%%)", res.Features.CodeLines, res.Features.CodeRatio*100))
+			templ_7745c5c3_Var60, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%.1f%%", res.LocalEligibleProb*100))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 867, Col: 142}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 854, Col: 74}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var60))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 144, "</span>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 145, "<span class=\"font-semibold text-gray-500\">None detected</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 147, "</span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 146, "</div><div class=\"bg-white p-2.5 rounded border border-gray-200\"><span class=\"text-gray-400 block text-[10px] uppercase\">Math / Algorithm</span> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 148, "</div></div><!-- Explainable Rationale --><div><h4 class=\"text-xs font-semibold text-gray-800 uppercase tracking-wider mb-1\">Decision Rationale</h4><p class=\"text-xs text-gray-700 bg-white p-3 rounded border border-gray-200 leading-relaxed font-sans\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var61 string
+		templ_7745c5c3_Var61, templ_7745c5c3_Err = templ.JoinStringErrs(res.Rationale)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 864, Col: 19}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var61))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 149, "</p></div><!-- Extracted Prompt Features Grid --><div><h4 class=\"text-xs font-semibold text-gray-800 uppercase tracking-wider mb-2\">Extracted Feature Signals</h4><div class=\"grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs\"><div class=\"bg-white p-2.5 rounded border border-gray-200\"><span class=\"text-gray-400 block text-[10px] uppercase\">Length / Words</span> <span class=\"font-semibold text-gray-800\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var62 string
+		templ_7745c5c3_Var62, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d chars / %d words", res.Features.Length, res.Features.WordCount))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 874, Col: 128}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var62))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 150, "</span></div><div class=\"bg-white p-2.5 rounded border border-gray-200\"><span class=\"text-gray-400 block text-[10px] uppercase\">Code Syntax</span> ")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if res.Features.HasCode {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 151, "<span class=\"font-semibold text-emerald-600\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var63 string
+			templ_7745c5c3_Var63, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("Yes (%d lines, %.0f%%)", res.Features.CodeLines, res.Features.CodeRatio*100))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 879, Col: 142}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var63))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 152, "</span>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 153, "<span class=\"font-semibold text-gray-500\">None detected</span>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 154, "</div><div class=\"bg-white p-2.5 rounded border border-gray-200\"><span class=\"text-gray-400 block text-[10px] uppercase\">Math / Algorithm</span> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if res.Features.HasMath {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 147, "<span class=\"font-semibold text-purple-600\">Yes (Formulas/O-notation)</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 155, "<span class=\"font-semibold text-purple-600\">Yes (Formulas/O-notation)</span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 148, "<span class=\"font-semibold text-gray-500\">None detected</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 156, "<span class=\"font-semibold text-gray-500\">None detected</span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 149, "</div><div class=\"bg-white p-2.5 rounded border border-gray-200\"><span class=\"text-gray-400 block text-[10px] uppercase\">Task Context</span> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 157, "</div><div class=\"bg-white p-2.5 rounded border border-gray-200\"><span class=\"text-gray-400 block text-[10px] uppercase\">Task Context</span> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if res.Features.ExtractedTask != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 150, "<span class=\"font-semibold text-blue-600 font-mono\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 158, "<span class=\"font-semibold text-blue-600 font-mono\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var61 string
-			templ_7745c5c3_Var61, templ_7745c5c3_Err = templ.JoinStringErrs(res.Features.ExtractedTask)
+			var templ_7745c5c3_Var64 string
+			templ_7745c5c3_Var64, templ_7745c5c3_Err = templ.JoinStringErrs(res.Features.ExtractedTask)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 883, Col: 86}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 895, Col: 86}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var61))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var64))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 151, "</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 159, "</span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 152, "<span class=\"font-semibold text-gray-500\">General</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 160, "<span class=\"font-semibold text-gray-500\">General</span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 153, "</div></div></div><!-- Scores Breakdown (if present) -->")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 161, "</div></div></div><!-- Scores Breakdown (if present) -->")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if len(res.Scores) > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 154, "<div><h4 class=\"text-xs font-semibold text-gray-800 uppercase tracking-wider mb-1\">Tier Scores</h4><div class=\"flex flex-wrap gap-2\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 162, "<div><h4 class=\"text-xs font-semibold text-gray-800 uppercase tracking-wider mb-1\">Calibrated Tier Probabilities / Scores</h4><div class=\"flex flex-wrap gap-2\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			for tier, score := range res.Scores {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 155, "<span class=\"inline-flex items-center gap-1 bg-white px-2.5 py-1 rounded border border-gray-200 text-xs font-mono text-gray-700\"><span class=\"font-semibold\">")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				var templ_7745c5c3_Var62 string
-				templ_7745c5c3_Var62, templ_7745c5c3_Err = templ.JoinStringErrs(tier)
-				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 898, Col: 41}
-				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var62))
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 156, ":</span> ")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				var templ_7745c5c3_Var63 string
-				templ_7745c5c3_Var63, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%.3f", score))
-				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 898, Col: 80}
-				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var63))
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 157, "</span>")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
+			for _, tier := range []string{"simple", "medium", "complex"} {
+				if score, ok := res.Scores[tier]; ok {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 163, "<span class=\"inline-flex items-center gap-1 bg-white px-2.5 py-1 rounded border border-gray-200 text-xs font-mono text-gray-700\"><span class=\"font-semibold\">")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var65 string
+					templ_7745c5c3_Var65, templ_7745c5c3_Err = templ.JoinStringErrs(tier)
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 911, Col: 42}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var65))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 164, ":</span> ")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var66 string
+					templ_7745c5c3_Var66, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%.3f", score))
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `frontend/dashboard/templates/complexity.templ`, Line: 911, Col: 81}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var66))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 165, "</span>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 158, "</div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 166, "</div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 159, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 167, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
