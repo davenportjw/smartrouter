@@ -57,8 +57,8 @@ We model traffic around a hierarchy: **Client -> App -> APIKey**.
 - **APIKey / OIDC Service Account**: Access credentials mapped directly to a specific `App`.
 - *How to use*: To access client and app constraints, query `rp.Store.LookupApp(appID)` and `rp.Store.LookupClient(clientID)`.
 
-### B. Crisp Slate & Cobalt 2–3 Panel Dashboard & Never-Mock Policy
-- **3-Panel Layout**: Left Sidebar (`#0F172A` Slate-900) for core domain navigation, Center Workspace (`#F8FAFC` Slate-50 canvas, `#FFFFFF` cards) with compact Intent Pills, and Right Expandable Contextual Drawer (`id="context-drawer"`) for live documentation and curl snippets using dynamic `ProxyURL()`.
+### B. Crisp Slate & Cobalt Admin UI & Never-Mock Policy
+- **Dashboard Layout**: Left Sidebar (`#0F172A` Slate-900) for domain navigation, primary Center Workspace (`#F8FAFC` Slate-50 canvas, `#FFFFFF` surfaces), and collapsible Contextual Drawer (`id="context-drawer"`) for live documentation and curl snippets using dynamic `ProxyURL()`.
 - **Strict Never-Mock Directive**: Never introduce synthetic telemetry (`generateMockMetrics`, `generateMockCosts`), `math/rand` fake numbers, or simulation toggles (`ToggleSimulation`) in dashboard or API handlers. Always query real backend endpoints and surface explicit empty states or error alerts (`FormErrorAlert`).
 
 ### C. Local JSON Database Mode (`LOCAL_DEV`)

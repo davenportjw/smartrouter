@@ -35,7 +35,7 @@ Before you write any code or create configuration schemas, keep these rules in m
 
 ### 3. Reusing Design Patterns & UI Architecture
 - **App-Centric Architecture**: Ensure priority, RPM, and TPM rate limits are mapped to an **App** (inheriting fallback limits from the parent **Client** when unspecified).
-- **Crisp Slate & Cobalt 2–3 Panel UI**: Keep the admin dashboard aligned with the 3-panel layout (Left core domain navigation, Center workspace with compact Intent Pills, and Right expandable Contextual Docs & Quick Reference drawer) with dynamic `PROXY_PUBLIC_URL` endpoint injection.
+- **Crisp Slate & Cobalt Admin UI**: Keep the admin dashboard clean and Workspace-tight (Left domain navigation, primary Center workspace, and collapsible Contextual Docs & Quick Reference drawer) with dynamic `PROXY_PUBLIC_URL` endpoint injection.
 - **Local Development (`LOCAL_DEV`)**: Use `LOCAL_DEV=true` with local data `data/local_db.json` when writing local tests or spinning up the proxy locally.
 - **Declarative Custom Headers**: Use `CustomHeader` configuration definitions instead of manually parsing and validating specific headers in Go code.
 
